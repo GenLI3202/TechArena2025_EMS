@@ -1,0 +1,342 @@
+{"timestamp": "2024-01-01 00:00:00", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 00:15:00", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 00:30:00.001000", "country": "AT", "price_eur_mwh": 0.48, "source": "day_ahead"}
+{"timestamp": "2024-01-01 00:45:00.001000", "country": "AT", "price_eur_mwh": -3.64, "source": "day_ahead"}
+{"timestamp": "2024-01-01 01:00:00.001000", "country": "AT", "price_eur_mwh": 17.74, "source": "day_ahead"}
+{"timestamp": "2024-01-01 01:15:00.001000", "country": "AT", "price_eur_mwh": 14.94, "source": "day_ahead"}
+{"timestamp": "2024-01-01 01:30:00.002000", "country": "AT", "price_eur_mwh": -2.74, "source": "day_ahead"}
+{"timestamp": "2024-01-01 01:45:00.002000", "country": "AT", "price_eur_mwh": -14.91, "source": "day_ahead"}
+{"timestamp": "2024-01-01 02:00:00.002000", "country": "AT", "price_eur_mwh": 15.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 02:15:00.003000", "country": "AT", "price_eur_mwh": 9.98, "source": "day_ahead"}
+{"timestamp": "2024-01-01 02:30:00.003000", "country": "AT", "price_eur_mwh": -2.69, "source": "day_ahead"}
+{"timestamp": "2024-01-01 02:45:00.003000", "country": "AT", "price_eur_mwh": -10.92, "source": "day_ahead"}
+{"timestamp": "2024-01-01 03:00:00.003000", "country": "AT", "price_eur_mwh": 9.98, "source": "day_ahead"}
+{"timestamp": "2024-01-01 03:15:00.004000", "country": "AT", "price_eur_mwh": 4.93, "source": "day_ahead"}
+{"timestamp": "2024-01-01 03:30:00.004000", "country": "AT", "price_eur_mwh": -0.2, "source": "day_ahead"}
+{"timestamp": "2024-01-01 03:45:00.004000", "country": "AT", "price_eur_mwh": -5.23, "source": "day_ahead"}
+{"timestamp": "2024-01-01 04:00:00.005000", "country": "AT", "price_eur_mwh": -4.64, "source": "day_ahead"}
+{"timestamp": "2024-01-01 04:15:00.005000", "country": "AT", "price_eur_mwh": -1.28, "source": "day_ahead"}
+{"timestamp": "2024-01-01 04:30:00.005000", "country": "AT", "price_eur_mwh": 4.93, "source": "day_ahead"}
+{"timestamp": "2024-01-01 04:45:00.005000", "country": "AT", "price_eur_mwh": 9.98, "source": "day_ahead"}
+{"timestamp": "2024-01-01 05:00:00.006000", "country": "AT", "price_eur_mwh": -9.93, "source": "day_ahead"}
+{"timestamp": "2024-01-01 05:15:00.006000", "country": "AT", "price_eur_mwh": -5.85, "source": "day_ahead"}
+{"timestamp": "2024-01-01 05:30:00.006000", "country": "AT", "price_eur_mwh": -4.58, "source": "day_ahead"}
+{"timestamp": "2024-01-01 05:45:00.007000", "country": "AT", "price_eur_mwh": 8.36, "source": "day_ahead"}
+{"timestamp": "2024-01-01 06:00:00.007000", "country": "AT", "price_eur_mwh": -17.22, "source": "day_ahead"}
+{"timestamp": "2024-01-01 06:15:00.007000", "country": "AT", "price_eur_mwh": -10.92, "source": "day_ahead"}
+{"timestamp": "2024-01-01 06:30:00.007000", "country": "AT", "price_eur_mwh": -5.76, "source": "day_ahead"}
+{"timestamp": "2024-01-01 06:45:00.008000", "country": "AT", "price_eur_mwh": 15.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 07:00:00.008000", "country": "AT", "price_eur_mwh": -21.52, "source": "day_ahead"}
+{"timestamp": "2024-01-01 07:15:00.008000", "country": "AT", "price_eur_mwh": -4.93, "source": "day_ahead"}
+{"timestamp": "2024-01-01 07:30:00.009000", "country": "AT", "price_eur_mwh": 15.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 07:45:00.009000", "country": "AT", "price_eur_mwh": 31.36, "source": "day_ahead"}
+{"timestamp": "2024-01-01 08:00:00.009000", "country": "AT", "price_eur_mwh": -16.69, "source": "day_ahead"}
+{"timestamp": "2024-01-01 08:15:00.010000", "country": "AT", "price_eur_mwh": -1.64, "source": "day_ahead"}
+{"timestamp": "2024-01-01 08:30:00.010000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 08:45:00.010000", "country": "AT", "price_eur_mwh": 17.52, "source": "day_ahead"}
+{"timestamp": "2024-01-01 09:00:00.010000", "country": "AT", "price_eur_mwh": 4.59, "source": "day_ahead"}
+{"timestamp": "2024-01-01 09:15:00.011000", "country": "AT", "price_eur_mwh": 3.71, "source": "day_ahead"}
+{"timestamp": "2024-01-01 09:30:00.011000", "country": "AT", "price_eur_mwh": 10.01, "source": "day_ahead"}
+{"timestamp": "2024-01-01 09:45:00.011000", "country": "AT", "price_eur_mwh": 1.7, "source": "day_ahead"}
+{"timestamp": "2024-01-01 10:00:00.012000", "country": "AT", "price_eur_mwh": 12.77, "source": "day_ahead"}
+{"timestamp": "2024-01-01 10:15:00.012000", "country": "AT", "price_eur_mwh": 5.27, "source": "day_ahead"}
+{"timestamp": "2024-01-01 10:30:00.012000", "country": "AT", "price_eur_mwh": 0.55, "source": "day_ahead"}
+{"timestamp": "2024-01-01 10:45:00.012000", "country": "AT", "price_eur_mwh": -9.97, "source": "day_ahead"}
+{"timestamp": "2024-01-01 11:00:00.013000", "country": "AT", "price_eur_mwh": 15.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 11:15:00.013000", "country": "AT", "price_eur_mwh": 3.93, "source": "day_ahead"}
+{"timestamp": "2024-01-01 11:30:00.013000", "country": "AT", "price_eur_mwh": -10.92, "source": "day_ahead"}
+{"timestamp": "2024-01-01 11:45:00.014000", "country": "AT", "price_eur_mwh": -10.92, "source": "day_ahead"}
+{"timestamp": "2024-01-01 12:00:00.014000", "country": "AT", "price_eur_mwh": 15.04, "source": "day_ahead"}
+{"timestamp": "2024-01-01 12:15:00.014000", "country": "AT", "price_eur_mwh": 3.98, "source": "day_ahead"}
+{"timestamp": "2024-01-01 12:30:00.014000", "country": "AT", "price_eur_mwh": -10.92, "source": "day_ahead"}
+{"timestamp": "2024-01-01 12:45:00.015000", "country": "AT", "price_eur_mwh": -12.4, "source": "day_ahead"}
+{"timestamp": "2024-01-01 13:00:00.015000", "country": "AT", "price_eur_mwh": -10.92, "source": "day_ahead"}
+{"timestamp": "2024-01-01 13:15:00.015000", "country": "AT", "price_eur_mwh": 2.52, "source": "day_ahead"}
+{"timestamp": "2024-01-01 13:30:00.016000", "country": "AT", "price_eur_mwh": -4.47, "source": "day_ahead"}
+{"timestamp": "2024-01-01 13:45:00.016000", "country": "AT", "price_eur_mwh": 5.04, "source": "day_ahead"}
+{"timestamp": "2024-01-01 14:00:00.016000", "country": "AT", "price_eur_mwh": -4.06, "source": "day_ahead"}
+{"timestamp": "2024-01-01 14:15:00.016000", "country": "AT", "price_eur_mwh": 7.94, "source": "day_ahead"}
+{"timestamp": "2024-01-01 14:30:00.017000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 14:45:00.017000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 15:00:00.017000", "country": "AT", "price_eur_mwh": 12.45, "source": "day_ahead"}
+{"timestamp": "2024-01-01 15:15:00.018000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 15:30:00.018000", "country": "AT", "price_eur_mwh": 15.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 15:45:00.018000", "country": "AT", "price_eur_mwh": 49.57, "source": "day_ahead"}
+{"timestamp": "2024-01-01 16:00:00.018000", "country": "AT", "price_eur_mwh": 10.25, "source": "day_ahead"}
+{"timestamp": "2024-01-01 16:15:00.019000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 16:30:00.019000", "country": "AT", "price_eur_mwh": 15.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 16:45:00.019000", "country": "AT", "price_eur_mwh": 56.55, "source": "day_ahead"}
+{"timestamp": "2024-01-01 17:00:00.020000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 17:15:00.020000", "country": "AT", "price_eur_mwh": 20.06, "source": "day_ahead"}
+{"timestamp": "2024-01-01 17:30:00.020000", "country": "AT", "price_eur_mwh": 23.18, "source": "day_ahead"}
+{"timestamp": "2024-01-01 17:45:00.020000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 18:00:00.021000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 18:15:00.021000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 18:30:00.021000", "country": "AT", "price_eur_mwh": 16.26, "source": "day_ahead"}
+{"timestamp": "2024-01-01 18:45:00.022000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 19:00:00.022000", "country": "AT", "price_eur_mwh": 40.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 19:15:00.022000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 19:30:00.022000", "country": "AT", "price_eur_mwh": 21.56, "source": "day_ahead"}
+{"timestamp": "2024-01-01 19:45:00.023000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 20:00:00.023000", "country": "AT", "price_eur_mwh": 55.07, "source": "day_ahead"}
+{"timestamp": "2024-01-01 20:15:00.023000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 20:30:00.024000", "country": "AT", "price_eur_mwh": 15.29, "source": "day_ahead"}
+{"timestamp": "2024-01-01 20:45:00.024000", "country": "AT", "price_eur_mwh": 10.56, "source": "day_ahead"}
+{"timestamp": "2024-01-01 21:00:00.024000", "country": "AT", "price_eur_mwh": 57.41, "source": "day_ahead"}
+{"timestamp": "2024-01-01 21:15:00.024000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 21:30:00.025000", "country": "AT", "price_eur_mwh": 27.55, "source": "day_ahead"}
+{"timestamp": "2024-01-01 21:45:00.025000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 22:00:00.025000", "country": "AT", "price_eur_mwh": 42.58, "source": "day_ahead"}
+{"timestamp": "2024-01-01 22:15:00.026000", "country": "AT", "price_eur_mwh": 49.94, "source": "day_ahead"}
+{"timestamp": "2024-01-01 22:30:00.026000", "country": "AT", "price_eur_mwh": 30.09, "source": "day_ahead"}
+{"timestamp": "2024-01-01 22:45:00.026000", "country": "AT", "price_eur_mwh": 21.39, "source": "day_ahead"}
+{"timestamp": "2024-01-01 23:00:00.026000", "country": "AT", "price_eur_mwh": 65.07, "source": "day_ahead"}
+{"timestamp": "2024-01-01 23:15:00.027000", "country": "AT", "price_eur_mwh": 39.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 23:30:00.027000", "country": "AT", "price_eur_mwh": 14.08, "source": "day_ahead"}
+{"timestamp": "2024-01-01 23:45:00.027000", "country": "AT", "price_eur_mwh": 10.58, "source": "day_ahead"}
+{"timestamp": "2024-01-02 00:00:00.028000", "country": "AT", "price_eur_mwh": 66.62, "source": "day_ahead"}
+{"timestamp": "2024-01-02 00:15:00.028000", "country": "AT", "price_eur_mwh": 49.94, "source": "day_ahead"}
+{"timestamp": "2024-01-02 00:30:00.028000", "country": "AT", "price_eur_mwh": 32.8, "source": "day_ahead"}
+{"timestamp": "2024-01-02 00:45:00.029000", "country": "AT", "price_eur_mwh": 20.06, "source": "day_ahead"}
+{"timestamp": "2024-01-02 01:00:00.029000", "country": "AT", "price_eur_mwh": 59.98, "source": "day_ahead"}
+{"timestamp": "2024-01-02 01:15:00.029000", "country": "AT", "price_eur_mwh": 52.41, "source": "day_ahead"}
+{"timestamp": "2024-01-02 01:30:00.029000", "country": "AT", "price_eur_mwh": 32.59, "source": "day_ahead"}
+{"timestamp": "2024-01-02 01:45:00.030000", "country": "AT", "price_eur_mwh": 11.52, "source": "day_ahead"}
+{"timestamp": "2024-01-02 02:00:00.030000", "country": "AT", "price_eur_mwh": 49.94, "source": "day_ahead"}
+{"timestamp": "2024-01-02 02:15:00.030000", "country": "AT", "price_eur_mwh": 44.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 02:30:00.031000", "country": "AT", "price_eur_mwh": 37.42, "source": "day_ahead"}
+{"timestamp": "2024-01-02 02:45:00.031000", "country": "AT", "price_eur_mwh": 22.92, "source": "day_ahead"}
+{"timestamp": "2024-01-02 03:00:00.031000", "country": "AT", "price_eur_mwh": 42.41, "source": "day_ahead"}
+{"timestamp": "2024-01-02 03:15:00.031000", "country": "AT", "price_eur_mwh": 39.54, "source": "day_ahead"}
+{"timestamp": "2024-01-02 03:30:00.032000", "country": "AT", "price_eur_mwh": 37.41, "source": "day_ahead"}
+{"timestamp": "2024-01-02 03:45:00.032000", "country": "AT", "price_eur_mwh": 37.46, "source": "day_ahead"}
+{"timestamp": "2024-01-02 04:00:00.032000", "country": "AT", "price_eur_mwh": 20.06, "source": "day_ahead"}
+{"timestamp": "2024-01-02 04:15:00.033000", "country": "AT", "price_eur_mwh": 33.91, "source": "day_ahead"}
+{"timestamp": "2024-01-02 04:30:00.033000", "country": "AT", "price_eur_mwh": 44.91, "source": "day_ahead"}
+{"timestamp": "2024-01-02 04:45:00.033000", "country": "AT", "price_eur_mwh": 65.12, "source": "day_ahead"}
+{"timestamp": "2024-01-02 05:00:00.033000", "country": "AT", "price_eur_mwh": 9.73, "source": "day_ahead"}
+{"timestamp": "2024-01-02 05:15:00.034000", "country": "AT", "price_eur_mwh": 47.96, "source": "day_ahead"}
+{"timestamp": "2024-01-02 05:30:00.034000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 05:45:00.034000", "country": "AT", "price_eur_mwh": 72.45, "source": "day_ahead"}
+{"timestamp": "2024-01-02 06:00:00.035000", "country": "AT", "price_eur_mwh": 11.08, "source": "day_ahead"}
+{"timestamp": "2024-01-02 06:15:00.035000", "country": "AT", "price_eur_mwh": 67.39, "source": "day_ahead"}
+{"timestamp": "2024-01-02 06:30:00.035000", "country": "AT", "price_eur_mwh": 77.37, "source": "day_ahead"}
+{"timestamp": "2024-01-02 06:45:00.035000", "country": "AT", "price_eur_mwh": 97.36, "source": "day_ahead"}
+{"timestamp": "2024-01-02 07:00:00.036000", "country": "AT", "price_eur_mwh": 30.49, "source": "day_ahead"}
+{"timestamp": "2024-01-02 07:15:00.036000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 07:30:00.036000", "country": "AT", "price_eur_mwh": 87.4, "source": "day_ahead"}
+{"timestamp": "2024-01-02 07:45:00.037000", "country": "AT", "price_eur_mwh": 112.85, "source": "day_ahead"}
+{"timestamp": "2024-01-02 08:00:00.037000", "country": "AT", "price_eur_mwh": 63.48, "source": "day_ahead"}
+{"timestamp": "2024-01-02 08:15:00.037000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 08:30:00.037000", "country": "AT", "price_eur_mwh": 70.62, "source": "day_ahead"}
+{"timestamp": "2024-01-02 08:45:00.038000", "country": "AT", "price_eur_mwh": 79.37, "source": "day_ahead"}
+{"timestamp": "2024-01-02 09:00:00.038000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 09:15:00.038000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 09:30:00.039000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 09:45:00.039000", "country": "AT", "price_eur_mwh": 70.62, "source": "day_ahead"}
+{"timestamp": "2024-01-02 10:00:00.039000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 10:15:00.039000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 10:30:00.040000", "country": "AT", "price_eur_mwh": 69.44, "source": "day_ahead"}
+{"timestamp": "2024-01-02 10:45:00.040000", "country": "AT", "price_eur_mwh": 65.94, "source": "day_ahead"}
+{"timestamp": "2024-01-02 11:00:00.040000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 11:15:00.041000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 11:30:00.041000", "country": "AT", "price_eur_mwh": 64.9, "source": "day_ahead"}
+{"timestamp": "2024-01-02 11:45:00.041000", "country": "AT", "price_eur_mwh": 55.75, "source": "day_ahead"}
+{"timestamp": "2024-01-02 12:00:00.041000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 12:15:00.042000", "country": "AT", "price_eur_mwh": 64.12, "source": "day_ahead"}
+{"timestamp": "2024-01-02 12:30:00.042000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 12:45:00.042000", "country": "AT", "price_eur_mwh": 50.12, "source": "day_ahead"}
+{"timestamp": "2024-01-02 13:00:00.043000", "country": "AT", "price_eur_mwh": 64.13, "source": "day_ahead"}
+{"timestamp": "2024-01-02 13:15:00.043000", "country": "AT", "price_eur_mwh": 63.88, "source": "day_ahead"}
+{"timestamp": "2024-01-02 13:30:00.043000", "country": "AT", "price_eur_mwh": 63.13, "source": "day_ahead"}
+{"timestamp": "2024-01-02 13:45:00.043000", "country": "AT", "price_eur_mwh": 52.45, "source": "day_ahead"}
+{"timestamp": "2024-01-02 14:00:00.044000", "country": "AT", "price_eur_mwh": 58.06, "source": "day_ahead"}
+{"timestamp": "2024-01-02 14:15:00.044000", "country": "AT", "price_eur_mwh": 59.93, "source": "day_ahead"}
+{"timestamp": "2024-01-02 14:30:00.044000", "country": "AT", "price_eur_mwh": 61.81, "source": "day_ahead"}
+{"timestamp": "2024-01-02 14:45:00.045000", "country": "AT", "price_eur_mwh": 65.06, "source": "day_ahead"}
+{"timestamp": "2024-01-02 15:00:00.045000", "country": "AT", "price_eur_mwh": 59.99, "source": "day_ahead"}
+{"timestamp": "2024-01-02 15:15:00.045000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 15:30:00.046000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 15:45:00.046000", "country": "AT", "price_eur_mwh": 72.44, "source": "day_ahead"}
+{"timestamp": "2024-01-02 16:00:00.046000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 16:15:00.046000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 16:30:00.047000", "country": "AT", "price_eur_mwh": 69.78, "source": "day_ahead"}
+{"timestamp": "2024-01-02 16:45:00.047000", "country": "AT", "price_eur_mwh": 89.99, "source": "day_ahead"}
+{"timestamp": "2024-01-02 17:00:00.047000", "country": "AT", "price_eur_mwh": 92.02, "source": "day_ahead"}
+{"timestamp": "2024-01-02 17:15:00.048000", "country": "AT", "price_eur_mwh": 94.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 17:30:00.048000", "country": "AT", "price_eur_mwh": 69.99, "source": "day_ahead"}
+{"timestamp": "2024-01-02 17:45:00.048000", "country": "AT", "price_eur_mwh": 69.98, "source": "day_ahead"}
+{"timestamp": "2024-01-02 18:00:00.048000", "country": "AT", "price_eur_mwh": 103.88, "source": "day_ahead"}
+{"timestamp": "2024-01-02 18:15:00.049000", "country": "AT", "price_eur_mwh": 92.44, "source": "day_ahead"}
+{"timestamp": "2024-01-02 18:30:00.049000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 18:45:00.049000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 19:00:00.050000", "country": "AT", "price_eur_mwh": 115.05, "source": "day_ahead"}
+{"timestamp": "2024-01-02 19:15:00.050000", "country": "AT", "price_eur_mwh": 79.95, "source": "day_ahead"}
+{"timestamp": "2024-01-02 19:30:00.050000", "country": "AT", "price_eur_mwh": 67.41, "source": "day_ahead"}
+{"timestamp": "2024-01-02 19:45:00.050000", "country": "AT", "price_eur_mwh": 37.54, "source": "day_ahead"}
+{"timestamp": "2024-01-02 20:00:00.051000", "country": "AT", "price_eur_mwh": 104.97, "source": "day_ahead"}
+{"timestamp": "2024-01-02 20:15:00.051000", "country": "AT", "price_eur_mwh": 72.48, "source": "day_ahead"}
+{"timestamp": "2024-01-02 20:30:00.051000", "country": "AT", "price_eur_mwh": 65.09, "source": "day_ahead"}
+{"timestamp": "2024-01-02 20:45:00.052000", "country": "AT", "price_eur_mwh": 38.07, "source": "day_ahead"}
+{"timestamp": "2024-01-02 21:00:00.052000", "country": "AT", "price_eur_mwh": 89.35, "source": "day_ahead"}
+{"timestamp": "2024-01-02 21:15:00.052000", "country": "AT", "price_eur_mwh": 70.62, "source": "day_ahead"}
+{"timestamp": "2024-01-02 21:30:00.052000", "country": "AT", "price_eur_mwh": 52.42, "source": "day_ahead"}
+{"timestamp": "2024-01-02 21:45:00.053000", "country": "AT", "price_eur_mwh": 25.09, "source": "day_ahead"}
+{"timestamp": "2024-01-02 22:00:00.053000", "country": "AT", "price_eur_mwh": 77.04, "source": "day_ahead"}
+{"timestamp": "2024-01-02 22:15:00.053000", "country": "AT", "price_eur_mwh": 74.95, "source": "day_ahead"}
+{"timestamp": "2024-01-02 22:30:00.054000", "country": "AT", "price_eur_mwh": 60.31, "source": "day_ahead"}
+{"timestamp": "2024-01-02 22:45:00.054000", "country": "AT", "price_eur_mwh": 47.45, "source": "day_ahead"}
+{"timestamp": "2024-01-02 23:00:00.054000", "country": "AT", "price_eur_mwh": 72.71, "source": "day_ahead"}
+{"timestamp": "2024-01-02 23:15:00.054000", "country": "AT", "price_eur_mwh": 69.61, "source": "day_ahead"}
+{"timestamp": "2024-01-02 23:30:00.055000", "country": "AT", "price_eur_mwh": 39.97, "source": "day_ahead"}
+{"timestamp": "2024-01-02 23:45:00.055000", "country": "AT", "price_eur_mwh": 21.5, "source": "day_ahead"}
+{"timestamp": "2024-01-03 00:00:00.055000", "country": "AT", "price_eur_mwh": 42.42, "source": "day_ahead"}
+{"timestamp": "2024-01-03 00:15:00.056000", "country": "AT", "price_eur_mwh": 27.48, "source": "day_ahead"}
+{"timestamp": "2024-01-03 00:30:00.056000", "country": "AT", "price_eur_mwh": 12.46, "source": "day_ahead"}
+{"timestamp": "2024-01-03 00:45:00.056000", "country": "AT", "price_eur_mwh": -0.01, "source": "day_ahead"}
+{"timestamp": "2024-01-03 01:00:00.056000", "country": "AT", "price_eur_mwh": 27.68, "source": "day_ahead"}
+{"timestamp": "2024-01-03 01:15:00.057000", "country": "AT", "price_eur_mwh": 19.97, "source": "day_ahead"}
+{"timestamp": "2024-01-03 01:30:00.057000", "country": "AT", "price_eur_mwh": 9.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 01:45:00.057000", "country": "AT", "price_eur_mwh": 4.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 02:00:00.058000", "country": "AT", "price_eur_mwh": 26.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 02:15:00.058000", "country": "AT", "price_eur_mwh": 14.97, "source": "day_ahead"}
+{"timestamp": "2024-01-03 02:30:00.058000", "country": "AT", "price_eur_mwh": 7.49, "source": "day_ahead"}
+{"timestamp": "2024-01-03 02:45:00.058000", "country": "AT", "price_eur_mwh": 5.12, "source": "day_ahead"}
+{"timestamp": "2024-01-03 03:00:00.059000", "country": "AT", "price_eur_mwh": 32.23, "source": "day_ahead"}
+{"timestamp": "2024-01-03 03:15:00.059000", "country": "AT", "price_eur_mwh": 26.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 03:30:00.059000", "country": "AT", "price_eur_mwh": -4.95, "source": "day_ahead"}
+{"timestamp": "2024-01-03 03:45:00.060000", "country": "AT", "price_eur_mwh": -2.48, "source": "day_ahead"}
+{"timestamp": "2024-01-03 04:00:00.060000", "country": "AT", "price_eur_mwh": -0.03, "source": "day_ahead"}
+{"timestamp": "2024-01-03 04:15:00.060000", "country": "AT", "price_eur_mwh": 5.59, "source": "day_ahead"}
+{"timestamp": "2024-01-03 04:30:00.060000", "country": "AT", "price_eur_mwh": 14.92, "source": "day_ahead"}
+{"timestamp": "2024-01-03 04:45:00.061000", "country": "AT", "price_eur_mwh": 31.23, "source": "day_ahead"}
+{"timestamp": "2024-01-03 05:00:00.061000", "country": "AT", "price_eur_mwh": -20.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 05:15:00.061000", "country": "AT", "price_eur_mwh": 10.43, "source": "day_ahead"}
+{"timestamp": "2024-01-03 05:30:00.062000", "country": "AT", "price_eur_mwh": 51.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 05:45:00.062000", "country": "AT", "price_eur_mwh": 70.34, "source": "day_ahead"}
+{"timestamp": "2024-01-03 06:00:00.062000", "country": "AT", "price_eur_mwh": -7.55, "source": "day_ahead"}
+{"timestamp": "2024-01-03 06:15:00.062000", "country": "AT", "price_eur_mwh": 34.06, "source": "day_ahead"}
+{"timestamp": "2024-01-03 06:30:00.063000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 06:45:00.063000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 07:00:00.063000", "country": "AT", "price_eur_mwh": 22.48, "source": "day_ahead"}
+{"timestamp": "2024-01-03 07:15:00.064000", "country": "AT", "price_eur_mwh": 46.06, "source": "day_ahead"}
+{"timestamp": "2024-01-03 07:30:00.064000", "country": "AT", "price_eur_mwh": 76.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 07:45:00.064000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 08:00:00.065000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 08:15:00.065000", "country": "AT", "price_eur_mwh": 54.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 08:30:00.065000", "country": "AT", "price_eur_mwh": 57.14, "source": "day_ahead"}
+{"timestamp": "2024-01-03 08:45:00.065000", "country": "AT", "price_eur_mwh": 61.46, "source": "day_ahead"}
+{"timestamp": "2024-01-03 09:00:00.066000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 09:15:00.066000", "country": "AT", "price_eur_mwh": 76.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 09:30:00.066000", "country": "AT", "price_eur_mwh": 49.99, "source": "day_ahead"}
+{"timestamp": "2024-01-03 09:45:00.067000", "country": "AT", "price_eur_mwh": 35.84, "source": "day_ahead"}
+{"timestamp": "2024-01-03 10:00:00.067000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 10:15:00.067000", "country": "AT", "price_eur_mwh": 72.42, "source": "day_ahead"}
+{"timestamp": "2024-01-03 10:30:00.067000", "country": "AT", "price_eur_mwh": 46.23, "source": "day_ahead"}
+{"timestamp": "2024-01-03 10:45:00.068000", "country": "AT", "price_eur_mwh": 34.14, "source": "day_ahead"}
+{"timestamp": "2024-01-03 11:00:00.068000", "country": "AT", "price_eur_mwh": 82.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 11:15:00.068000", "country": "AT", "price_eur_mwh": 58.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 11:30:00.069000", "country": "AT", "price_eur_mwh": 42.43, "source": "day_ahead"}
+{"timestamp": "2024-01-03 11:45:00.069000", "country": "AT", "price_eur_mwh": 27.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 12:00:00.069000", "country": "AT", "price_eur_mwh": 64.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 12:15:00.069000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 12:30:00.070000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 12:45:00.070000", "country": "AT", "price_eur_mwh": 42.31, "source": "day_ahead"}
+{"timestamp": "2024-01-03 13:00:00.070000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 13:15:00.071000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 13:30:00.071000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 13:45:00.071000", "country": "AT", "price_eur_mwh": 51.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 14:00:00.071000", "country": "AT", "price_eur_mwh": 38.85, "source": "day_ahead"}
+{"timestamp": "2024-01-03 14:15:00.072000", "country": "AT", "price_eur_mwh": 51.81, "source": "day_ahead"}
+{"timestamp": "2024-01-03 14:30:00.072000", "country": "AT", "price_eur_mwh": 69.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 14:45:00.072000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 15:00:00.073000", "country": "AT", "price_eur_mwh": 34.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 15:15:00.073000", "country": "AT", "price_eur_mwh": 60.27, "source": "day_ahead"}
+{"timestamp": "2024-01-03 15:30:00.073000", "country": "AT", "price_eur_mwh": 79.91, "source": "day_ahead"}
+{"timestamp": "2024-01-03 15:45:00.073000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 16:00:00.074000", "country": "AT", "price_eur_mwh": 50.58, "source": "day_ahead"}
+{"timestamp": "2024-01-03 16:15:00.074000", "country": "AT", "price_eur_mwh": 76.18, "source": "day_ahead"}
+{"timestamp": "2024-01-03 16:30:00.074000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 16:45:00.075000", "country": "AT", "price_eur_mwh": 91.43, "source": "day_ahead"}
+{"timestamp": "2024-01-03 17:00:00.075000", "country": "AT", "price_eur_mwh": 103.63, "source": "day_ahead"}
+{"timestamp": "2024-01-03 17:15:00.075000", "country": "AT", "price_eur_mwh": 107.74, "source": "day_ahead"}
+{"timestamp": "2024-01-03 17:30:00.075000", "country": "AT", "price_eur_mwh": 55.07, "source": "day_ahead"}
+{"timestamp": "2024-01-03 17:45:00.076000", "country": "AT", "price_eur_mwh": 57.51, "source": "day_ahead"}
+{"timestamp": "2024-01-03 18:00:00.076000", "country": "AT", "price_eur_mwh": 99.72, "source": "day_ahead"}
+{"timestamp": "2024-01-03 18:15:00.076000", "country": "AT", "price_eur_mwh": 87.12, "source": "day_ahead"}
+{"timestamp": "2024-01-03 18:30:00.077000", "country": "AT", "price_eur_mwh": 79.91, "source": "day_ahead"}
+{"timestamp": "2024-01-03 18:45:00.077000", "country": "AT", "price_eur_mwh": 55.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 19:00:00.077000", "country": "AT", "price_eur_mwh": 101.69, "source": "day_ahead"}
+{"timestamp": "2024-01-03 19:15:00.077000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 19:30:00.078000", "country": "AT", "price_eur_mwh": 59.98, "source": "day_ahead"}
+{"timestamp": "2024-01-03 19:45:00.078000", "country": "AT", "price_eur_mwh": 44.97, "source": "day_ahead"}
+{"timestamp": "2024-01-03 20:00:00.078000", "country": "AT", "price_eur_mwh": 97.49, "source": "day_ahead"}
+{"timestamp": "2024-01-03 20:15:00.079000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 20:30:00.079000", "country": "AT", "price_eur_mwh": 52.93, "source": "day_ahead"}
+{"timestamp": "2024-01-03 20:45:00.079000", "country": "AT", "price_eur_mwh": 35.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 21:00:00.079000", "country": "AT", "price_eur_mwh": 85.0, "source": "day_ahead"}
+{"timestamp": "2024-01-03 21:15:00.080000", "country": "AT", "price_eur_mwh": 71.15, "source": "day_ahead"}
+{"timestamp": "2024-01-03 21:30:00.080000", "country": "AT", "price_eur_mwh": 49.06, "source": "day_ahead"}
+{"timestamp": "2024-01-03 21:45:00.080000", "country": "AT", "price_eur_mwh": 30.8, "source": "day_ahead"}
+{"timestamp": "2024-01-03 22:00:00.081000", "country": "AT", "price_eur_mwh": 84.67, "source": "day_ahead"}
+{"timestamp": "2024-01-03 22:15:00.081000", "country": "AT", "price_eur_mwh": 68.11, "source": "day_ahead"}
+{"timestamp": "2024-01-03 22:30:00.081000", "country": "AT", "price_eur_mwh": 37.43, "source": "day_ahead"}
+{"timestamp": "2024-01-03 22:45:00.082000", "country": "AT", "price_eur_mwh": 25.79, "source": "day_ahead"}
+{"timestamp": "2024-01-03 23:00:00.082000", "country": "AT", "price_eur_mwh": 77.48, "source": "day_ahead"}
+{"timestamp": "2024-01-03 23:15:00.082000", "country": "AT", "price_eur_mwh": 52.82, "source": "day_ahead"}
+{"timestamp": "2024-01-03 23:30:00.082000", "country": "AT", "price_eur_mwh": 26.66, "source": "day_ahead"}
+{"timestamp": "2024-01-03 23:45:00.083000", "country": "AT", "price_eur_mwh": 17.45, "source": "day_ahead"}
+{"timestamp": "2024-01-01 00:00:00", "country": "AT", "price_eur_mwh": 114.8, "source": "fcr"}
+{"timestamp": "2024-01-01 04:00:00", "country": "AT", "price_eur_mwh": 104.4, "source": "fcr"}
+{"timestamp": "2024-01-01 08:00:00.001000", "country": "AT", "price_eur_mwh": 68.8, "source": "fcr"}
+{"timestamp": "2024-01-01 12:00:00.001000", "country": "AT", "price_eur_mwh": 77.6, "source": "fcr"}
+{"timestamp": "2024-01-01 16:00:00.001000", "country": "AT", "price_eur_mwh": 72.4, "source": "fcr"}
+{"timestamp": "2024-01-01 20:00:00.001000", "country": "AT", "price_eur_mwh": 79.96, "source": "fcr"}
+{"timestamp": "2024-01-02 00:00:00.002000", "country": "AT", "price_eur_mwh": 94.0, "source": "fcr"}
+{"timestamp": "2024-01-02 04:00:00.002000", "country": "AT", "price_eur_mwh": 98.0, "source": "fcr"}
+{"timestamp": "2024-01-02 08:00:00.002000", "country": "AT", "price_eur_mwh": 67.03, "source": "fcr"}
+{"timestamp": "2024-01-02 12:00:00.003000", "country": "AT", "price_eur_mwh": 59.21, "source": "fcr"}
+{"timestamp": "2024-01-02 16:00:00.003000", "country": "AT", "price_eur_mwh": 60.0, "source": "fcr"}
+{"timestamp": "2024-01-02 20:00:00.003000", "country": "AT", "price_eur_mwh": 57.04, "source": "fcr"}
+{"timestamp": "2024-01-03 00:00:00.003000", "country": "AT", "price_eur_mwh": 94.4, "source": "fcr"}
+{"timestamp": "2024-01-03 04:00:00.004000", "country": "AT", "price_eur_mwh": 87.7, "source": "fcr"}
+{"timestamp": "2024-01-03 08:00:00.004000", "country": "AT", "price_eur_mwh": 56.4, "source": "fcr"}
+{"timestamp": "2024-01-03 12:00:00.004000", "country": "AT", "price_eur_mwh": 60.0, "source": "fcr"}
+{"timestamp": "2024-01-03 16:00:00.005000", "country": "AT", "price_eur_mwh": 67.4, "source": "fcr"}
+{"timestamp": "2024-01-03 20:00:00.005000", "country": "AT", "price_eur_mwh": 55.6, "source": "fcr"}
+{"timestamp": "2024-01-01 00:00:00", "price_eur_mwh": 21.06, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-01 04:00:00", "price_eur_mwh": 17.62, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-01 08:00:00.001000", "price_eur_mwh": 8.5, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-01 12:00:00.001000", "price_eur_mwh": 9.52, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-01 16:00:00.001000", "price_eur_mwh": 4.16, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-01 20:00:00.001000", "price_eur_mwh": 6.72, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-02 00:00:00.002000", "price_eur_mwh": 15.88, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-02 04:00:00.002000", "price_eur_mwh": 15.46, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-02 08:00:00.002000", "price_eur_mwh": 6.97, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-02 12:00:00.003000", "price_eur_mwh": 8.45, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-02 16:00:00.003000", "price_eur_mwh": 3.59, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-02 20:00:00.003000", "price_eur_mwh": 6.32, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-03 00:00:00.003000", "price_eur_mwh": 16.88, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-03 04:00:00.004000", "price_eur_mwh": 14.95, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-03 08:00:00.004000", "price_eur_mwh": 6.61, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-03 12:00:00.004000", "price_eur_mwh": 7.93, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-03 16:00:00.005000", "price_eur_mwh": 3.53, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-03 20:00:00.005000", "price_eur_mwh": 5.58, "country": "AT", "direction": "negative", "source": "afrr"}
+{"timestamp": "2024-01-01 00:00:00", "price_eur_mwh": 3.78, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-01 04:00:00", "price_eur_mwh": 4.06, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-01 08:00:00.001000", "price_eur_mwh": 5.57, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-01 12:00:00.001000", "price_eur_mwh": 3.56, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-01 16:00:00.001000", "price_eur_mwh": 9.4, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-01 20:00:00.001000", "price_eur_mwh": 6.66, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-02 00:00:00.002000", "price_eur_mwh": 4.23, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-02 04:00:00.002000", "price_eur_mwh": 4.33, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-02 08:00:00.002000", "price_eur_mwh": 5.69, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-02 12:00:00.003000", "price_eur_mwh": 3.84, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-02 16:00:00.003000", "price_eur_mwh": 9.92, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-02 20:00:00.003000", "price_eur_mwh": 6.83, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-03 00:00:00.003000", "price_eur_mwh": 4.01, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-03 04:00:00.004000", "price_eur_mwh": 4.16, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-03 08:00:00.004000", "price_eur_mwh": 6.07, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-03 12:00:00.004000", "price_eur_mwh": 4.06, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-03 16:00:00.005000", "price_eur_mwh": 10.06, "country": "AT", "direction": "positive", "source": "afrr"}
+{"timestamp": "2024-01-03 20:00:00.005000", "price_eur_mwh": 6.73, "country": "AT", "direction": "positive", "source": "afrr"}

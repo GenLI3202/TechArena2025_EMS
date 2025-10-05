@@ -1,0 +1,217 @@
+\documentclass{article}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{a4paper, margin=1in}
+
+% --- lstlisting Configuration ---
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=mystyle}
+% --- End lstlisting Configuration ---
+
+\title{Pyomo Implementation Pipeline for Huawei TechArena 2025}
+\author{Gen's BESS Optimization Team}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+This document outlines the step-by-step process for implementing the BESS optimization model using Python and Pyomo.
+
+\section{Project Setup}
+
+\subsection{Directory Structure}
+A logical project structure is crucial for maintainability.
+\begin{lstlisting}[language=bash, caption={Recommended Directory Structure}]
+.
+|-- input/
+|   `-- TechArena2025_data.jsonl
+|-- output/
+|-- main.py
+`-- requirements.txt
+\end{lstlisting}
+
+\subsection{Environment and Dependencies}
+A dedicated virtual environment prevents dependency conflicts. The \texttt{requirements.txt} file should specify all necessary packages.
+\begin{lstlisting}[caption={\texttt{requirements.txt}}]
+pandas
+numpy
+pyomo
+openpyxl
+# A solver like CBC or GLPK must be installed and accessible in the system PATH.
+\end{lstlisting}
+
+\section{Data Loading and Preprocessing (\texttt{main.py})}
+This phase transforms raw data into a model-ready format.
+
+\subsection{Load Raw Data}
+\begin{itemize}
+    \item Read the \texttt{TechArena2025\_data\_tidy.jsonl} file line by line into a pandas DataFrame.
+\end{itemize}
+
+\subsection{Clean and Structure Data}
+\begin{itemize}
+    \item Convert the \texttt{timestamp} column to datetime objects and set it as the DataFrame index.
+    \item Pivot the DataFrame to create a multi-level column structure: \texttt{(country, source, direction)}.
+\end{itemize}
+
+\subsection{Resample and Align Time Series}
+\begin{itemize}
+    \item Resample all time series to a consistent 15-minute frequency (\texttt{15T}).
+    \item Use forward-fill (\texttt{ffill}) to propagate prices within their validity periods (e.g., a 4-hour ancillary price applies to all 15-min intervals within that block).
+    \item Create helper columns for 'day' and '4-hour block' identifiers to facilitate constraint mapping.
+\end{itemize}
+
+\section{Main Loop Structure (\texttt{main.py})}
+The core logic iterates through every required scenario (country $\times$ C-rate $\times$ cycle limit).
+\begin{lstlisting}[language=Python, caption={Pseudocode for the Main Scenario Loop}]
+countries = ['DE', 'AT', 'CH', 'HU', 'CZ']
+c_rates = [0.25, 0.33, 0.50]
+daily_cycles = [1.0, 1.5, 2.0]
+
+all_scenario_results = {}
+
+for country in countries:
+    for c_rate in c_rates:
+        for n_cycles in daily_cycles:
+            # Get the preprocessed data for the current country
+            country_data =...
+
+            # Define BESS parameters for this specific scenario
+            bess_params = {
+                'E_nom': 4472.0,  # kWh [1]
+                'P_max_config': 4472.0 * c_rate,  # kW [1]
+                'N_cycles': n_cycles,
+                'eta_ch': 0.90**0.5,  # Round-trip efficiency is 90%
+                'eta_dis': 0.90**0.5,
+                'SOC_min': 0.0,
+                'SOC_max': 1.0,
+                'delta_t': 0.25,  # hours
+                'delta_b': 4.0, # hours
+                'min_bid_fcr': 1.0, # MW
+                'min_bid_afrr': 1.0 # MW
+            }
+            
+            # Apply country-specific rules (CRITICAL)
+            if country == 'CH':
+                # Swiss aFRR market has a 5 MW minimum bid, BESS max power is ~2.2 MW
+                # Therefore, the BESS cannot participate in the Swiss aFRR market.
+                bess_params['can_bid_afrr'] = False
+            else:
+                bess_params['can_bid_afrr'] = True
+
+            # Call the optimization function
+            # This should implement the rolling horizon strategy (see Section 6)
+            solution = solve_bess_optimization(country_data, bess_params)
+
+            # Store the results
+            all_scenario_results[(country, c_rate, n_cycles)] = solution
+
+# 5. Post-process all_results and generate output files
+\end{lstlisting}
+
+\section{Pyomo Model Implementation (\texttt{run\_optimization} function)}
+This function encapsulates the mathematical model definition and solver execution. Follow the official Pyomo documentation for detailed syntax and capabilities: \url{https://pyomo.readthedocs.io/en/stable/}.
+
+\subsection{Initialize Model and Define Sets}
+\begin{lstlisting}[language=Python]
+import pyomo.environ as pyo
+
+def run_optimization(data, params):
+    model = pyo.ConcreteModel(name="BESS_Optimization")
+    
+    # Define Sets from data indices
+    model.T = pyo.Set(initialize=range(len(data.index)))
+    model.B = pyo.Set(initialize=data['block_id'].unique())
+    model.D = pyo.Set(initialize=data['day_id'].unique())
+\end{lstlisting}
+
+\subsection{Define Parameters and Variables}
+\begin{itemize}
+    \item Create \texttt{pyo.Param} objects for all input data (prices, efficiencies, etc.).
+    \item Create \texttt{pyo.Var} objects for all decision variables, specifying domains (e.g., \texttt{pyo.NonNegativeReals}, \texttt{pyo.Binary}).
+\end{itemize}
+
+\subsection{Define Objective Function and Constraints}
+Each mathematical equation is translated into a Python function.
+\begin{lstlisting}[language=Python, caption={Example Constraint Implementation}]
+# --- Objective Function ---
+def objective_rule(model):
+    # Return objective expression from the refined mathematical model
+    return sum(...)
+model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
+
+# --- SOC Dynamics Constraint ---
+def soc_dynamics_rule(model, t):
+    if t == model.T.first():
+        return model.e_soc[t] == params['E_soc_initial'] + ...
+    return model.e_soc[t] == model.e_soc[t-1] + ...
+model.soc_dynamics = pyo.Constraint(model.T, rule=soc_dynamics_rule)
+
+# --- Daily Cycle Constraint ---
+def daily_cycle_rule(model, d):
+    # Get all time steps 't' for day 'd'
+    time_steps_in_day = [t for t in model.T if data.loc[t, 'day_id'] == d]
+    return sum(model.p_ch[t] * params['dt'] for t in time_steps_in_day) <= \
+           model.N_cycles * model.E_nom
+model.daily_cycle_limit = pyo.Constraint(model.D, rule=daily_cycle_rule)
+\end{lstlisting}
+
+\subsection{Solve and Extract Results}
+\begin{itemize}
+    \item Instantiate a solver (e.g., CBC, GLPK) and call the \texttt{solve()} method.
+    \item Extract the optimal values from the model's variables.
+    \item Return a structured object (e.g., a dictionary) containing the key results for the scenario.
+\end{itemize}
+
+\section{Post-Processing and Output Generation (\texttt{main.py})}
+The final step aggregates results and formats them according to submission guidelines.
+
+\subsection{Aggregate Results and Calculate Metrics}
+\begin{itemize}
+    \item Convert the list of result dictionaries into pandas DataFrames.
+    \item Calculate final metrics like Levelized Return on Investment (ROI) over a 10-year horizon.
+\end{itemize}
+
+\subsection{Write to Excel}
+As per the FaQ, create three Excel files, each containing separate sheets for each country.
+\begin{itemize}
+    \item \texttt{TechArena\_Phase1\_Configuration.xlsx}
+    \item \texttt{TechArena\_Phase1\_Investment.xlsx}
+    \item \texttt{TechArena\_Phase1\_Operation.xlsx}
+\end{itemize}
+\begin{lstlisting}[language=Python, caption={Pseudocode for Writing Excel Output}]
+# Pseudocode for writing one of the output files
+with pd.ExcelWriter('output/TechArena_Phase1_Configuration.xlsx') as writer:
+    for country in countries:
+        df_config_country = df_all_configs[df_all_configs['Country'] == country]
+        df_config_country.to_excel(writer, sheet_name=country, index=False)
+# Repeat for Investment and Operation files
+\end{lstlisting}
+
+\end{document}

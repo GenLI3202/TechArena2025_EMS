@@ -1,0 +1,57 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore the large data files
+#data/
+#SoloGen_TechArena2025_Phase1/input/
+
+# Ignore generated output from the main script
+#SoloGen_TechArena2025_Phase1/output/
+
+# Ignore generated documentation files
+# documentation/*.pdf
+documentation/*.log
+documentation/*.aux
+documentation/*.out
+documentation/*.fls
+documentation/*.fdb_latexmk
+documentation/*.synctex.gz
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# ============================================
+# Large Files (>100MB) - Prevent Git Upload
+# ============================================
+
+# Large JSON result files (8.5GB+)
+results/optimization_results_full.json
+results/optimization_results_full.jsonl
+results/*.json
+results/*.jsonl
+
+# Large JSONL data files (200K+ lines)
+**/input/TechArena2025_data_tidy.jsonl
+**/TechArena2025_data_tidy.jsonl
+
+# Large notebook files with embedded outputs
+jb_notebook/final_validation.ipynb
+
+# ZIP archives
+*.zip
+!requirements.txt.zip
+
+# Large Excel files from validation tests
+ValidationTest_*/TechArena_Phase1_Operation.xlsx
+**/vali_TechArena_Phase1_*.xlsx
+
+# Temporary and backup files
+*_backup.md
+*_OLD_BACKUP.md
+*.log
+*.aux
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk

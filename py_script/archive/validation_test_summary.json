@@ -1,0 +1,117 @@
+{
+  "validation_test": true,
+  "data_period": "October 2024",
+  "scale_factor": 12,
+  "total_scenarios": 45,
+  "successful": 0,
+  "failed": 45,
+  "success_rate": 0.0,
+  "total_monthly_revenue": 0,
+  "total_annual_revenue_estimate": 0,
+  "avg_monthly_revenue_per_scenario": 0,
+  "avg_annual_revenue_estimate_per_scenario": 0,
+  "total_optimization_time": 0.032941579818725586,
+  "avg_optimization_time": 0.0007320351070827908,
+  "by_country": {
+    "DE_LU": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "AT": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "CH": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "HU": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "CZ": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    }
+  },
+  "by_configuration": {
+    "C0.25_Cyc1.0": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.25_Cyc1.5": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.25_Cyc2.0": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.33_Cyc1.0": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.33_Cyc1.5": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.33_Cyc2.0": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.5_Cyc1.0": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.5_Cyc1.5": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    },
+    "C0.5_Cyc2.0": {
+      "scenarios": 0,
+      "total_monthly_revenue": 0,
+      "total_annual_revenue_estimate": 0,
+      "avg_monthly_revenue": 0,
+      "avg_annual_revenue_estimate": 0
+    }
+  }
+}

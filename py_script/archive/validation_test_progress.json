@@ -1,0 +1,407 @@
+{
+  "DE_LU_C0.25_Cyc1.0": {
+    "country": "DE_LU",
+    "c_rate": 0.25,
+    "cycle_limit": 1.0,
+    "scenario_key": "DE_LU_C0.25_Cyc1.0",
+    "optimization_time": 0.0020046234130859375,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.25_Cyc1.5": {
+    "country": "DE_LU",
+    "c_rate": 0.25,
+    "cycle_limit": 1.5,
+    "scenario_key": "DE_LU_C0.25_Cyc1.5",
+    "optimization_time": 0.0009911060333251953,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.25_Cyc2.0": {
+    "country": "DE_LU",
+    "c_rate": 0.25,
+    "cycle_limit": 2.0,
+    "scenario_key": "DE_LU_C0.25_Cyc2.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.33_Cyc1.0": {
+    "country": "DE_LU",
+    "c_rate": 0.33,
+    "cycle_limit": 1.0,
+    "scenario_key": "DE_LU_C0.33_Cyc1.0",
+    "optimization_time": 0.0009920597076416016,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.33_Cyc1.5": {
+    "country": "DE_LU",
+    "c_rate": 0.33,
+    "cycle_limit": 1.5,
+    "scenario_key": "DE_LU_C0.33_Cyc1.5",
+    "optimization_time": 0.0010175704956054688,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.33_Cyc2.0": {
+    "country": "DE_LU",
+    "c_rate": 0.33,
+    "cycle_limit": 2.0,
+    "scenario_key": "DE_LU_C0.33_Cyc2.0",
+    "optimization_time": 0.0010001659393310547,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.5_Cyc1.0": {
+    "country": "DE_LU",
+    "c_rate": 0.5,
+    "cycle_limit": 1.0,
+    "scenario_key": "DE_LU_C0.5_Cyc1.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.5_Cyc1.5": {
+    "country": "DE_LU",
+    "c_rate": 0.5,
+    "cycle_limit": 1.5,
+    "scenario_key": "DE_LU_C0.5_Cyc1.5",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "DE_LU_C0.5_Cyc2.0": {
+    "country": "DE_LU",
+    "c_rate": 0.5,
+    "cycle_limit": 2.0,
+    "scenario_key": "DE_LU_C0.5_Cyc2.0",
+    "optimization_time": 0.0010023117065429688,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.25_Cyc1.0": {
+    "country": "AT",
+    "c_rate": 0.25,
+    "cycle_limit": 1.0,
+    "scenario_key": "AT_C0.25_Cyc1.0",
+    "optimization_time": 0.000993967056274414,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.25_Cyc1.5": {
+    "country": "AT",
+    "c_rate": 0.25,
+    "cycle_limit": 1.5,
+    "scenario_key": "AT_C0.25_Cyc1.5",
+    "optimization_time": 0.0009911060333251953,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.25_Cyc2.0": {
+    "country": "AT",
+    "c_rate": 0.25,
+    "cycle_limit": 2.0,
+    "scenario_key": "AT_C0.25_Cyc2.0",
+    "optimization_time": 0.001013040542602539,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.33_Cyc1.0": {
+    "country": "AT",
+    "c_rate": 0.33,
+    "cycle_limit": 1.0,
+    "scenario_key": "AT_C0.33_Cyc1.0",
+    "optimization_time": 0.0010030269622802734,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.33_Cyc1.5": {
+    "country": "AT",
+    "c_rate": 0.33,
+    "cycle_limit": 1.5,
+    "scenario_key": "AT_C0.33_Cyc1.5",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.33_Cyc2.0": {
+    "country": "AT",
+    "c_rate": 0.33,
+    "cycle_limit": 2.0,
+    "scenario_key": "AT_C0.33_Cyc2.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.5_Cyc1.0": {
+    "country": "AT",
+    "c_rate": 0.5,
+    "cycle_limit": 1.0,
+    "scenario_key": "AT_C0.5_Cyc1.0",
+    "optimization_time": 0.0009932518005371094,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.5_Cyc1.5": {
+    "country": "AT",
+    "c_rate": 0.5,
+    "cycle_limit": 1.5,
+    "scenario_key": "AT_C0.5_Cyc1.5",
+    "optimization_time": 0.002010822296142578,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "AT_C0.5_Cyc2.0": {
+    "country": "AT",
+    "c_rate": 0.5,
+    "cycle_limit": 2.0,
+    "scenario_key": "AT_C0.5_Cyc2.0",
+    "optimization_time": 0.0009884834289550781,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.25_Cyc1.0": {
+    "country": "CH",
+    "c_rate": 0.25,
+    "cycle_limit": 1.0,
+    "scenario_key": "CH_C0.25_Cyc1.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.25_Cyc1.5": {
+    "country": "CH",
+    "c_rate": 0.25,
+    "cycle_limit": 1.5,
+    "scenario_key": "CH_C0.25_Cyc1.5",
+    "optimization_time": 0.001005411148071289,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.25_Cyc2.0": {
+    "country": "CH",
+    "c_rate": 0.25,
+    "cycle_limit": 2.0,
+    "scenario_key": "CH_C0.25_Cyc2.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.33_Cyc1.0": {
+    "country": "CH",
+    "c_rate": 0.33,
+    "cycle_limit": 1.0,
+    "scenario_key": "CH_C0.33_Cyc1.0",
+    "optimization_time": 0.000993490219116211,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.33_Cyc1.5": {
+    "country": "CH",
+    "c_rate": 0.33,
+    "cycle_limit": 1.5,
+    "scenario_key": "CH_C0.33_Cyc1.5",
+    "optimization_time": 0.0014290809631347656,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.33_Cyc2.0": {
+    "country": "CH",
+    "c_rate": 0.33,
+    "cycle_limit": 2.0,
+    "scenario_key": "CH_C0.33_Cyc2.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.5_Cyc1.0": {
+    "country": "CH",
+    "c_rate": 0.5,
+    "cycle_limit": 1.0,
+    "scenario_key": "CH_C0.5_Cyc1.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.5_Cyc1.5": {
+    "country": "CH",
+    "c_rate": 0.5,
+    "cycle_limit": 1.5,
+    "scenario_key": "CH_C0.5_Cyc1.5",
+    "optimization_time": 0.0010266304016113281,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CH_C0.5_Cyc2.0": {
+    "country": "CH",
+    "c_rate": 0.5,
+    "cycle_limit": 2.0,
+    "scenario_key": "CH_C0.5_Cyc2.0",
+    "optimization_time": 0.0009999275207519531,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.25_Cyc1.0": {
+    "country": "HU",
+    "c_rate": 0.25,
+    "cycle_limit": 1.0,
+    "scenario_key": "HU_C0.25_Cyc1.0",
+    "optimization_time": 0.0009911060333251953,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.25_Cyc1.5": {
+    "country": "HU",
+    "c_rate": 0.25,
+    "cycle_limit": 1.5,
+    "scenario_key": "HU_C0.25_Cyc1.5",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.25_Cyc2.0": {
+    "country": "HU",
+    "c_rate": 0.25,
+    "cycle_limit": 2.0,
+    "scenario_key": "HU_C0.25_Cyc2.0",
+    "optimization_time": 0.0010004043579101562,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.33_Cyc1.0": {
+    "country": "HU",
+    "c_rate": 0.33,
+    "cycle_limit": 1.0,
+    "scenario_key": "HU_C0.33_Cyc1.0",
+    "optimization_time": 0.0009999275207519531,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.33_Cyc1.5": {
+    "country": "HU",
+    "c_rate": 0.33,
+    "cycle_limit": 1.5,
+    "scenario_key": "HU_C0.33_Cyc1.5",
+    "optimization_time": 0.000993490219116211,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.33_Cyc2.0": {
+    "country": "HU",
+    "c_rate": 0.33,
+    "cycle_limit": 2.0,
+    "scenario_key": "HU_C0.33_Cyc2.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.5_Cyc1.0": {
+    "country": "HU",
+    "c_rate": 0.5,
+    "cycle_limit": 1.0,
+    "scenario_key": "HU_C0.5_Cyc1.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.5_Cyc1.5": {
+    "country": "HU",
+    "c_rate": 0.5,
+    "cycle_limit": 1.5,
+    "scenario_key": "HU_C0.5_Cyc1.5",
+    "optimization_time": 0.001001596450805664,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "HU_C0.5_Cyc2.0": {
+    "country": "HU",
+    "c_rate": 0.5,
+    "cycle_limit": 2.0,
+    "scenario_key": "HU_C0.5_Cyc2.0",
+    "optimization_time": 0.0005066394805908203,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.25_Cyc1.0": {
+    "country": "CZ",
+    "c_rate": 0.25,
+    "cycle_limit": 1.0,
+    "scenario_key": "CZ_C0.25_Cyc1.0",
+    "optimization_time": 0.000993490219116211,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.25_Cyc1.5": {
+    "country": "CZ",
+    "c_rate": 0.25,
+    "cycle_limit": 1.5,
+    "scenario_key": "CZ_C0.25_Cyc1.5",
+    "optimization_time": 0.0009922981262207031,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.25_Cyc2.0": {
+    "country": "CZ",
+    "c_rate": 0.25,
+    "cycle_limit": 2.0,
+    "scenario_key": "CZ_C0.25_Cyc2.0",
+    "optimization_time": 0.0009992122650146484,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.33_Cyc1.0": {
+    "country": "CZ",
+    "c_rate": 0.33,
+    "cycle_limit": 1.0,
+    "scenario_key": "CZ_C0.33_Cyc1.0",
+    "optimization_time": 0.0010097026824951172,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.33_Cyc1.5": {
+    "country": "CZ",
+    "c_rate": 0.33,
+    "cycle_limit": 1.5,
+    "scenario_key": "CZ_C0.33_Cyc1.5",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.33_Cyc2.0": {
+    "country": "CZ",
+    "c_rate": 0.33,
+    "cycle_limit": 2.0,
+    "scenario_key": "CZ_C0.33_Cyc2.0",
+    "optimization_time": 0.0,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.5_Cyc1.0": {
+    "country": "CZ",
+    "c_rate": 0.5,
+    "cycle_limit": 1.0,
+    "scenario_key": "CZ_C0.5_Cyc1.0",
+    "optimization_time": 0.001001596450805664,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.5_Cyc1.5": {
+    "country": "CZ",
+    "c_rate": 0.5,
+    "cycle_limit": 1.5,
+    "scenario_key": "CZ_C0.5_Cyc1.5",
+    "optimization_time": 0.0009927749633789062,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  },
+  "CZ_C0.5_Cyc2.0": {
+    "country": "CZ",
+    "c_rate": 0.5,
+    "cycle_limit": 2.0,
+    "scenario_key": "CZ_C0.5_Cyc2.0",
+    "optimization_time": 0.001003265380859375,
+    "optimization_status": "failed",
+    "error": "[Errno 2] No such file or directory: 'data/TechArena2025_data_tidy.jsonl'"
+  }
+}
