@@ -55,3 +55,6 @@ ValidationTest_*/TechArena_Phase1_Operation.xlsx
 *.synctex.gz
 *.fls
 *.fdb_latexmk
+
+# Local editor settings (do not track personal MCP config)
+.vscode/mcp.json
