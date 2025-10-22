@@ -1,5 +1,10 @@
 # Huawei TechArena 2025: BESS Energy Management System
 
+> **Repository Status:** Currently developing **Round 2 (Phase 2)** solution.
+> Phase 1 (2024 optimization) artifacts have been archived to `archive_old_files/`.
+> **New Data:** `data/TechArena2025_Phase2_data.xlsx`
+> **Active Branch:** `r2-with-bat-config`
+
 A Python-based Energy Management System (EMS) for optimizing Battery Energy Storage System (BESS) operations across multiple European electricity markets.
 
 ## Table of Contents

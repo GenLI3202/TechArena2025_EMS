@@ -58,3 +58,21 @@ ValidationTest_*/TechArena_Phase1_Operation.xlsx
 
 # Local editor settings (do not track personal MCP config)
 .vscode/mcp.json
+
+# ============================================
+# Round 2 Specific Ignores
+# ============================================
+
+# Phase 1 specific patterns
+**/Phase1_*
+**/submission_phase1_*
+
+# Excel temp files
+~$*.xlsx
+
+# Archive backups
+*_backup_*/
+*_old_backup_*/
+
+# Validation logs
+validation_*.log
