@@ -1,6 +1,6 @@
 ---
 description: 'A dedicated mode for generating high-level implementation plans, multi-step roadmaps, and architectural designs before writing any code.'
-tools: ['fetch', 'githubRepo', 'search', 'usages','edit/editFiles']
+tools: ['edit/editFiles', 'search', 'usages', 'fetch', 'githubRepo']
 model: Claude Sonnet 4.5
 ---
 
