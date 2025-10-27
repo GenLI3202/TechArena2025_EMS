@@ -79,10 +79,9 @@ Submissions are evaluated based on:
 
 The objective is to maximize the total net profit over the one-year horizon. This is the sum of day-ahead energy arbitrage revenue and ancillary service capacity payments, minus the cost of energy purchased for charging.
 
-```
-max Z = Σ(t∈T) [(P_DA(t)/1000 · p_dis(t) - P_DA(t)/1000 · p_ch(t)) · Δt]
-      + Σ(b∈B) [P_FCR(b) · c_fcr(b) + P_aFRR^pos(b) · c_afrr^pos(b) + P_aFRR^neg(b) · c_afrr^neg(b)] · Δb
-```
+$$ max Z = \sum_{t \in T} [(P_DA(t)/1000 · p_dis(t) - P_DA(t)/1000 · p_ch(t)) · Δt]
+      + \sum_{b\in B} [P_FCR(b) · c_fcr(b) + P_aFRR^pos(b) · c_afrr^pos(b) + P_aFRR^neg(b) · c_afrr^neg(b)] · Δb $$
+
 
 Where:
 - **First term**: Day-ahead net profit (power in kW, price in EUR/MWh)

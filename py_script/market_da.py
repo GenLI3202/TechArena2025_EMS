@@ -1437,6 +1437,763 @@ def ensure_csv_exports(tables: Dict[str, pd.DataFrame], directory: Path) -> None
         df.to_csv(directory / f"{key}.csv", index=False)
 
 
+# ===========================================================================
+# PHASE 2 EXTENSIONS
+# ===========================================================================
+
+# Phase 2 Constants
+AFRR_ENERGY_SHEET = "aFRR energy prices"
+
+# Validation Constants
+PRICE_BOUNDS = {
+    'day_ahead': (-500, 2000),    # EUR/MWh (allow extreme scarcity prices)
+    'fcr': (0, 10000),             # EUR/MW (capacity always non-negative)
+    'afrr_capacity': (0, 10000),   # EUR/MW
+    'afrr_energy': (-500, 2000)    # EUR/MWh (allow extreme scarcity prices)
+}
+ZERO_THRESHOLD_PCT = 95  # Flag if >95% zeros
+
+
+def load_phase2_market_tables(workbook_path: Path, *, prefer_csv: bool = False) -> Dict[str, pd.DataFrame]:
+    """Load Phase 2 market tables including aFRR energy prices.
+
+    Parameters
+    ----------
+    workbook_path : Path
+        Path to TechArena2025_Phase2_data.xlsx
+    prefer_csv : bool, optional
+        If True and CSV cache exists, use it instead of Excel
+
+    Returns
+    -------
+    dict
+        Keys: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy' (NEW)
+        Values: Wide-format DataFrames
+
+    DataFrame Formats
+    -----------------
+    day_ahead:
+        Columns: [timestamp, DE_LU, AT, CH, HU, CZ]
+
+    fcr:
+        Columns: [timestamp, DE, AT, CH, HU, CZ]
+
+    afrr_capacity:
+        Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
+
+    afrr_energy (NEW):
+        Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
+    """
+    from exceptions import DataLoadingError
+    import logging
+
+    logger = logging.getLogger(__name__)
+    workbook_path = workbook_path.expanduser().resolve()
+
+    try:
+        xl = pd.ExcelFile(workbook_path)
+    except FileNotFoundError:
+        raise DataLoadingError(f"Excel file not found: {workbook_path}")
+    except Exception as e:
+        raise DataLoadingError(f"Failed to open Excel file: {e}")
+
+    tables = {}
+
+    # Load each sheet with individual error handling
+    sheet_configs = [
+        (DAY_AHEAD_SHEET, 'day_ahead', _tidy_market_frame, PRICE_COL_MWH),
+        (FCR_SHEET, 'fcr', _tidy_market_frame, PRICE_COL_MW),
+        (AFRR_SHEET, 'afrr_capacity', _tidy_afrr_frame, None),
+        (AFRR_ENERGY_SHEET, 'afrr_energy', _tidy_afrr_frame, None)  # NEW
+    ]
+
+    for sheet_name, table_key, loader_func, value_name in sheet_configs:
+        try:
+            raw_df = xl.parse(sheet_name)
+
+            if value_name:
+                processed_df = loader_func(raw_df, value_name=value_name)
+            else:
+                processed_df = loader_func(raw_df)
+
+            # Convert to numeric
+            for col in processed_df.columns[1:]:  # Skip timestamp
+                processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce')
+
+            tables[table_key] = processed_df
+            logger.info(f"Loaded {table_key}: {len(processed_df)} rows, {len(processed_df.columns)} columns")
+
+        except KeyError:
+            logger.warning(f"Sheet '{sheet_name}' not found, skipping...")
+            continue  # Allow partial loading
+        except Exception as e:
+            logger.error(f"Error processing sheet '{sheet_name}': {e}")
+            raise DataLoadingError(f"Failed to process sheet '{sheet_name}': {e}")
+
+    # Validate we have minimum required tables
+    if 'day_ahead' not in tables:
+        raise DataLoadingError("Critical: Day-ahead data missing")
+
+    return tables
+
+
+def validate_phase2_data(tables: Dict[str, pd.DataFrame]) -> Dict[str, any]:
+    """Comprehensive Phase 2 data quality validation.
+
+    Validates:
+    - Row count alignment
+    - Timestamp continuity and gaps
+    - Price bounds (detect outliers)
+    - Excessive zeros
+    - Data correlations
+
+    Parameters
+    ----------
+    tables : dict
+        Dictionary of market DataFrames from load_phase2_market_tables()
+
+    Returns
+    -------
+    dict
+        Validation report with keys:
+        - 'errors': list of error messages
+        - 'warnings': list of warning messages
+        - 'stats': dict of validation statistics
+        - 'passed': bool indicating if validation passed
+
+    Raises
+    ------
+    DataValidationError
+        If critical errors are found (via calling code)
+    """
+    report = {
+        "errors": [],
+        "warnings": [],
+        "stats": {},
+        "passed": True
+    }
+
+    # 1. Validate timestamp alignment (15-min data)
+    if 'day_ahead' in tables and 'afrr_energy' in tables:
+        day_ahead = tables['day_ahead']
+        afrr_energy = tables['afrr_energy']
+
+        if len(afrr_energy) != len(day_ahead):
+            report["errors"].append(
+                f"Row count mismatch: aFRR energy ({len(afrr_energy)}) "
+                f"!= day-ahead ({len(day_ahead)})"
+            )
+            report["passed"] = False
+
+    # 2. Check timestamp continuity and gaps
+    for market, df in tables.items():
+        if TIMESTAMP_COL not in df.columns:
+            continue
+
+        ts = df[TIMESTAMP_COL]
+        expected_freq = '15T' if market in ['day_ahead', 'afrr_energy'] else '4H'
+
+        # Check for gaps
+        time_diff = ts.diff()[1:]
+        expected_delta = pd.Timedelta(expected_freq)
+        gaps = time_diff[time_diff > expected_delta]
+
+        if len(gaps) > 0:
+            report["warnings"].append(
+                f"{market}: Found {len(gaps)} timestamp gaps "
+                f"(largest: {gaps.max()})"
+            )
+            report["stats"][f"{market}_gaps"] = len(gaps)
+
+    # 3. Price bounds validation
+    for market, df in tables.items():
+        # Get bounds for this market
+        bounds_key = market if market in PRICE_BOUNDS else 'day_ahead'
+        bounds = PRICE_BOUNDS.get(bounds_key, (-1000, 10000))
+
+        price_cols = [col for col in df.columns if col != TIMESTAMP_COL]
+
+        for col in price_cols:
+            min_val = df[col].min()
+            max_val = df[col].max()
+
+            if min_val < bounds[0]:
+                report["errors"].append(
+                    f"{market}.{col}: Min price {min_val:.2f} < lower bound {bounds[0]}"
+                )
+                report["passed"] = False
+
+            if max_val > bounds[1]:
+                report["errors"].append(
+                    f"{market}.{col}: Max price {max_val:.2f} > upper bound {bounds[1]}"
+                )
+                report["passed"] = False
+
+            # Statistics
+            report["stats"][f"{market}.{col}_min"] = float(min_val)
+            report["stats"][f"{market}.{col}_max"] = float(max_val)
+            report["stats"][f"{market}.{col}_mean"] = float(df[col].mean())
+
+    # 4. Check for excessive zeros (may indicate missing data)
+    if 'afrr_energy' in tables:
+        afrr_energy = tables['afrr_energy']
+        for col in afrr_energy.columns[1:]:  # Skip timestamp
+            zero_pct = (afrr_energy[col] == 0).sum() / len(afrr_energy) * 100
+            report["stats"][f"afrr_energy.{col}_zero_pct"] = float(zero_pct)
+
+            if zero_pct > ZERO_THRESHOLD_PCT:
+                report["warnings"].append(
+                    f"aFRR energy {col}: {zero_pct:.1f}% zeros "
+                    f"(common for activation prices, but verify)"
+                )
+
+    # 5. Correlation checks (sanity check: DA prices should correlate across countries)
+    if 'day_ahead' in tables:
+        day_ahead = tables['day_ahead']
+        da_price_cols = [col for col in day_ahead.columns if col != TIMESTAMP_COL]
+
+        if len(da_price_cols) >= 2:
+            corr_matrix = day_ahead[da_price_cols].corr()
+            min_corr = corr_matrix.min().min()
+
+            if min_corr < 0.3:  # Expect some correlation in European markets
+                report["warnings"].append(
+                    f"Day-ahead: Low price correlation detected (min={min_corr:.2f}). "
+                    f"Verify data integrity."
+                )
+
+            report["stats"]["day_ahead_min_correlation"] = float(min_corr)
+
+    return report
+
+
+# ===========================================================================
+# VIEW 1: DATA EXPLORATION VISUALIZATIONS (McKinsey Style)
+# ===========================================================================
+
+def _filter_by_time_range(df: pd.DataFrame, time_range: str) -> pd.DataFrame:
+    """Filter DataFrame by time range string.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with 'timestamp' column
+    time_range : str
+        One of: 'full', 'Q1', 'Q2', 'Q3', 'Q4', or 'YYYY-MM'
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered DataFrame
+    """
+    if time_range == 'full':
+        return df
+    elif time_range in ['Q1', 'Q2', 'Q3', 'Q4']:
+        quarter_map = {'Q1': [1,2,3], 'Q2': [4,5,6], 'Q3': [7,8,9], 'Q4': [10,11,12]}
+        months = quarter_map[time_range]
+        return df[df[TIMESTAMP_COL].dt.month.isin(months)]
+    else:
+        # Assume format 'YYYY-MM'
+        return df[df[TIMESTAMP_COL].dt.strftime('%Y-%m') == time_range]
+
+
+def plot_price_time_series_mckinsey(
+    tables: Dict[str, pd.DataFrame],
+    country: str,
+    time_range: str = 'full',
+    markets: list = None
+) -> go.Figure:
+    """Plot multi-market price time series with McKinsey styling.
+
+    Module A: Electricity Price Time Series
+
+    Creates an interactive multi-series line chart showing DA, FCR, aFRR capacity,
+    and aFRR energy prices for a selected country.
+
+    Parameters
+    ----------
+    tables : dict
+        Dictionary with keys: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy'
+    country : str
+        Country code (DE, AT, CH, HU, CZ)
+    time_range : str, optional
+        'full', 'Q1', 'Q2', 'Q3', 'Q4', or 'YYYY-MM' (default: 'full')
+    markets : list, optional
+        List of markets to plot. Default: all
+
+    Returns
+    -------
+    go.Figure
+        McKinsey-styled Plotly figure
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_price_time_series_mckinsey(tables, country='DE', time_range='Q1')
+    >>> fig.show()
+    """
+    from viz_config import MCKINSEY_COLORS, get_country_color, apply_mckinsey_style
+
+    if markets is None:
+        markets = ['day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy']
+
+    fig = go.Figure()
+
+    # Add DA prices (15-min, EUR/MWh)
+    if 'day_ahead' in markets and 'day_ahead' in tables:
+        df_da = tables['day_ahead']
+        country_col = 'DE_LU' if country == 'DE' else country
+
+        if country_col in df_da.columns:
+            df_filtered = _filter_by_time_range(df_da, time_range)
+
+            fig.add_trace(go.Scatter(
+                x=df_filtered[TIMESTAMP_COL],
+                y=df_filtered[country_col],
+                mode='lines',
+                name='Day-Ahead',
+                line=dict(color=MCKINSEY_COLORS['cat_1'], width=1.5),
+                hovertemplate='%{y:.2f} EUR/MWh<extra></extra>'
+            ))
+
+    # Add FCR prices (4-hour blocks, EUR/MW) - on secondary axis
+    if 'fcr' in markets and 'fcr' in tables:
+        df_fcr = tables['fcr']
+
+        if country in df_fcr.columns:
+            df_filtered = _filter_by_time_range(df_fcr, time_range)
+
+            fig.add_trace(go.Scatter(
+                x=df_filtered[TIMESTAMP_COL],
+                y=df_filtered[country],
+                mode='lines',
+                name='FCR Capacity',
+                line=dict(color=MCKINSEY_COLORS['cat_2'], width=1.5, dash='dot'),
+                hovertemplate='%{y:.2f} EUR/MW<extra></extra>',
+                yaxis='y2'  # Secondary axis
+            ))
+
+    # Add aFRR capacity (4-hour blocks, EUR/MW, Pos/Neg)
+    if 'afrr_capacity' in markets and 'afrr_capacity' in tables:
+        df_afrr_cap = tables['afrr_capacity']
+        df_filtered = _filter_by_time_range(df_afrr_cap, time_range)
+
+        if f'{country}_Pos' in df_afrr_cap.columns:
+            fig.add_trace(go.Scatter(
+                x=df_filtered[TIMESTAMP_COL],
+                y=df_filtered[f'{country}_Pos'],
+                mode='lines',
+                name='aFRR Cap (Pos)',
+                line=dict(color=MCKINSEY_COLORS['positive'], width=1.5, dash='dash'),
+                hovertemplate='%{y:.2f} EUR/MW<extra></extra>',
+                yaxis='y2'
+            ))
+
+        if f'{country}_Neg' in df_afrr_cap.columns:
+            fig.add_trace(go.Scatter(
+                x=df_filtered[TIMESTAMP_COL],
+                y=df_filtered[f'{country}_Neg'],
+                mode='lines',
+                name='aFRR Cap (Neg)',
+                line=dict(color=MCKINSEY_COLORS['negative'], width=1.5, dash='dash'),
+                hovertemplate='%{y:.2f} EUR/MW<extra></extra>',
+                yaxis='y2'
+            ))
+
+    # Add aFRR energy (15-min, EUR/MWh, Pos/Neg) - NEW
+    if 'afrr_energy' in markets and 'afrr_energy' in tables:
+        df_afrr_energy = tables['afrr_energy']
+        df_filtered = _filter_by_time_range(df_afrr_energy, time_range)
+
+        if f'{country}_Pos' in df_afrr_energy.columns:
+            fig.add_trace(go.Scatter(
+                x=df_filtered[TIMESTAMP_COL],
+                y=df_filtered[f'{country}_Pos'],
+                mode='lines',
+                name='aFRR Energy (Pos)',
+                line=dict(color=MCKINSEY_COLORS['teal'], width=1.5),
+                hovertemplate='%{y:.2f} EUR/MWh<extra></extra>'
+            ))
+
+        if f'{country}_Neg' in df_afrr_energy.columns:
+            fig.add_trace(go.Scatter(
+                x=df_filtered[TIMESTAMP_COL],
+                y=df_filtered[f'{country}_Neg'],
+                mode='lines',
+                name='aFRR Energy (Neg)',
+                line=dict(color=MCKINSEY_COLORS['cat_5'], width=1.5),
+                hovertemplate='%{y:.2f} EUR/MWh<extra></extra>'
+            ))
+
+    # Apply McKinsey styling and layout
+    fig = apply_mckinsey_style(
+        fig,
+        title=f'Electricity Market Prices - {country} ({time_range})'
+    )
+
+    fig.update_layout(
+        xaxis_title='Time',
+        yaxis_title='Energy Price (EUR/MWh)',
+        yaxis2=dict(
+            title='Capacity Price (EUR/MW)',
+            overlaying='y',
+            side='right',
+            showgrid=False
+        ),
+        hovermode='x unified',
+        height=500,
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1
+        )
+    )
+
+    return fig
+
+
+def plot_da_price_distribution_mckinsey(
+    day_ahead_df: pd.DataFrame,
+    country: str,
+    bins: int = 50
+) -> go.Figure:
+    """Plot day-ahead price distribution with McKinsey styling.
+
+    Module B: Price Distribution (DA)
+
+    Creates a histogram with KDE overlay showing the frequency distribution
+    of day-ahead prices.
+
+    Parameters
+    ----------
+    day_ahead_df : pd.DataFrame
+        Wide-format day-ahead data
+    country : str
+        Country code
+    bins : int, optional
+        Number of histogram bins (default: 50)
+
+    Returns
+    -------
+    go.Figure
+        Histogram with KDE overlay
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_da_price_distribution_mckinsey(tables['day_ahead'], country='DE')
+    >>> fig.show()
+    """
+    from viz_config import MCKINSEY_COLORS, apply_mckinsey_style
+    import numpy as np
+    from scipy import stats
+
+    # Get prices for country
+    country_col = 'DE_LU' if country == 'DE' else country
+
+    if country_col not in day_ahead_df.columns:
+        raise ValueError(f"Country {country} not found in day-ahead data")
+
+    prices = day_ahead_df[country_col].dropna()
+
+    # Create figure
+    fig = go.Figure()
+
+    # Histogram
+    fig.add_trace(go.Histogram(
+        x=prices,
+        nbinsx=bins,
+        name='Frequency',
+        marker_color=MCKINSEY_COLORS['navy'],
+        opacity=0.7,
+        hovertemplate='Price: %{x:.2f} EUR/MWh<br>Count: %{y}<extra></extra>'
+    ))
+
+    # KDE overlay
+    try:
+        kde = stats.gaussian_kde(prices)
+        x_range = np.linspace(prices.min(), prices.max(), 200)
+        kde_values = kde(x_range)
+
+        # Scale KDE to match histogram height
+        kde_scaled = kde_values * len(prices) * (prices.max() - prices.min()) / bins
+
+        fig.add_trace(go.Scatter(
+            x=x_range,
+            y=kde_scaled,
+            mode='lines',
+            name='Density',
+            line=dict(color=MCKINSEY_COLORS['teal'], width=2),
+            yaxis='y2',
+            hovertemplate='Price: %{x:.2f} EUR/MWh<extra></extra>'
+        ))
+    except:
+        pass  # Skip KDE if scipy not available or data issue
+
+    # Add vertical lines for mean and median
+    mean_price = prices.mean()
+    median_price = prices.median()
+
+    fig.add_vline(
+        x=mean_price,
+        line_dash="dash",
+        line_color=MCKINSEY_COLORS['gray_dark'],
+        annotation_text=f"Mean: {mean_price:.1f}",
+        annotation_position="top"
+    )
+
+    fig.add_vline(
+        x=median_price,
+        line_dash="dot",
+        line_color=MCKINSEY_COLORS['gray_dark'],
+        annotation_text=f"Median: {median_price:.1f}",
+        annotation_position="bottom"
+    )
+
+    # Apply McKinsey styling
+    fig = apply_mckinsey_style(
+        fig,
+        title=f'Day-Ahead Price Distribution - {country}'
+    )
+
+    fig.update_layout(
+        xaxis_title='Price (EUR/MWh)',
+        yaxis_title='Frequency',
+        yaxis2=dict(
+            overlaying='y',
+            side='right',
+            showgrid=False
+        ),
+        height=400,
+        showlegend=True
+    )
+
+    return fig
+
+
+def plot_da_price_heatmap_mckinsey(
+    day_ahead_df: pd.DataFrame,
+    country: str
+) -> go.Figure:
+    """Plot hour-of-day vs month heatmap with McKinsey styling.
+
+    Module C: DA Price Heatmap
+
+    Creates a 2D heatmap showing average day-ahead prices by hour and month.
+
+    Parameters
+    ----------
+    day_ahead_df : pd.DataFrame
+        Wide-format day-ahead data with timestamp column
+    country : str
+        Country code
+
+    Returns
+    -------
+    go.Figure
+        Heatmap visualization
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_da_price_heatmap_mckinsey(tables['day_ahead'], country='DE')
+    >>> fig.show()
+    """
+    from viz_config import MCKINSEY_COLORS, apply_mckinsey_style
+
+    # Get data for country
+    country_col = 'DE_LU' if country == 'DE' else country
+
+    if country_col not in day_ahead_df.columns:
+        raise ValueError(f"Country {country} not found in day-ahead data")
+
+    df = day_ahead_df[[TIMESTAMP_COL, country_col]].copy()
+    df['hour'] = df[TIMESTAMP_COL].dt.hour
+    df['month'] = df[TIMESTAMP_COL].dt.month
+
+    # Pivot to create hour x month matrix
+    pivot = df.pivot_table(
+        index='hour',
+        columns='month',
+        values=country_col,
+        aggfunc='mean'
+    )
+
+    # Create custom colorscale (diverging: negative=blue, zero=white, positive=red)
+    colorscale = [
+        [0.0, '#003f5c'],   # Dark blue (negative)
+        [0.25, '#2f4b7c'],  # Blue
+        [0.5, '#ffffff'],   # White (zero)
+        [0.75, '#ff6361'],  # Coral
+        [1.0, '#bc5090']    # Purple (high positive)
+    ]
+
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=pivot.values,
+        x=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        y=list(range(24)),
+        colorscale=colorscale,
+        colorbar=dict(
+            title='Avg Price<br>(EUR/MWh)',
+            titleside='right'
+        ),
+        hovertemplate='Month: %{x}<br>Hour: %{y}:00<br>Avg Price: %{z:.2f} EUR/MWh<extra></extra>'
+    ))
+
+    # Apply McKinsey styling
+    fig = apply_mckinsey_style(
+        fig,
+        title=f'Day-Ahead Price Pattern - {country}'
+    )
+
+    fig.update_layout(
+        xaxis_title='Month',
+        yaxis_title='Hour of Day',
+        height=500,
+        yaxis=dict(
+            tickmode='linear',
+            tick0=0,
+            dtick=2  # Show every 2 hours
+        )
+    )
+
+    return fig
+
+
+def calculate_price_statistics_mckinsey(
+    tables: Dict[str, pd.DataFrame],
+    country: str,
+    market: str = 'day_ahead'
+) -> pd.DataFrame:
+    """Calculate comprehensive price statistics.
+
+    Module D: Price Statistics
+
+    Calculates descriptive statistics for a selected market and country.
+
+    Parameters
+    ----------
+    tables : dict
+        All market tables
+    country : str
+        Country code
+    market : str, optional
+        One of: 'day_ahead', 'fcr', 'afrr_capacity_pos', 'afrr_capacity_neg',
+                'afrr_energy_pos', 'afrr_energy_neg' (default: 'day_ahead')
+
+    Returns
+    -------
+    pd.DataFrame
+        Statistics table ready for display
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> stats = calculate_price_statistics_mckinsey(tables, country='DE', market='day_ahead')
+    >>> print(stats)
+    """
+    # Get appropriate data
+    if market == 'day_ahead':
+        col = 'DE_LU' if country == 'DE' else country
+        data = tables['day_ahead'][col]
+        unit = 'EUR/MWh'
+    elif market == 'fcr':
+        data = tables['fcr'][country]
+        unit = 'EUR/MW'
+    elif market.startswith('afrr_capacity'):
+        direction = 'Pos' if 'pos' in market else 'Neg'
+        data = tables['afrr_capacity'][f'{country}_{direction}']
+        unit = 'EUR/MW'
+    elif market.startswith('afrr_energy'):
+        direction = 'Pos' if 'pos' in market else 'Neg'
+        data = tables['afrr_energy'][f'{country}_{direction}']
+        unit = 'EUR/MWh'
+    else:
+        raise ValueError(f"Unknown market: {market}")
+
+    # Calculate statistics
+    stats = {
+        'Metric': ['Mean', 'Median', 'Std Dev', 'Min', 'Max', 'Range',
+                   '10th Percentile', '90th Percentile'],
+        'Value': [
+            f"{data.mean():.2f}",
+            f"{data.median():.2f}",
+            f"{data.std():.2f}",
+            f"{data.min():.2f}",
+            f"{data.max():.2f}",
+            f"{data.max() - data.min():.2f}",
+            f"{data.quantile(0.1):.2f}",
+            f"{data.quantile(0.9):.2f}"
+        ],
+        'Unit': [unit] * 8
+    }
+
+    return pd.DataFrame(stats)
+
+
+def plot_price_statistics_mckinsey(
+    stats_df: pd.DataFrame,
+    country: str,
+    market: str
+) -> go.Figure:
+    """Display statistics as a clean table figure.
+
+    Module D: Price Statistics (Visualization)
+
+    Creates a professional table visualization for price statistics.
+
+    Parameters
+    ----------
+    stats_df : pd.DataFrame
+        Statistics from calculate_price_statistics_mckinsey()
+    country : str
+        Country code
+    market : str
+        Market name for title
+
+    Returns
+    -------
+    go.Figure
+        Table visualization
+
+    Example
+    -------
+    >>> stats = calculate_price_statistics_mckinsey(tables, 'DE', 'day_ahead')
+    >>> fig = plot_price_statistics_mckinsey(stats, 'DE', 'day_ahead')
+    >>> fig.show()
+    """
+    from viz_config import MCKINSEY_COLORS, MCKINSEY_FONTS
+
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=['<b>Metric</b>', '<b>Value</b>', '<b>Unit</b>'],
+            fill_color=MCKINSEY_COLORS['navy'],
+            font=dict(color='white', size=MCKINSEY_FONTS['axis_label_size']),
+            align='left',
+            height=30
+        ),
+        cells=dict(
+            values=[stats_df['Metric'], stats_df['Value'], stats_df['Unit']],
+            fill_color=[[MCKINSEY_COLORS['bg_light_gray'], 'white'] * 4],
+            font=dict(size=MCKINSEY_FONTS['tick_label_size']),
+            align='left',
+            height=25
+        )
+    )])
+
+    fig.update_layout(
+        title=f'Price Statistics - {market.replace("_", " ").title()} - {country}',
+        height=350,
+        margin=dict(l=20, r=20, t=60, b=20)
+    )
+
+    return fig
+
+
 # ---------------------------------------------------------------------------
 # CLI bootstrap
 # ---------------------------------------------------------------------------
