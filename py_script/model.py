@@ -60,10 +60,12 @@ class ImprovedBESSOptimizer:
         
         # Market parameters
         self.market_params = {
+            'min_bid_da': 0.1,    # MW
             'min_bid_fcr': 1.0,   # MW
             'min_bid_afrr': 1.0,  # MW
             'time_step_hours': 0.25,  # 15 minutes
             'block_duration_hours': 4.0,  # AS market blocks
+            'reserve_duration_hours': 0.25, # Assumed activation duration for reserve calculation
             'solver_time_limit': 600  # seconds - consistent across all solvers
         }
         
@@ -76,6 +78,7 @@ class ImprovedBESSOptimizer:
         # Pre-computed mappings for efficiency
         self._block_to_times = {}
         self._time_to_block = {}
+        self._day_to_times = {}
         
         logger.info("Improved BESS Optimizer initialized")
     
@@ -275,15 +278,22 @@ class ImprovedBESSOptimizer:
         # PRE-COMPUTE MAPPINGS FOR EFFICIENCY (Addresses Critical Issue #3)
         block_to_times = {}
         time_to_block = {}
+        day_to_times = {}
         for t in T_data:
             block_id = int(country_data['block_id'].iloc[t])
-            time_to_block[t] = block_id
             if block_id not in block_to_times:
                 block_to_times[block_id] = []
             block_to_times[block_id].append(t)
-        
+            time_to_block[t] = block_id
+
+            day_id = int(country_data['day_id'].iloc[t])
+            if day_id not in day_to_times:
+                day_to_times[day_id] = []
+            day_to_times[day_id].append(t)
+
         # Store for objective function (eliminates O(B×T) complexity)
         self._block_to_times = block_to_times
+        self._day_to_times = day_to_times
         
         # PRE-COMPUTE AS PRICES BY BLOCK (Addresses Critical Issue #4)
         fcr_prices_by_block = {}
@@ -325,10 +335,14 @@ class ImprovedBESSOptimizer:
         # Parameters - Time intervals  
         model.dt = pyo.Param(initialize=self.market_params['time_step_hours'], 
                             doc="Time step duration (hours)")
+        model.tau = pyo.Param(initialize=self.market_params['reserve_duration_hours'],
+                             doc="Assumed reserve activation duration (hours)")
         model.db = pyo.Param(initialize=self.market_params['block_duration_hours'], 
                             doc="Block duration for AS markets (hours)")
         
         # Parameters - Minimum bid sizes
+        model.min_bid_da = pyo.Param(initialize=self.market_params['min_bid_da'],
+                                     doc="Minimum DA bid size (MW)")
         model.min_bid_fcr = pyo.Param(initialize=self.market_params['min_bid_fcr'], 
                                      doc="Minimum FCR bid size (MW)")
         model.min_bid_afrr = pyo.Param(initialize=self.market_params['min_bid_afrr'], 
@@ -384,118 +398,142 @@ class ImprovedBESSOptimizer:
         model.y_afrr_neg = pyo.Var(model.B, domain=pyo.Binary, 
                                   doc="aFRR negative market participation")
         
-        # CONSTRAINTS (No more closure anti-patterns!)
-        
-        # 1. SOC dynamics
+        # ============================================================================
+        # CONSTRAINTS (Ordered to match documentation structure)
+        # ============================================================================
+
+        # Cst-1: Energy Balance (SOC Dynamics)
+        # e_soc(t) = e_soc(t-1) + (p_ch(t)*η_ch - p_dis(t)/η_dis) * Δt
         def soc_dynamics_rule(model, t):
             if t == T_data[0]:
                 return model.e_soc[t] == model.E_soc_init + (model.eta_ch * model.p_ch[t] - model.p_dis[t] / model.eta_dis) * model.dt
             else:
                 return model.e_soc[t] == model.e_soc[t-1] + (model.eta_ch * model.p_ch[t] - model.p_dis[t] / model.eta_dis) * model.dt
         model.soc_dynamics = pyo.Constraint(model.T, rule=soc_dynamics_rule)
-        
-        # 2. Charging power limits
-        def charging_limit_rule(model, t):
-            return model.p_ch[t] <= model.y_ch[t] * model.P_max_config
-        model.charging_limit = pyo.Constraint(model.T, rule=charging_limit_rule)
-        
-        # 3. Discharging power limits
-        def discharging_limit_rule(model, t):
-            return model.p_dis[t] <= model.y_dis[t] * model.P_max_config
-        model.discharging_limit = pyo.Constraint(model.T, rule=discharging_limit_rule)
-        
-        # 4. Simultaneous operation prevention
+
+        # Cst-2: SOC Limits
+        # SOC_min * E_nom ≤ e_soc(t) ≤ SOC_max * E_nom
+        # Note: Already enforced via variable bounds (lines 375-377)
+        # No explicit constraint needed - included in model.e_soc variable definition
+
+        # Cst-3: Simultaneous Operation Prevention
+        # y_ch(t) + y_dis(t) ≤ 1
         def no_simultaneous_rule(model, t):
             return model.y_ch[t] + model.y_dis[t] <= 1
         model.no_simultaneous = pyo.Constraint(model.T, rule=no_simultaneous_rule)
-        
-        # 5. Market co-optimization power limits (FIXED - no external data access!)
+
+        # Cst-4: Market Co-optimization Power Limits
+        # Total discharge: p_dis(t) + 1000*c_fcr(b) + 1000*c_afrr_pos(b) ≤ P_max
+        # Total charge: p_ch(t) + 1000*c_fcr(b) + 1000*c_afrr_neg(b) ≤ P_max
         def power_dis_reserve_limit_rule(model, t):
-            b = model.block_map[t]  # Use model parameter instead of external data
-            return (model.p_dis[t] + 1000 * model.c_fcr[b] + 
-                   1000 * model.c_afrr_pos[b] <= model.P_max_config)
+            block = model.block_map[t]
+            return model.p_dis[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_pos[block] <= model.P_max_config
         model.power_dis_reserve_limit = pyo.Constraint(model.T, rule=power_dis_reserve_limit_rule)
-        
+
         def power_ch_reserve_limit_rule(model, t):
-            b = model.block_map[t]  # Use model parameter instead of external data
-            return (model.p_ch[t] + 1000 * model.c_fcr[b] + 
-                   1000 * model.c_afrr_neg[b] <= model.P_max_config)
+            block = model.block_map[t]
+            return model.p_ch[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_neg[block] <= model.P_max_config
         model.power_ch_reserve_limit = pyo.Constraint(model.T, rule=power_ch_reserve_limit_rule)
-        
-        # 6. Daily cycle limit
+
+        # Cst-5: Daily Cycle Limits
+        # Σ_{t∈d} (p_dis(t)/η_dis * Δt) ≤ N_cycles * E_nom
         def daily_cycle_rule(model, d):
-            # Get time steps for this day using pre-computed mapping
-            day_times = [t for t in model.T if country_data['day_id'].iloc[t] == d]
-            if day_times:
-                return sum(model.p_dis[t] * model.dt for t in day_times) <= model.N_cycles * model.E_nom
-            else:
-                return pyo.Constraint.Skip
+            # Use pre-computed day_to_times mapping
+            return sum(model.p_dis[t] / model.eta_dis * model.dt for t in self._day_to_times[d]) <= model.N_cycles * model.E_nom
         model.daily_cycle_limit = pyo.Constraint(model.D, rule=daily_cycle_rule)
-        
-        # 7. Ancillary service energy reserve constraints 
+
+        # Cst-6: Ancillary Service Energy Reserve
+        # Upward regulation: (1000*c_fcr + 1000*c_afrr_pos)*τ/η_dis ≤ e_soc(t) - SOC_min*E_nom
+        # Downward regulation: (1000*c_fcr + 1000*c_afrr_neg)*τ*η_ch ≤ SOC_max*E_nom - e_soc(t)
         def energy_reserve_pos_rule(model, t):
-            b = model.block_map[t]  # Use model parameter
-            return (model.e_soc[t] >= 
-                   model.SOC_min * model.E_nom + 
-                   (1000 * model.c_fcr[b] + 1000 * model.c_afrr_pos[b]) * model.dt)
+            block = model.block_map[t]
+            required_energy = (1000 * model.c_fcr[block] + 1000 * model.c_afrr_pos[block]) * model.tau / model.eta_dis
+            return required_energy <= model.e_soc[t] - model.SOC_min * model.E_nom
         model.energy_reserve_pos = pyo.Constraint(model.T, rule=energy_reserve_pos_rule)
-        
+
         def energy_reserve_neg_rule(model, t):
-            b = model.block_map[t]  # Use model parameter
-            # CORRECT implementation with MINUS sign (Python code was already correct)
-            return (model.e_soc[t] <= 
-                   model.SOC_max * model.E_nom - 
-                   (1000 * model.c_fcr[b] + 1000 * model.c_afrr_neg[b]) * model.dt)
+            block = model.block_map[t]
+            required_storage = (1000 * model.c_fcr[block] + 1000 * model.c_afrr_neg[block]) * model.tau * model.eta_ch
+            return required_storage <= model.SOC_max * model.E_nom - model.e_soc[t]
         model.energy_reserve_neg = pyo.Constraint(model.T, rule=energy_reserve_neg_rule)
-        
-        # 8. Minimum bid size constraints
+
+        # Cst-7: Ancillary Service Market Mutual Exclusivity
+        # y_fcr(b) + y_afrr_pos(b) + y_afrr_neg(b) ≤ 1
+        def as_market_exclusivity_rule(model, b):
+            return model.y_fcr[b] + model.y_afrr_pos[b] + model.y_afrr_neg[b] <= 1
+        model.as_market_exclusivity = pyo.Constraint(model.B, rule=as_market_exclusivity_rule)
+
+        # Cst-8: Cross-Market Mutual Exclusivity
+        # y_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no discharge bid with charging AS)
+        # y_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no charge bid with discharging AS)
+        def cross_market_exclusivity_rule_1(model, t):
+            block = model.block_map[t]
+            return model.y_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
+        model.cross_market_exclusivity1 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_1)
+
+        def cross_market_exclusivity_rule_2(model, t):
+            block = model.block_map[t]
+            return model.y_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
+        model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2)
+
+        # Cst-9: Minimum and Maximum Bid Size Constraints
+        # DA Energy Bids: y(t)*MinBid*1000 ≤ p(t) ≤ y(t)*P_max_config
+        def da_ch_min_bid_rule(model, t):
+            return model.p_ch[t] >= model.y_ch[t] * model.min_bid_da * 1000
+        model.da_ch_min_bid = pyo.Constraint(model.T, rule=da_ch_min_bid_rule)
+
+        def da_ch_max_bid_rule(model, t):
+            return model.p_ch[t] <= model.y_ch[t] * model.P_max_config
+        model.da_ch_max_bid = pyo.Constraint(model.T, rule=da_ch_max_bid_rule)
+
+        def da_dis_min_bid_rule(model, t):
+            return model.p_dis[t] >= model.y_dis[t] * model.min_bid_da * 1000
+        model.da_dis_min_bid = pyo.Constraint(model.T, rule=da_dis_min_bid_rule)
+
+        def da_dis_max_bid_rule(model, t):
+            return model.p_dis[t] <= model.y_dis[t] * model.P_max_config
+        model.da_dis_max_bid = pyo.Constraint(model.T, rule=da_dis_max_bid_rule)
+
+        # FCR Capacity Bids: y(b)*MinBid ≤ c(b) ≤ y(b)*P_max_config/1000
         def fcr_min_bid_rule(model, b):
             return model.c_fcr[b] >= model.y_fcr[b] * model.min_bid_fcr
         model.fcr_min_bid = pyo.Constraint(model.B, rule=fcr_min_bid_rule)
-        
+
         def fcr_max_bid_rule(model, b):
             return model.c_fcr[b] <= model.y_fcr[b] * (model.P_max_config / 1000)
         model.fcr_max_bid = pyo.Constraint(model.B, rule=fcr_max_bid_rule)
-        
+
+        # aFRR Capacity Bids: y(b)*MinBid ≤ c(b) ≤ y(b)*P_max_config/1000
         def afrr_pos_min_bid_rule(model, b):
             return model.c_afrr_pos[b] >= model.y_afrr_pos[b] * model.min_bid_afrr
         model.afrr_pos_min_bid = pyo.Constraint(model.B, rule=afrr_pos_min_bid_rule)
-        
+
         def afrr_pos_max_bid_rule(model, b):
             return model.c_afrr_pos[b] <= model.y_afrr_pos[b] * (model.P_max_config / 1000)
         model.afrr_pos_max_bid = pyo.Constraint(model.B, rule=afrr_pos_max_bid_rule)
-        
+
         def afrr_neg_min_bid_rule(model, b):
             return model.c_afrr_neg[b] >= model.y_afrr_neg[b] * model.min_bid_afrr
         model.afrr_neg_min_bid = pyo.Constraint(model.B, rule=afrr_neg_min_bid_rule)
-        
+
         def afrr_neg_max_bid_rule(model, b):
             return model.c_afrr_neg[b] <= model.y_afrr_neg[b] * (model.P_max_config / 1000)
         model.afrr_neg_max_bid = pyo.Constraint(model.B, rule=afrr_neg_max_bid_rule)
         
-        # 9. CRITICAL FIX: Ancillary Service Market Mutual Exclusivity
-        # Prevent simultaneous bidding in multiple AS markets for the same block
-        def as_market_exclusivity_rule(model, b):
-            return model.y_fcr[b] + model.y_afrr_pos[b] + model.y_afrr_neg[b] <= 1
-        model.as_market_exclusivity = pyo.Constraint(model.B, rule=as_market_exclusivity_rule)
-        
         # OPTIMIZED OBJECTIVE FUNCTION (Addresses Critical Issue #3)
         def objective_rule(model):
-            # Day-ahead arbitrage revenue (indexed by time)
-            da_revenue = sum(
-                (model.p_dis[t] - model.p_ch[t]) * model.P_DA[t] / 1000 * model.dt
-                for t in model.T
-            )
+            # Day-ahead profit
+            da_profit = sum((model.P_DA[t] / 1000 * model.p_dis[t] - 
+                             model.P_DA[t] / 1000 * model.p_ch[t]) * model.dt 
+                            for t in model.T)
             
-            # Ancillary services revenue (indexed by block - OPTIMIZED!)
-            as_revenue = sum(
-                model.P_FCR[b] * model.c_fcr[b] * model.db +
-                model.P_aFRR_pos[b] * model.c_afrr_pos[b] * model.db +
-                model.P_aFRR_neg[b] * model.c_afrr_neg[b] * model.db
-                for b in model.B
-            )
+            # Ancillary service profit (prices are per block, so no db multiplication)
+            as_profit = sum(model.P_FCR[b] * model.c_fcr[b] +
+                            model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
+                            model.P_aFRR_neg[b] * model.c_afrr_neg[b]
+                            for b in model.B)
             
-            return da_revenue + as_revenue
+            return da_profit + as_profit
         
         model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
         

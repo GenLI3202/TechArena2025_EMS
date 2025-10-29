@@ -290,19 +290,19 @@ $$
 
 
 ##### **(Cst-6): Ancillary Service Energy Reserve**
-Maintain sufficient energy reserve for ancillary service activation, accounting for BESS efficiency.
+Maintain sufficient energy reserve for ancillary service activation, accounting for BESS efficiency. The parameter $\tau$ represents the assumed worst-case continuous activation duration for reserves (typically set to $\Delta t = 0.25$ hours for this model).
 
 *   To provide upward regulation (discharge), the available energy in the BESS must cover the energy drawn from the DC side.
 $$
 \begin{equation}
-    \frac{\big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b)\big)\Delta t}{\eta_{\mathrm{dis}}} \leq e_{\mathrm{soc}}(t) - SOC_{\min}\,E_{\mathrm{nom}}  
+    \frac{\big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b)\big)\,\tau}{\eta_{\mathrm{dis}}} \leq e_{\mathrm{soc}}(t) - SOC_{\min}\,E_{\mathrm{nom}}  
     \qquad \forall b\in B,\, \forall t\in b
 \end{equation}
 $$
 *   To provide downward regulation (charge), the available headroom in the BESS must be able to store the energy delivered to the DC side.
 $$
 \begin{equation}
-    \big[\big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b)\big)\,\Delta t\big] \eta_{\mathrm{ch}} \leq SOC_{\max}\,E_{\mathrm{nom}} - e_{\mathrm{soc}}(t)
+    \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b)\big)\,\tau\,\eta_{\mathrm{ch}} \leq SOC_{\max}\,E_{\mathrm{nom}} - e_{\mathrm{soc}}(t)
     \qquad \forall b\in B,\, \forall t\in b
 \end{equation}
 $$
