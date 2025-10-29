@@ -410,17 +410,17 @@ class ImprovedBESSOptimizer:
         model.no_simultaneous = pyo.Constraint(model.T, rule=no_simultaneous_rule)
         
         # 5. Market co-optimization power limits (FIXED - no external data access!)
-        def power_ch_reserve_limit_rule(model, t):
-            b = model.block_map[t]  # Use model parameter instead of external data
-            return (model.p_ch[t] + 1000 * model.c_fcr[b] + 
-                   1000 * model.c_afrr_pos[b] <= model.P_max_config)
-        model.power_ch_reserve_limit = pyo.Constraint(model.T, rule=power_ch_reserve_limit_rule)
-        
         def power_dis_reserve_limit_rule(model, t):
             b = model.block_map[t]  # Use model parameter instead of external data
             return (model.p_dis[t] + 1000 * model.c_fcr[b] + 
-                   1000 * model.c_afrr_neg[b] <= model.P_max_config)
+                   1000 * model.c_afrr_pos[b] <= model.P_max_config)
         model.power_dis_reserve_limit = pyo.Constraint(model.T, rule=power_dis_reserve_limit_rule)
+        
+        def power_ch_reserve_limit_rule(model, t):
+            b = model.block_map[t]  # Use model parameter instead of external data
+            return (model.p_ch[t] + 1000 * model.c_fcr[b] + 
+                   1000 * model.c_afrr_neg[b] <= model.P_max_config)
+        model.power_ch_reserve_limit = pyo.Constraint(model.T, rule=power_ch_reserve_limit_rule)
         
         # 6. Daily cycle limit
         def daily_cycle_rule(model, d):

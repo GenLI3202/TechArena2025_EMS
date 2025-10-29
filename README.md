@@ -69,7 +69,7 @@ Submissions are evaluated based on:
 | 0.33 C | 1,476 | 1.5 | 6,708 |
 | 0.50 C | 2,236 | 2.0 | 8,944 |
 
-**Total Scenarios**: 6 countries (DE, DE_LU, AT, CH, HU, CZ) × 3 C-rates × 3 cycles = 54 scenarios
+**Total Scenarios**: 5 countries (DE (DE_LU), AT, CH, HU, CZ) × 3 C-rates × 3 cycles = 45 scenarios
 
 ---
 

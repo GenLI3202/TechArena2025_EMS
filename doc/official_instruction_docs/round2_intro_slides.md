@@ -4,7 +4,8 @@
 
 * In Phase II, students have the opportunity to improve their codes to achieve better and more optimized solutions. 
 * The new phase must include **the effect of battery degradation**. In other words, the operational strategy should aim to maximize battery lifetime. 
-* From an operational perspective, participants should also **integrate the aFRR market and intraday trading **into their EMS algorithms.
+    > - [ ] Comment by Gen: Shall this be optimized as a bi-objective problem, show optimal solutions in Pareto plots?
+* From an operational perspective, participants should also **integrate the aFRR market and intraday trading** into their EMS algorithms.
 
 ```mermaid
 flowchart TD
