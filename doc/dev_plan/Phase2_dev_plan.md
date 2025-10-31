@@ -1,832 +1,943 @@
-# TechArena 2025 Phase 2 Development Plan
+# TechArena 2025 Phase 2 Development Plan (REVISED)
 
 **Created:** 2025-10-25
-**Timeline:** Oct 25 - Nov 9 (15 days)
-**Demo Deadline:** Oct 31 (6 days)
-**Submission Deadline:** Nov 9 (15 days)
+**Last Updated:** 2025-10-31 (Post-Week 1 Review)
+**Timeline:** Oct 25 - Nov 9 (15 days total, 9 days remaining)
+**Demo Deadline:** Oct 31 (TODAY)
+**Submission Deadline:** Nov 9 (9 days remaining)
 
 ---
 
-## Executive Summary
+## ⚠️ WEEK 1 REALITY CHECK - CRITICAL UPDATE
+
+**Overall Progress:** ~40% of Week 1 deliverables completed
+**Status:** Behind schedule but with strong foundation
+**Revised Target:** Aggressive sprint mode for Week 2
+
+### What Actually Happened in Week 1
+
+**✅ COMPLETED:**
+1. **Phase 1 Model Validation** (Oct 27-30)
+   - Comprehensive week-long validation across all 45 scenarios
+   - Constraint verification and performance testing
+   - Model refactoring and optimization
+   - **Result:** Production-ready Phase 1 baseline
+
+2. **Phase 2 Mathematical Design** (Oct 26-29)
+   - Complete formulation in `doc/gg_dp_p2_model.tex/p2_model_ggdp.tex`
+   - Battery degradation modeling approach (cyclic + calendar aging)
+   - aFRR energy market integration design
+   - **Result:** Implementation-ready mathematical model
+
+3. **Data Processing & Visualization Infrastructure** (Oct 26)
+   - Data pipeline: `process_phase2_data.py` ✅
+   - View 1 visualizations: All 4 modules implemented ✅
+   - McKinsey styling: `viz_config.py` ✅
+   - **Result:** Dashboard backend is ready
+
+**❌ NOT STARTED:**
+1. Battery degradation model implementation (0%)
+2. Phase 2 optimization model extension (0%)
+3. Web dashboard application (Dash/Streamlit) (0%)
+
+**Key Insight:** Week 1 prioritized "correctness over speed" - ensuring Phase 1 is bulletproof before extending. This was wise but creates time pressure for Week 2.
+
+---
+
+## Executive Summary (REVISED)
 
 ### Strategic Answer to Your Question
 
-**Should you migrate visualization to web dashboard first, or focus on battery degradation modeling?**
+**Original Question:** Should you migrate visualization to web dashboard first, or focus on battery degradation modeling?
 
-**Answer: Neither-first approach. Do BOTH in parallel with smart prioritization.**
+**REVISED Answer:** Neither-first is no longer viable. **DEGRADATION-FIRST ONLY.**
 
-**Week 1 Strategy (Oct 25-31, 6 days to demo):**
-1. **Days 1-2:** Battery degradation model (core algorithm) - 30% of grade
-2. **Days 3-4:** Integration into optimization model + initial testing
-3. **Days 5-6:** Minimal web dashboard (market data viz + 2-3 results)
+### Week 2 Strategy (Nov 1-9, 9 days to submission)
 
-**Week 2 Strategy (Nov 1-9, 9 days to submission):**
-1. Comprehensive scenario analysis with degradation
-2. Dashboard completion with all results
-3. Documentation, testing, validation
+**CRITICAL PATH (Non-negotiable):**
+1. **Days 1-3 (Nov 1-3):** Battery degradation model + Phase 2 optimization (60% of grade)
+2. **Days 4-6 (Nov 4-6):** Scenario analysis (45 scenarios)
+3. **Days 7-9 (Nov 7-9):** Results analysis + documentation + dashboard development
 
-### Visualization Strategy: Python + Web (Not Either/Or)
+**SCOPE ADJUSTMENTS:**
+- ✅ 45 scenarios: 5 countries (DE, AT, CH, CZ, HU) × 3 C-rates × 3 cycle settings
+- ✅ Web dashboard development included
+- ✅ 5 SOC segments (simplified degradation)
+- [?] Temperature effects → Optional, if time permits (focus on C-rate, SOC, DoD primarily)
 
-**Use BOTH, for different purposes:**
+**Why This Will Work:**
+- Visualization infrastructure already exists (Oct 26 work)
+- Phase 1 model is validated and ready to extend
+- Mathematical design is complete - just needs implementation
+- 45 scenarios provide comprehensive methodology across all target markets
 
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| **Python/Plotly in Jupyter** | Development & validation | Daily model testing, quick sanity checks, parameter tuning |
-| **Web Dashboard** | Presentation & communication | Oct 31 demo, final submission, stakeholder presentation |
+### Visualization Strategy: Web Dashboard + Notebooks
 
-**Rationale:** Building the dashboard BEFORE having validated model results is putting the cart before the horse. The dashboard is a **presentation layer** - it needs validated data to present. Focus on generating that data first.
+| Tool | Plan | Status | Justification |
+|------|------|--------|---------------|
+| **Web Dashboard** | Plotly Dash, 3 tabs, interactive | ✅ INCLUDED | Enhances presentation and code quality (target 90%+) |
+| **Jupyter Notebooks** | Development & analysis | ✅ INCLUDED | View 1 functions already work; used for detailed analysis |
+| **Existing Viz Functions** | Backend for dashboard | ✅ READY | `plot_*_mckinsey()` functions are presentation-ready |
+
+**Impact on Code Quality Grade (20%):**
+- Web dashboard with professional McKinsey-style plots: 90%+ potential
+- Integration with existing visualization functions reduces development time
+- Notebooks complement dashboard for detailed technical analysis
 
 ---
 
-## 1. Evaluation Criteria Analysis
+## 1. Evaluation Criteria Analysis (UNCHANGED)
 
 ### Phase 2 Grading Breakdown
-| Criteria | Weight | Current Status | Development Priority |
-|----------|--------|----------------|---------------------|
-| **Revenue maximization** | 30% | Baseline from Phase 1 | P1 - Enhance with intraday aFRR |
-| **Battery degradation** | 30% | ❌ Not started | **P0 - CRITICAL PATH** |
-| **Investment optimization** | 10% | Baseline from Phase 1 | P2 - Update with degradation impact |
-| **Configuration optimization** | 10% | Baseline from Phase 1 | P2 - Re-analyze with degradation |
-| **Code quality & documentation** | 20% | Good foundation exists | P1 - Dashboard + docs |
 
-**Key Insight:** Battery degradation (30%) + Revenue (30%) = 60% of your grade. These are the critical path items.
+| Criteria | Weight | Current Status | Week 2 Target | Development Priority |
+|----------|--------|----------------|---------------|---------------------|
+| **Revenue maximization** | 30% | Phase 1 baseline solid | 80%+ | P1 - Enhance with intraday aFRR |
+| **Battery degradation** | 30% | ❌ Not started (0%) | 75%+ | **P0 - CRITICAL PATH** |
+| **Investment optimization** | 10% | Phase 1 baseline solid | 85%+ | P2 - Update with degradation impact |
+| **Configuration optimization** | 10% | Phase 1 validated | 85%+ | P2 - Re-analyze with degradation |
+| **Code quality & documentation** | 20% | Good foundation exists | 85%+ | P1 - Notebooks + docs |
+
+**Revised Target Score:** 80% (realistic given time pressure)
+**Original Target:** 87% (no longer achievable without cutting sleep)
 
 ### What's NEW in Phase 2
-1.**Battery Degradation Modeling** - Using ORC model (organizers will validate with their model)
-2.**Intraday aFRR Energy Market** - New revenue stream (activation-based, not just capacity)
-3.**Enhanced Results Presentation** - Dashboard expected (supports 20% code quality grade)
+
+1. **Battery Degradation Modeling** - Using simplified ORC approach (5 segments)
+2. **Intraday aFRR Energy Market** - New revenue stream (activation-based)
+3. **Enhanced Results Presentation** - Jupyter notebooks with professional plots
 
 ---
 
-## 2. Two-Week Sprint Plan Overview
+## 2. WEEK 2: Emergency Sprint Plan (Nov 1-9)
 
+### Critical Time Budget
 
-Week 1 (Oct 25-31): Foundation + Demo
-- [ ] Day 1-2: Battery degradation model implementation
-- [ ] Day 3-4: Optimization model integration + validation
-- [ ] Day 5-6: Minimal web dashboard for demo
-- [ ] Oct 31: Industry expert demo
-
-Week 2 (Nov 1-9): Completion + Submission
-- [ ] Day 7-8: Full scenario analysis (54 scenarios)
-- [ ] Day 9-10: Investment analysis update
-- [ ] Day 11-12: Dashboard completion + documentation
-- [ ] Day 13-14: Testing, validation, report writing
-- [ ] Nov 9: Final submission
-
+**Total Time Available:** 9 days × 8 hours/day = **72 hours**
+**Required Work:** ~80 hours (original Week 1 + Week 2)
+**Strategy:** Aggressive descoping + parallel work + accepting "good enough"
 
 ---
 
-## 3. WEEK 1: Foundation + Demo (Oct 25-31)
+## 3. DAILY BREAKDOWN: Nov 1-3 (Critical Path Implementation)
 
-### Day 1-2 (Oct 25-26): Battery Degradation Model
+### Day 1 (Nov 1): Battery Degradation Model Foundation
 
-**Objective:** Implement ORC battery degradation model
+**Objective:** Implement simplified degradation calculator
 
-#### Background: Why Degradation Matters
-From the Phase 2 instructions and literature:
-- Battery degradation is **30% of your grade**
-- Organizers will evaluate your operation schedule using **their ORC model**
-- Better degradation models € higher profits with similar SOH impact (see Battery_degradation.png)
+#### Morning Session (4 hours): Literature & Parameters
 
-#### Priority Degradation Factors (P1 Level)
-Based on official docs (`round2_intro_slides.md`):
+**Task 1.1: Extract Degradation Parameters (2 hours)**
+- [ ] Read Collath et al. (2023) Section 2.2 (Calendar aging model)
+- [ ] Read Xu et al. (2017) Section III (Piecewise-linear cycling cost)
+- [ ] Document key equations in notebook for reference
+- [ ] Extract numerical parameters:
+  - Calendar aging: SOC vs. capacity fade rate (Table II)
+  - Cyclic aging: DoD vs. cycle life (Figure 3)
 
-| Factor | Impact Mechanism | How to Model |
-|--------|------------------|--------------|
-| **C-rate** | High charge/discharge rates € lithium plating, heat | Track: avg/max C-rate, time at high C-rate |
-| **SoC Range** | High SoC (>90%) € cathode oxidation<br>Low SoC (<10%) € copper dissolution | Track: time at extreme SoC, avg SoC |
-| **Depth of Discharge** | Deep cycles (0-100%) € electrode stress<br>Shallow cycles (20-80%) € longer life | Track: cycle depth distribution, cumulative FEC |
+**Task 1.2: Design Simplified Model (2 hours)**
+- [ ] Choose 5 SOC segments (0-20%, 20-40%, 40-60%, 60-80%, 80-100%)
+- [ ] Calculate marginal costs for each segment:
+  ```python
+  # Example structure:
+  DEGRADATION_COST = {
+      'segment_1': 0.01,  # EUR/kWh (shallow cycles - cheap)
+      'segment_2': 0.015,
+      'segment_3': 0.02,
+      'segment_4': 0.03,
+      'segment_5': 0.05,  # EUR/kWh (deep cycles - expensive)
+  }
+  ```
+- [ ] Define calendar aging breakpoints (5 points: 0%, 25%, 50%, 75%, 100% SOC)
 
-#### Tasks
+#### Afternoon Session (4 hours): Implementation
 
-**Task 1.1: Literature Review (3 hours)**
-- [ ] Read: Collath et al. (2023) "Increasing lifetime profitability of BESS..."
-- [ ] Study: ORC model equations from official docs
-- [ ] Extract: Key parameters for degradation calculation
-  - Cycle aging: f(DoD, C-rate, temperature)
-  - Calendar aging: f(SoC_avg, temperature, time)
-
-**Task 1.2: Create `py_script/battery_degradation.py` (6 hours)**
+**Task 1.3: Create `battery_degradation.py` (4 hours)**
 
 ```python
-"""Battery degradation model for TechArena 2025 Phase 2.
+"""
+Battery Degradation Model for TechArena 2025 Phase 2
+====================================================
 
-This module implements the ORC battery degradation model considering:
-- Cycle aging (P1 factors: C-rate, SoC range, DoD)
-- Calendar aging (P1 factors: average SoC, time)
-- SOH evolution over 10-year operational horizon
+Implements simplified ORC-based degradation model with:
+- Cyclic aging (piecewise-linear by SOC segment)
+- Calendar aging (SOS2 linearization)
+
+Author: Team SoloGen
+Date: November 2025
 """
 
+import numpy as np
+import pandas as pd
+from typing import Dict, Tuple, List
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class BatteryDegradationModel:
-    """ORC-based battery degradation calculator."""
+    """
+    Simplified battery degradation calculator for BESS optimization.
 
-    def __init__(self, battery_params):
-        """Initialize with battery specifications."""
-        self.capacity_kwh = battery_params['capacity_kwh']
-        self.initial_soh = 1.0  # 100% at start
+    Focuses on P1 factors:
+    - C-rate (implicit in power profile)
+    - SoC range (via segmentation)
+    - Depth of discharge (via piecewise-linear cost)
 
-    def calculate_cycle_aging(self, soc_profile, power_profile, temperature=25):
-        """Calculate capacity fade due to cycling.
+    Ignores for simplicity:
+    - Temperature effects
+    - Detailed SOH evolution (uses cost proxy instead)
+    """
+
+    def __init__(self, battery_capacity_kwh: float = 4472,
+                 battery_cost_eur_per_kwh: float = 200,
+                 expected_lifetime_years: int = 10):
+        """
+        Initialize degradation model with battery specs.
 
         Args:
-            soc_profile: Array of SOC values (0-1) for each timestep
-            power_profile: Dict with 'charge' and 'discharge' arrays (kW)
-            temperature: Operating temperature (°C)
-
-        Returns:
-            capacity_fade_percent: Capacity loss due to cycling (%)
+            battery_capacity_kwh: Nominal battery capacity (default: 4472 kWh)
+            battery_cost_eur_per_kwh: Battery replacement cost (default: 200 EUR/kWh)
+            expected_lifetime_years: Expected operational lifetime (default: 10 years)
         """
-        # Implement ORC cycle aging formula
-        # Key inputs: DoD, C-rate, number of cycles
-        pass
+        self.capacity_kwh = battery_capacity_kwh
+        self.cost_eur_per_kwh = battery_cost_eur_per_kwh
+        self.lifetime_years = expected_lifetime_years
 
-    def calculate_calendar_aging(self, soc_avg, days, temperature=25):
-        """Calculate capacity fade due to calendar aging.
+        # Simplified degradation parameters (from literature)
+        # These are annualized costs in EUR per kWh discharged from each segment
+        self.cyclic_cost_per_segment = {
+            1: 0.008,   # Segment 1: 80-100% SOC (shallow - cheapest)
+            2: 0.012,   # Segment 2: 60-80% SOC
+            3: 0.018,   # Segment 3: 40-60% SOC (middle)
+            4: 0.028,   # Segment 4: 20-40% SOC
+            5: 0.045,   # Segment 5: 0-20% SOC (deep - most expensive)
+        }
+
+        # Calendar aging: Cost per kWh*hour of storage at different SOC levels
+        # (annualized)
+        self.calendar_cost_by_soc = {
+            0.0: 0.001,    # 0% SOC
+            0.25: 0.0015,  # 25% SOC
+            0.50: 0.002,   # 50% SOC
+            0.75: 0.0035,  # 75% SOC
+            1.0: 0.005,    # 100% SOC (highest calendar aging)
+        }
+
+        # SOC boundaries for each segment (5 segments)
+        self.segment_bounds = {
+            1: (0.80, 1.00),
+            2: (0.60, 0.80),
+            3: (0.40, 0.60),
+            4: (0.20, 0.40),
+            5: (0.00, 0.20),
+        }
+
+        logger.info("Battery degradation model initialized")
+        logger.info(f"Capacity: {battery_capacity_kwh} kWh, "
+                   f"Cost: {battery_cost_eur_per_kwh} EUR/kWh, "
+                   f"Lifetime: {expected_lifetime_years} years")
+
+    def get_segment_from_soc(self, soc: float) -> int:
+        """
+        Determine which segment a given SOC belongs to.
 
         Args:
-            soc_avg: Average SOC over the period (0-1)
-            days: Number of days stored
-            temperature: Storage temperature (°C)
+            soc: State of charge (0.0 to 1.0)
 
         Returns:
-            capacity_fade_percent: Capacity loss due to calendar aging (%)
+            Segment number (1-5)
         """
-        # Implement ORC calendar aging formula
-        pass
+        for seg_num, (lower, upper) in self.segment_bounds.items():
+            if lower <= soc <= upper:
+                return seg_num
+        # Edge case: return nearest segment
+        if soc > 1.0:
+            return 1
+        else:
+            return 5
 
-    def calculate_total_degradation(self, operation_schedule, years=10):
-        """Calculate total SOH reduction over operational lifetime.
+    def get_cyclic_cost_parameters(self) -> Dict[int, Tuple[float, float]]:
+        """
+        Get cyclic aging cost parameters for Pyomo model.
+
+        Returns:
+            Dict mapping segment number to (capacity_kwh, cost_eur_per_kwh)
+        """
+        segment_capacity = self.capacity_kwh / 5  # Equal segments
+
+        return {
+            seg: (segment_capacity, cost)
+            for seg, cost in self.cyclic_cost_per_segment.items()
+        }
+
+    def get_calendar_cost_breakpoints(self) -> Tuple[List[float], List[float]]:
+        """
+        Get calendar aging breakpoints for SOS2 linearization.
+
+        Returns:
+            Tuple of (soc_points, cost_points) for Pyomo SOS2 constraints
+        """
+        soc_points = sorted(self.calendar_cost_by_soc.keys())
+        cost_points = [self.calendar_cost_by_soc[soc] for soc in soc_points]
+
+        return soc_points, cost_points
+
+    def estimate_annual_degradation_cost(self,
+                                        discharge_by_segment: Dict[int, float],
+                                        avg_soc: float,
+                                        hours: int = 8760) -> Dict[str, float]:
+        """
+        Estimate annual degradation cost from operational profile.
+
+        This is a post-optimization analysis function (not used in optimization itself).
 
         Args:
-            operation_schedule: DataFrame with columns:
-                - timestamp, soc, p_ch, p_dis
-            years: Operational lifetime
+            discharge_by_segment: Total kWh discharged from each segment in the year
+            avg_soc: Average SOC throughout the year (0.0 to 1.0)
+            hours: Number of hours (default: 8760 for full year)
 
         Returns:
-            dict with:
-                - final_soh: SOH after 'years' of operation (0-1)
-                - yearly_soh: Array of SOH for each year
-                - cycle_aging_contribution: % of total fade
-                - calendar_aging_contribution: % of total fade
+            Dict with 'cyclic_cost', 'calendar_cost', 'total_cost' in EUR
         """
-        pass
+        # Cyclic cost
+        cyclic_cost = sum(
+            discharge_by_segment.get(seg, 0) * cost
+            for seg, cost in self.cyclic_cost_per_segment.items()
+        )
+
+        # Calendar cost (interpolate for avg SOC)
+        soc_points, cost_points = self.get_calendar_cost_breakpoints()
+        calendar_cost_per_hour = np.interp(avg_soc, soc_points, cost_points)
+        calendar_cost = calendar_cost_per_hour * self.capacity_kwh * hours
+
+        return {
+            'cyclic_cost_eur': cyclic_cost,
+            'calendar_cost_eur': calendar_cost,
+            'total_degradation_cost_eur': cyclic_cost + calendar_cost
+        }
 ```
 
-**Task 1.3: Python Visualization for Validation (3 hours)**
-- [ ] Add to `py_script/market_da.py`:
-
-```python
-def plot_degradation_analysis(degradation_results, title_suffix=""):
-    """Plot degradation analysis with multiple subplots.
-
-    Shows:
-    1. SOH evolution over 10 years
-    2. Cycle aging vs calendar aging contribution
-    3. Key degradation factors (C-rate distribution, SoC histogram)
-    """
-    pass
-
-def plot_revenue_vs_degradation_tradeoff(scenarios_df):
-    """Scatter plot: Annual revenue vs 10-year SOH.
-
-    Helps identify optimal trade-off between profit and battery life.
-    """
-    pass
-```
-
-- [ ] Test in Jupyter notebook with dummy data:
-  - Create synthetic operation profile (aggressive vs conservative strategy)
-  - Calculate degradation for both
-  - Visualize difference
-  - Validate: Conservative should have higher SOH, lower revenue
-
-**Deliverables:**
-- ✅ Working degradation model with P1 factors
-- ✅ Python visualization functions for internal validation
-- ✅ Notebook demonstrating degradation calculations
-
-**Success Criteria:**
-- Degradation increases with higher C-rate (validated numerically)
-- Degradation increases with wider SoC range (validated numerically)
-- 10-year SOH projections are reasonable (70-95% range)
+**Deliverable:** Working `battery_degradation.py` with tests
 
 ---
 
-### Day 3-4 (Oct 27-28): Optimization Model Integration
+### Day 2 (Nov 2): Phase 2 Optimization Model - Part 1
 
-**Objective:** Integrate degradation model into Pyomo optimization framework
+**Objective:** Extend Phase 1 model with degradation and aFRR energy
 
-#### The Challenge
-Current objective (Phase 1):
-```
-max Z = Revenue(DA + FCR + aFRR)
-```
+#### Morning Session (4 hours): Model Structure
 
-New objective (Phase 2):
-```
-max Z = Revenue(DA + FCR + aFRR + aFRR_energy) - Degradation_Cost
-```
-
-Where:
-```
-Degradation_Cost = (Capacity_Fade_% € Battery_Replacement_Cost) / Lifetime_Years
-```
-
-#### Tasks
-
-**Task 2.1: Extend Pyomo Model (6 hours)**
-- [ ] Create `py_script/model_phase2.py` (extends `model.py`)
+**Task 2.1: Create `model_phase2.py` (4 hours)**
 
 ```python
-class BESSOptimizerPhase2(ImprovedBESSOptimizer):
-    """Phase 2 optimizer with degradation and intraday aFRR."""
+"""
+Phase 2 BESS Optimization Model with Degradation
+=================================================
+
+Extends Phase 1 model (model.py) with:
+1. Battery degradation cost (cyclic + calendar)
+2. aFRR energy market integration
+
+Author: Team SoloGen
+Date: November 2025
+"""
+
+from model import ImprovedBESSOptimizer
+from battery_degradation import BatteryDegradationModel
+import pyomo.environ as pyo
+import pandas as pd
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class Phase2BESSOptimizer(ImprovedBESSOptimizer):
+    """
+    Phase 2 BESS optimizer with degradation modeling.
+
+    Extends Phase 1 by:
+    - Adding aFRR energy market variables
+    - Segmenting SOC for piecewise-linear cyclic aging
+    - Adding SOS2 constraints for calendar aging
+    - Modifying objective to subtract degradation cost
+    """
 
     def __init__(self):
+        """Initialize Phase 2 optimizer."""
         super().__init__()
-        self.degradation_model = BatteryDegradationModel(self.battery_params)
 
-    def create_model_with_degradation(self, country_data):
-        """Create Pyomo model with degradation penalty."""
+        # Initialize degradation model
+        self.degradation_model = BatteryDegradationModel(
+            battery_capacity_kwh=self.battery_params['capacity_kwh']
+        )
 
-        # Start with Phase 1 model
-        model = self.create_model(country_data)
+        # Phase 2 market parameters
+        self.market_params['min_bid_afrr_energy'] = 1.0  # MW
 
-        # Add degradation cost estimation
-        # (Note: This is challenging because degradation depends on
-        #  the solution itself - may need iterative approach)
+        # SOC segmentation (5 segments for cyclic aging)
+        self.num_segments = 5
+        self.segment_capacity = self.battery_params['capacity_kwh'] / self.num_segments
 
-        # Approach 1: Penalty-based (simpler)
-        # Add soft constraints penalizing:
-        # - Time spent at extreme SoC (>90% or <10%)
-        # - High C-rate operations
-        # - Deep discharge cycles
+        logger.info("Phase 2 BESS Optimizer initialized with degradation modeling")
 
-        # Approach 2: Iterative (more accurate)
-        # 1. Solve optimization without degradation
-        # 2. Calculate degradation from solution
-        # 3. Add degradation cost, re-solve
-        # 4. Repeat until convergence
+    def create_phase2_model(self, country_data: pd.DataFrame,
+                           c_rate: float, daily_cycles: float,
+                           include_degradation: bool = True) -> pyo.ConcreteModel:
+        """
+        Create Phase 2 Pyomo model with degradation.
+
+        Args:
+            country_data: Market data (same as Phase 1)
+            c_rate: C-rate configuration
+            daily_cycles: Daily cycle limit (may be ignored if degradation included)
+            include_degradation: Whether to include degradation cost (default: True)
+
+        Returns:
+            Pyomo ConcreteModel ready to solve
+        """
+        logger.info(f"Creating Phase 2 model: C-rate={c_rate}, "
+                   f"Cycles={daily_cycles}, Degradation={include_degradation}")
+
+        # Start with Phase 1 model structure
+        # (We'll modify it rather than calling super().create_model())
+
+        model = pyo.ConcreteModel()
+
+        # === SETS === (same as Phase 1, plus segments)
+        # ... [Implementation continues - see below]
 
         return model
 ```
 
-**Task 2.2: Intraday aFRR Energy Market (5 hours)**
-- [ ] Load Phase 2 data with aFRR energy activation prices
-- [ ] Add to model:
+#### Afternoon Session (4 hours): aFRR Energy Market Variables
 
-```python
-# New variables
-model.e_afrr_pos_activation = pyo.Var(
-    model.T, bounds=(0, None),
-    doc="aFRR positive energy activation (kW)"
-)
-model.e_afrr_neg_activation = pyo.Var(
-    model.T, bounds=(0, None),
-    doc="aFRR negative energy activation (kW)"
-)
+**Task 2.2: Add aFRR Energy Market Variables (4 hours)**
+- [ ] Add variables: `p_afrr_energy_pos[t]`, `p_afrr_energy_neg[t]`
+- [ ] Add binaries: `y_afrr_energy_pos[t]`, `y_afrr_energy_neg[t]`
+- [ ] Add to objective:
+  ```python
+  afrr_energy_revenue = sum(
+      (prices['afrr_energy_pos'][t] * model.p_afrr_energy_pos[t] -
+       prices['afrr_energy_neg'][t] * model.p_afrr_energy_neg[t])
+      * dt / 1000  # Convert kW to MW
+      for t in model.T
+  )
+  ```
+- [ ] Add minimum bid constraints (similar to DA market)
 
-# New constraint: Activation only if bid < marginal price
-def afrr_activation_rule(model, t):
-    b = model.block_map[t]
-    # Only activate if capacity was bid AND price is favorable
-    return model.e_afrr_pos_activation[t] <= model.c_afrr_pos[b] * 1000 * eligible_flag[t]
-
-# Update objective with energy revenue
-afrr_energy_revenue = sum(
-    model.P_aFRR_energy[t] * model.e_afrr_pos_activation[t] * model.dt / 1000
-    for t in model.T
-)
-```
-
-**Task 2.3: Model Testing & Validation (5 hours)**
-- [ ] Run single scenario: DE, 0.5C, 2.0 cycles
-- [ ] Compare Phase 1 vs Phase 2 results:
-
-| Metric | Phase 1 | Phase 2 | Expected Change |
-|--------|---------|---------|-----------------|
-| Annual Revenue | €XXX,XXX | €XXX,XXX | +5-15% (aFRR energy) |
-| Avg C-rate | X.XX | X.XX | Decrease (degradation penalty) |
-| Time at extreme SoC | XX% | XX% | Decrease (degradation penalty) |
-| 1-year SOH | 98-99% | 99-100% | Increase (gentler operation) |
-| 10-year SOH | 70-85% | 80-90% | Increase (degradation-aware) |
-
-- [ ] Validate in Jupyter with Plotly:
-  - Plot: SoC profile comparison (Phase 1 vs Phase 2)
-  - Plot: Revenue breakdown (DA, FCR, aFRR capacity, aFRR energy)
-  - Plot: Degradation metrics
-
-**Deliverables:**
-- ✅ Extended Pyomo model with degradation cost
--  Intraday aFRR energy market integration
-- ✅ Validated results showing degradation-aware operation
-
-**Success Criteria:**
-- Phase 2 model solves successfully (within 10 min)
-- Revenue increases modestly (+5-15%) due to aFRR energy
-- Battery operates more conservatively (lower C-rate, narrower SoC)
-- Projected 10-year SOH improves (vs Phase 1 aggressive operation)
+**Deliverable:** Model with aFRR energy integrated
 
 ---
 
-### Day 5-6 (Oct 29-30): Minimal Web Dashboard
+### Day 3 (Nov 3): Phase 2 Model - Part 2 & Critical Testing
 
-**Objective:** Build demo-ready dashboard for Oct 31 presentation
+**Objective:** Complete degradation integration and validate model solves
 
-#### Technology Decision: Plotly Dash
+#### Morning Session (4 hours): Degradation Variables
 
-**Why Dash?**
-- Reuses 80% of existing Plotly code from `market_da.py`
-- Pure Python (no JavaScript required)
-- 1-2 day development time to MVP
-- Professional appearance with Bootstrap components
+**Task 3.1: Add SOC Segmentation (2 hours)**
+- [ ] Add variables: `e_soc_segment[j, t]` for j=1..5 segments
+- [ ] Add variables: `p_ch_segment[j, t]`, `p_dis_segment[j, t]`
+- [ ] Modify SOC dynamics:
+  ```python
+  # Total SOC is sum of segments
+  model.total_soc_constraint = pyo.Constraint(
+      model.T,
+      rule=lambda m, t: m.e_soc[t] == sum(m.e_soc_segment[j, t] for j in range(1, 6))
+  )
 
-**Alternative considered:** Streamlit (simpler but less customizable)
+  # Segment capacity limits
+  model.segment_capacity_constraint = pyo.Constraint(
+      range(1, 6), model.T,
+      rule=lambda m, j, t: m.e_soc_segment[j, t] <= segment_capacity
+  )
+  ```
 
-#### Tasks
+**Task 3.2: Add Calendar Aging SOS2 (2 hours)**
+- [ ] Add variables: `lambda_soc[i, t]` for i=1..5 SOC breakpoints
+- [ ] Add SOS2 constraint:
+  ```python
+  model.sos2_constraint = pyo.SOSConstraint(
+      model.T,
+      var=model.lambda_soc,
+      sos=2
+  )
+  ```
+- [ ] Link SOC to calendar cost via breakpoints
 
-**Task 3.1: Dashboard Skeleton (3 hours)**
-- [ ] Create `dashboard/app.py`:
+#### Afternoon Session (4 hours): Integration & Testing
+
+**Task 3.3: Update Objective Function (1 hour)**
+- [ ] Add degradation cost terms:
+  ```python
+  # Cyclic aging cost
+  cyclic_cost = sum(
+      cost_per_seg[j] * model.p_dis_segment[j, t] * dt
+      for j in range(1, 6)
+      for t in model.T
+  )
+
+  # Calendar aging cost
+  calendar_cost = sum(
+      model.calendar_cost[t] * dt
+      for t in model.T
+  )
+
+  # Modified objective
+  model.obj = pyo.Objective(
+      expr=da_revenue + as_revenue + afrr_energy_revenue - cyclic_cost - calendar_cost,
+      sense=pyo.maximize
+  )
+  ```
+
+**Task 3.4: CRITICAL TESTING (3 hours)**
+- [ ] Test Case 1: Phase 1 comparison
+  - Run same scenario (DE, 0.5C, 2.0) with degradation OFF
+  - Results should match Phase 1 within 1%
+
+- [ ] Test Case 2: Phase 2 with degradation
+  - Run DE, 0.5C, 2.0 with degradation ON
+  - Model must solve within 10 minutes
+  - Check: Revenue should be higher (aFRR energy), but net profit lower (degradation cost)
+
+- [ ] Test Case 3: Solver tolerance
+  - If timeout: Increase MIP gap to 3-5%
+  - If infeasible: Debug constraint violations
+
+**GATE:** Model must solve successfully before continuing to Day 4
+
+**Deliverable:** Validated Phase 2 model that solves
+
+---
+
+## 4. DAILY BREAKDOWN: Nov 4-6 (Scenario Analysis - Complete Matrix)
+
+### Day 4 (Nov 4): Batch Run Setup & Launch
+
+**Objective:** Run 45 scenarios overnight
+
+#### Morning Session (3 hours): Setup
+
+**Task 4.1: Create Scenario Runner (3 hours)**
 
 ```python
+"""
+Phase 2 Scenario Analysis Runner
+=================================
+
+Runs complete scenario matrix:
+- Countries: DE, AT, CH, CZ, HU (5 countries)
+- C-rates: 0.25, 0.33, 0.5 (3 rates)
+- Daily cycles: 1.0, 1.5, 2.0 (3 limits)
+Total: 5 × 3 × 3 = 45 scenarios
+
+Author: Team SoloGen
+Date: November 2025
+"""
+
+from model_phase2 import Phase2BESSOptimizer
+from market_da import load_phase2_market_tables
+import pandas as pd
+import json
+from pathlib import Path
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+# Complete scenario matrix
+COUNTRIES = ['DE', 'AT', 'CH', 'CZ', 'HU']  # All 5 target countries
+C_RATES = [0.25, 0.33, 0.5]
+DAILY_CYCLES = [1.0, 1.5, 2.0]
+
+def run_phase2_scenarios():
+    """Run all 45 Phase 2 scenarios."""
+
+    results = []
+    optimizer = Phase2BESSOptimizer()
+
+    # Load market data
+    data_path = Path('data/TechArena2025_Phase2_data.xlsx')
+    tables = load_phase2_market_tables(data_path)
+
+    scenario_num = 0
+    total_scenarios = len(COUNTRIES) * len(C_RATES) * len(DAILY_CYCLES)  # 5 × 3 × 3 = 45
+
+    for country in COUNTRIES:
+        country_data = prepare_country_data(tables, country)
+
+        for c_rate in C_RATES:
+            for cycles in DAILY_CYCLES:
+                scenario_num += 1
+                logger.info(f"[{scenario_num}/{total_scenarios}] "
+                           f"Running {country}, C={c_rate}, N={cycles}")
+
+                try:
+                    # Run optimization
+                    result = optimizer.optimize_phase2(
+                        country_data=country_data,
+                        c_rate=c_rate,
+                        daily_cycles=cycles,
+                        solver_name='cbc',  # or 'gurobi'
+                        time_limit=600,
+                        mip_gap=0.03  # Accept 3% gap for speed
+                    )
+
+                    results.append({
+                        'country': country,
+                        'c_rate': c_rate,
+                        'daily_cycles': cycles,
+                        'status': 'success',
+                        **result
+                    })
+
+                except Exception as e:
+                    logger.error(f"Scenario failed: {e}")
+                    results.append({
+                        'country': country,
+                        'c_rate': c_rate,
+                        'daily_cycles': cycles,
+                        'status': 'failed',
+                        'error': str(e)
+                    })
+
+    # Save results
+    df = pd.DataFrame(results)
+    output_path = Path('results/phase2/scenario_analysis.csv')
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, index=False)
+
+    logger.info(f"Completed {len(results)} scenarios. Results saved to {output_path}")
+    return df
+```
+
+#### Afternoon Session (5 hours): Launch & Monitor
+
+**Task 4.2: Start Batch Run (5 hours)**
+- [ ] Run `python run_phase2_scenarios.py` in background
+- [ ] Monitor progress (45 scenarios × 10 min = ~7.5 hours)
+- [ ] Debug any failed scenarios in real-time
+- [ ] If solver times out:
+  - Increase MIP gap to 5%
+  - Reduce time limit to 300s
+  - Accept suboptimal solutions
+
+**Deliverable:** 45 scenario results (CSV file)
+
+---
+
+### Day 5 (Nov 5): Complete Runs & Analysis
+
+#### Morning Session (4 hours): Finish & Collect
+
+**Task 5.1: Complete Batch (if needed) (2 hours)**
+- [ ] Rerun any failed scenarios
+- [ ] Accept partial results if necessary (minimum 40/45 scenarios)
+
+**Task 5.2: Results Analysis (2 hours)**
+- [ ] Load `scenario_analysis.csv`
+- [ ] Calculate key metrics:
+  - Annual revenue by market (DA, FCR, aFRR capacity, aFRR energy)
+  - Degradation cost (cyclic vs. calendar)
+  - Net profit (revenue - degradation)
+- [ ] Identify best configuration per country
+
+#### Afternoon Session (4 hours): Visualization
+
+**Task 5.3: Create Analysis Notebook (4 hours)**
+
+Use existing visualization functions from Oct 26 work:
+- [ ] Bar chart: Revenue comparison across countries
+- [ ] Heatmap: Configuration performance (C-rate × cycles)
+- [ ] Scatter: Revenue vs. degradation cost (Pareto frontier)
+- [ ] Table: Top 5 configurations by net profit
+
+**Deliverable:** Analysis notebook with key insights
+
+---
+
+### Day 6 (Nov 6): Investment Analysis Update
+
+**Objective:** Calculate degradation-adjusted NPV
+
+#### Full Day Session (8 hours): DCF Model
+
+**Task 6.1: Update Investment Calculator (4 hours)**
+
+```python
+def calculate_npv_with_degradation(
+    annual_revenue: float,
+    degradation_cost: float,
+    country: str,
+    years: int = 10
+) -> Dict[str, float]:
+    """
+    Calculate NPV accounting for degradation over 10 years.
+
+    Simplified assumptions:
+    - Linear revenue decline with capacity fade (1% per year)
+    - Constant degradation cost (conservative)
+    - No battery replacement (assume stays above 80% SOH)
+    """
+
+    WACC = {'DE': 0.083, 'AT': 0.083, 'CH': 0.083, 'HU': 0.15, 'CZ': 0.12}
+    INFLATION = {'DE': 0.02, 'AT': 0.033, 'CH': 0.001, 'HU': 0.046, 'CZ': 0.029}
+
+    wacc = WACC[country]
+    inflation = INFLATION[country]
+    capex = 200 * 4472  # EUR/kWh * capacity
+
+    # Calculate NPV
+    npv = -capex  # Initial investment
+
+    for year in range(1, years + 1):
+        # Revenue decreases due to capacity fade (assume 1% per year)
+        capacity_factor = 1.0 - 0.01 * year
+
+        # Net cash flow
+        net_revenue = (annual_revenue * capacity_factor - degradation_cost)
+        inflated_revenue = net_revenue * (1 + inflation) ** (year - 1)
+
+        # Discount to present value
+        pv = inflated_revenue / (1 + wacc) ** year
+        npv += pv
+
+    # Salvage value (assume 90% SOH after 10 years)
+    salvage = capex * 0.3 * 0.9
+    npv += salvage / (1 + wacc) ** years
+
+    # ROI
+    levelized_roi = (npv / capex) * 100
+
+    return {
+        'npv_eur': npv,
+        'levelized_roi_percent': levelized_roi,
+        'payback_years': estimate_payback(annual_revenue, degradation_cost, capex)
+    }
+```
+
+**Task 6.2: Run Investment Analysis (2 hours)**
+- [ ] Calculate NPV for all 27 scenarios
+- [ ] Identify best investment country
+- [ ] Generate investment recommendation table
+
+**Task 6.3: Configuration Ranking (2 hours)**
+- [ ] Rank configurations per country by NPV
+- [ ] Document optimal settings (C-rate, cycles)
+- [ ] Calculate sensitivity to degradation assumptions
+
+**Deliverable:** Investment analysis with NPV rankings
+
+---
+
+## 5. DAILY BREAKDOWN: Nov 7-9 (Documentation, Dashboard & Submission)
+
+### Day 7 (Nov 7): Master Results Notebook + Dashboard Development
+
+**Objective:** Create presentation-quality Jupyter notebook and start dashboard development
+
+#### Morning Session (4 hours): Notebook Structure
+
+**Task 7.1: Create Master Notebook (4 hours)**
+
+Sections:
+1. **Introduction** (Markdown)
+   - Phase 2 objectives
+   - Methodology overview
+
+2. **Market Data Exploration** (Use Oct 26 functions)
+   - `plot_price_time_series_mckinsey()` for each country
+   - `plot_da_price_heatmap_mckinsey()` to show patterns
+
+3. **Phase 2 Model Overview** (Markdown + Equations)
+   - Show degradation formulation
+   - Explain piecewise-linear approach
+   - Export LaTeX equations as images
+
+4. **Scenario Results** (Tables + Charts)
+   - Revenue comparison bar chart
+   - Configuration heatmaps
+   - Best configs per country
+
+#### Afternoon Session (4 hours): Degradation Analysis
+
+**Task 7.2: Degradation Visualizations (4 hours)**
+- [ ] Degradation cost breakdown (cyclic vs. calendar)
+- [ ] Revenue vs. degradation scatter plot
+- [ ] SOC usage distribution (show shallow vs. deep cycling)
+- [ ] Pareto frontier (if time permits)
+
+**Deliverable:** Complete results notebook
+
+---
+
+### Day 8 (Nov 8): Dashboard Development + Technical Report
+
+**Objective:** Complete web dashboard and write technical report
+
+#### Morning Session (4 hours): Dashboard Development
+
+**Task 8.1: Create Interactive Dashboard (4 hours)**
+
+```python
+"""
+Phase 2 Interactive Dashboard
+==============================
+
+Plotly Dash web app with 3 main views:
+1. Market Data Explorer: Price visualization across countries
+2. Scenario Results: Configuration comparison and analysis
+3. Investment Analysis: NPV, ROI, and recommendations
+
+Author: Team SoloGen
+Date: November 2025
+"""
+
 import dash
-import dash_bootstrap_components as dbc
 from dash import dcc, html, Input, Output
+import plotly.graph_objects as go
+from market_da import plot_price_time_series_mckinsey, plot_da_price_heatmap_mckinsey
+from viz_config import MCKINSEY_COLORS, MCKINSEY_FONTS
+import pandas as pd
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+# Initialize Dash app
+app = dash.Dash(__name__)
 
-app.layout = dbc.Container([
-    dbc.Row([
-        dbc.Col(html.H1("TechArena 2025 BESS Optimization Dashboard"), width=12)
-    ]),
-
-    dcc.Tabs(id='tabs', value='tab-market', children=[
-        dcc.Tab(label='Market Data', value='tab-market'),
-        dcc.Tab(label='Optimization Results', value='tab-results'),
-        dcc.Tab(label='Degradation Analysis', value='tab-degradation'),
-    ]),
-
-    html.Div(id='tabs-content')
+# Layout with 3 tabs
+app.layout = html.Div([
+    html.H1("TechArena 2025 Phase 2 - BESS Optimization Results"),
+    dcc.Tabs([
+        dcc.Tab(label='Market Data', children=[
+            # Country selector and price visualizations
+        ]),
+        dcc.Tab(label='Scenario Results', children=[
+            # Configuration heatmaps and comparison charts
+        ]),
+        dcc.Tab(label='Investment Analysis', children=[
+            # NPV rankings and recommendations
+        ]),
+    ])
 ])
-
-@app.callback(
-    Output('tabs-content', 'children'),
-    Input('tabs', 'value')
-)
-def render_content(tab):
-    if tab == 'tab-market':
-        return create_market_data_tab()
-    elif tab == 'tab-results':
-        return create_results_tab()
-    elif tab == 'tab-degradation':
-        return create_degradation_tab()
 
 if __name__ == '__main__':
     app.run_server(debug=True)
 ```
 
-**Task 3.2: Market Data Tab (4 hours)**
-- [ ] Implement visualizations from `data_result_dashboard.md`:
-  - Module A: Multi-series time series (DA, FCR, aFRR prices)
-  - Module B: Price distribution histogram
-  - Module C: Hour-of-day vs Month heatmap (reuse `plot_day_ahead_heatmap`)
-  - Module D: Price statistics table
-
-- [ ] Add interactive controls:
-  - Country selector dropdown
-  - Date range picker
-  - Market type toggle
-
-**Task 3.3: Optimization Results Tab (4 hours)**
-- [ ] Run 2-3 scenarios (DE and AT, best configs)
-- [ ] Implement visualizations:
-  - KPI cards (Total Profit, ROI, NPV, SOH)
-  - BESS operation schedule (1 week sample)
-  - Revenue breakdown pie chart
-  - Profit comparison bar chart
-
-**Task 3.4: Degradation Analysis Tab (Placeholder) (1 hour)**
-- [ ] Add placeholder message: "Full analysis coming after Week 2 scenario runs"
-- [ ] Show sample degradation plot from Day 1-2 work
-
-**Task 3.5: Dashboard Testing & Demo Prep (2 hours)**
-- [ ] Test all interactive components
-- [ ] Verify visualizations update correctly with filters
-- [ ] Prepare demo script for Oct 31
-- [ ] Take screenshots for backup slides
-
-**Deliverables:**
-- ✅ Working web dashboard (http://localhost:8050)
--  Market data visualization (complete)
--  Optimization results (2-3 scenarios)
--  Demo script prepared
-
-**Success Criteria:**
-- Dashboard loads without errors
-- All market data visualizations work correctly
-- Results tab shows at least 2 countries with Phase 2 results
-- Dashboard is impressive enough to demo to industry expert
-
----
-
-### Oct 31: Industry Expert Demo
-
-**Presentation Structure (30 minutes)**
-
-#### Slide 1-2: Problem & Approach (5 min)
-- Phase 2 requirements overview
-- Evaluation criteria (30% degradation, 30% revenue)
-- Our approach: Degradation-aware optimization with intraday aFRR
-
-#### Slide 3-5: Technical Implementation (10 min)
-- Battery degradation model (ORC with P1 factors)
-- Enhanced Pyomo optimization
-- Trade-off: Revenue vs Battery Lifetime
-
-#### Live Dashboard Demo (10 min)
-1. **Tab 1: Market Data**
-   - Show price patterns across countries
-   - Highlight arbitrage opportunities
-   - Demonstrate interactive filtering
-
-2. **Tab 2: Optimization Results**
-   - Compare Germany vs Austria
-   - Show degradation-aware strategy (gentler cycling)
-   - Revenue breakdown with new aFRR energy stream
-
-3. **Python Notebook (Quick peek)**
-   - Show model validation process
-   - Degradation calculation details
-   - Quick iteration capabilities
-
-#### Q&A + Feedback Collection (5 min)
-**Key questions to ask expert:**
-- Are our degradation model assumptions reasonable?
-- Should we prioritize any specific degradation factor?
-- What level of detail do you expect in final report?
-
-**Expected feedback areas:**
-- Degradation model completeness
-- Dashboard usability
-- Areas needing more rigor
-
----
-
-## 4. WEEK 2: Completion + Submission (Nov 1-9)
-
-### Day 7-8 (Nov 1-2): Comprehensive Scenario Analysis
-
-**Objective:** Run all 54 scenarios with Phase 2 enhancements
-
-#### Tasks
-
-**Task 4.1: Batch Optimization Run (8 hours compute time, 4 hours monitoring)**
-- [ ] Update scenario runner script:
-
-```python
-# Configuration matrix
-countries = ['DE', 'DE_LU', 'AT', 'CH', 'HU', 'CZ']  # 6 countries
-c_rates = [0.25, 0.33, 0.5]  # 3 C-rates
-daily_cycles = [1.0, 1.5, 2.0]  # 3 cycle limits
-# Total: 6 € 3 € 3 = 54 scenarios
-
-results = []
-for country in countries:
-    for c_rate in c_rates:
-        for cycles in daily_cycles:
-            # Run Phase 2 optimization
-            optimizer = BESSOptimizerPhase2()
-            result = optimizer.optimize(country, c_rate, cycles)
-
-            # Calculate degradation
-            degradation = optimizer.degradation_model.calculate_total_degradation(
-                operation_schedule=result['schedule'],
-                years=10
-            )
-
-            results.append({
-                'country': country,
-                'c_rate': c_rate,
-                'daily_cycles': cycles,
-                'annual_revenue': result['total_profit'],
-                'da_revenue': result['da_revenue'],
-                'as_revenue': result['as_revenue'],
-                'afrr_energy_revenue': result['afrr_energy_revenue'],
-                'degradation_cost': degradation['degradation_cost'],
-                'net_profit': result['total_profit'] - degradation['degradation_cost'],
-                'final_soh_10yr': degradation['final_soh'],
-                'solve_time': result['solve_time']
-            })
-
-# Save results
-results_df = pd.DataFrame(results)
-results_df.to_csv('results/phase2/scenario_analysis.csv', index=False)
-```
-
-- [ ] Run overnight on powerful machine
-- [ ] Monitor for solver failures
-
-**Task 4.2: Incorporate Oct 31 Feedback (4 hours)**
-- [ ] Update degradation model based on expert input
-- [ ] Adjust parameters if recommended
-- [ ] Re-run critical scenarios if needed
-
-**Task 4.3: Results Analysis & Insights (4 hours)**
-- [ ] Identify best configuration per country
-- [ ] Analyze trade-offs:
-  - Revenue vs SOH scatter plot
-  - Pareto frontier identification
-- [ ] Key findings for report:
-  - How much revenue is sacrificed for degradation reduction?
-  - Which countries benefit most from degradation-aware operation?
-  - Optimal C-rate and cycle limit recommendations
-
-**Deliverables:**
-- ✅ Complete scenario analysis (54 scenarios)
--  Degradation metrics for all scenarios
--  Analysis insights documented
-
----
-
-### Day 9-10 (Nov 3-4): Investment Analysis Update
-
-**Objective:** Update 10-year DCF analysis with degradation impact
-
-#### Tasks
-
-**Task 5.1: Degradation-Adjusted DCF Model (5 hours)**
-- [ ] Extend `py_script/investment_analysis.py`:
-
-```python
-def calculate_npv_with_degradation(scenario_result, country_params, years=10):
-    """Calculate NPV accounting for battery degradation over time.
-
-    Key changes from Phase 1:
-    1. Revenue decreases each year as capacity fades
-    2. May need battery replacement if SOH < 80%
-    3. Salvage value depends on final SOH
-    """
-
-    wacc = country_params['wacc']
-    inflation = country_params['inflation']
-    capex = 200 * 4472  # EUR/kWh € capacity
-
-    # Year-by-year degradation from model
-    yearly_soh = scenario_result['degradation']['yearly_soh']
-
-    npv = -capex  # Initial investment
-
-    for year in range(1, years + 1):
-        # Revenue scales with capacity
-        capacity_factor = yearly_soh[year]
-        nominal_revenue = scenario_result['annual_revenue'] * capacity_factor
-        inflated_revenue = nominal_revenue * (1 + inflation)**(year - 1)
-
-        # Check if replacement needed
-        if yearly_soh[year] < 0.80 and year < years:
-            # Replace battery (typically after 7-9 years)
-            replacement_cost = capex * 0.7  # 30% cost reduction expected
-            inflated_revenue -= replacement_cost
-
-        # Discount to present value
-        pv = inflated_revenue / (1 + wacc)**year
-        npv += pv
-
-    # Add salvage value
-    if yearly_soh[years] >= 0.80:
-        # Battery still has value
-        salvage = capex * 0.3 * yearly_soh[years]
-        npv += salvage / (1 + wacc)**years
-
-    return npv
-```
-
-**Task 5.2:✅ Updated Investment Metrics (3 hours)**
-- [ ] Calculate for all 54 scenarios:
-  - NPV (degradation-adjusted)
-  - Levelized ROI (degradation-adjusted)
-  - Payback period
-  - IRR (Internal Rate of Return)
-
-- [ ] Identify:
-  - Best country for investment (highest NPV)
-  - Best configuration per country
-  - Sensitivity to degradation assumptions
-
-**Task 5.3: Configuration Optimization Analysis (4 hours)**
-- [ ] For each country, compare 9 configurations
-- [ ] Create analysis table:
-
-| Country | Best Config | Annual Revenue | 10-yr NPV | Final SOH | Levelized ROI |
-|---------|-------------|----------------|-----------|-----------|---------------|
-| DE | 0.5C / 1.5 cycles | €X | €Y | 85% | Z% |
-| AT | ... | ... | ... | ... | ... |
-
-- [ ] Key insights:
-  - Does higher C-rate still win when degradation is considered?
-  - Are cycle limits binding or dominated by degradation concerns?
-  - Which configuration offers best ROI-SOH trade-off?
-
-**Deliverables:**
-- ✅ Updated investment analysis with degradation
--  Configuration recommendations per country
--  Sensitivity analysis results
-
----
-
-### Day 11-12 (Nov 5-6): Dashboard Completion
-
-**Objective:**✅ Complete all dashboard tabs with full results
-
-#### Tasks
-
-**Task 6.1: Enhanced Results Tab (5 hours)**
-- [ ] Add all 54 scenarios to database/cache
-- [ ] Implement comparison features:
-  - Multi-scenario comparison (select 2-4 scenarios, compare side-by-side)
-  - Country-level summaries
-  - Configuration ranking tables
-
-- [ ] Advanced visualizations:
-  - Battery operation schedule (full year, zoomable)
-  - Market participation timeline (which market when, color-coded)
-  - Hourly profitability heatmap
-
-**Task 6.2:✅ Complete Degradation Analysis Tab (5 hours)**
-- [ ] Implement visualizations from Week 1 Python work:
-  - SOH evolution (all scenarios, filterable)
-  - Degradation factor breakdown (cycle vs calendar aging)
-  - P1 factor impact analysis (C-rate, SoC, DoD distributions)
-  - Trade-off plots (Revenue vs SOH scatter, Pareto frontier)
-
-- [ ] Interactive elements:
-  - Scenario selector
-  - Degradation factor filter (show only cycle aging, etc.)
-  - Year slider (show SOH at year X)
-
-**Task 6.3: Export & Sharing Features (2 hours)**
-- [ ] Add download buttons:
-  - Download current plot as PNG
-  - Download scenario data as CSV
-  - Download full report as PDF (if time permits)
-
-- [ ] Add documentation tab:
-  - Methodology overview
-  - Model assumptions
-  - How to use dashboard
-
-**Task 6.4: Polish & UX (2 hours)**
-- [ ] Consistent styling (colors, fonts, spacing)
-- [ ] Loading indicators for slow operations
-- [ ] Error handling (e.g., if data not yet computed)
-- [ ] Mobile responsiveness (basic)
-
-**Deliverables:**
-- ✅ Complete, polished dashboard with all features
-- ✅ Export/download capabilities
-- ✅ User documentation
-
----
-
-### Day 13-14 (Nov 7-8): Testing, Validation & Report
-
-**Objective:** Ensure correctness and prepare final documentation
-
-#### Tasks
-
-**Task 7.1: End-to-End Testing (4 hours)**
-- [ ] Run full pipeline from scratch:
-  1. Load Phase 2 data
-  2. Run optimization for 3 sample scenarios
-  3. Calculate degradation
-  4. Update investment analysis
-  5. Generate dashboard
-  6. Export submission files
-
-- [ ] Validate outputs:
-  - No NaN or inf values
-  - Units are correct (kW vs MW, kWh vs MWh)
-  - Timestamps align (15-min intervals, no gaps)
-  - Results are reasonable (revenue in expected range, SOH 70-95%)
-
-**Task 7.2: Results Cross-Validation (4 hours)**
-- [ ] Manual calculations for spot checks:
-  - Pick one scenario
-  - Manually calculate DA revenue for one day
-  - Manually calculate degradation for one cycle
-  - Compare with model output (should match within 1%)
-
-- [ ] Comparison with Phase 1:
-  - Same scenario (DE, 0.5C, 2.0 cycles) with degradation turned OFF
-  - Should get similar results to Phase 1 (confirms code correctness)
-
-- [ ] Literature benchmarks:
-  - Compare degradation rates with published values
-  - Validate SOH trajectories are realistic
-
-**Task 7.3: Report Writing (8 hours)**
-- [ ] Structure (15-20 pages):
-
-**1. Executive Summary (1 page)**
-- Key findings
-- Best investment country
-- Optimal configurations
-
-**2. Methodology (5 pages)**
-- 2.1 Battery Degradation Model
-  - ORC model overview
-  - P1 factors implementation
-  - Validation approach
-- 2.2 Optimization Model
-  - Objective function with degradation cost
-  - Intraday aFRR energy integration
-  - Constraints (unchanged from Phase 1)
-- 2.3 Investment Analysis
-  - Degradation-adjusted DCF
-  - Replacement strategy
-  - Sensitivity analysis
-
-**3. Results (6 pages)**
-- 3.1 Revenue Analysis
-  - Comparison: Phase 1 vs Phase 2
-  - Breakdown: DA, FCR, aFRR capacity, aFRR energy
-  - Country rankings
-- 3.2 Degradation Impact
-  - SOH evolution (10-year trajectories)
-  - Factor contributions (cycle vs calendar)
-  - Configuration impact (C-rate, cycles)
-- 3.3 Investment Recommendations
-  - Best country (NPV, ROI)
-  - Optimal configurations per market
-  - Risk analysis
-
-**4. Discussion (2 pages)**
-- 4.1 Trade-offs
-  - Revenue vs Lifetime balance
-  - When to operate aggressively vs conservatively
-- 4.2 Sensitivity Analysis
-  - Degradation model assumptions
-  - Price forecast uncertainty
-  - Battery cost trends
-
-**5. Conclusion (1 page)**
-- Key insights
-- Limitations
-- Future work
+- [ ] Implement Tab 1: Market Data Explorer with country selector
+- [ ] Implement Tab 2: Scenario Results with interactive filters
+- [ ] Implement Tab 3: Investment Analysis with NPV rankings
+- [ ] Integrate existing McKinsey-style plotting functions
+- [ ] Test dashboard functionality
+
+#### Afternoon Session (4 hours): Report Writing
+
+**Structure:**
+
+1. **Executive Summary** (1 page, 1 hour)
+   - Key findings
+   - Best investment country: [COUNTRY]
+   - Optimal configuration: [C-rate] / [cycles]
+   - Expected ROI: [X]%
+
+2. **Methodology** (5 pages, 3 hours)
+   - **2.1 Battery Degradation Model**
+     - Piecewise-linear cyclic aging (Xu et al. approach)
+     - SOS2 calendar aging (Collath et al. approach)
+     - Parameters and assumptions
+   - **2.2 Optimization Model**
+     - Phase 2 extensions (aFRR energy + degradation)
+     - Objective function formulation
+     - Key constraints
+   - **2.3 Scenario Matrix**
+     - 45 scenarios (5 countries × 9 configs)
+     - Solver settings and performance
+
+3. **Results** (6 pages, 3 hours)
+   - **3.1 Revenue Analysis**
+     - Comparison across countries
+     - Market contribution breakdown (DA, FCR, aFRR capacity, aFRR energy)
+     - Impact of aFRR energy integration (+X% revenue)
+   - **3.2 Degradation Impact**
+     - Degradation cost by configuration
+     - Trade-off: Revenue vs. battery life
+     - Cyclic vs. calendar aging contribution
+   - **3.3 Investment Recommendations**
+     - NPV analysis
+     - Optimal configurations per country
+     - Sensitivity analysis
+
+4. **Discussion** (2 pages, 1 hour)
+   - Trade-offs (revenue vs. lifetime)
+   - Limitations (simplified model, ignored factors)
+   - Sensitivity to assumptions
+
+5. **Conclusion** (1 page, 0.5 hours)
+   - Key insights
+   - Recommendations
+   - Future work
 
 **Appendices:**
-- A: Model Equations
-- B: Parameter Tables
-- C: Full Scenario Results
+- A: Model equations (LaTeX)
+- B: Parameter tables
+- C: Scenario results summary
 
-**Deliverables:**
-- ✅ Complete testing with no failures
-- ✅ Validated results (manual checks pass)
--  Professional report (15-20 pages, well-formatted)
+**Deliverable:** 15-page technical report (PDF)
 
 ---
 
-### Day 15 (Nov 9): Final Submission
+### Day 9 (Nov 9): Submission Preparation
 
-**Objective:** Package and submit all deliverables
+**Objective:** Package and submit
 
-#### Submission Checklist
+#### Morning Session (4 hours): Submission Files
 
-**Required Files:**
-- [ ] `TechArena_Phase2_Configuration.csv`
-  - Columns: C-rate, cycles, yearly profit, degradation cost, net profit, final SOH, levelized ROI
+**Task 9.1: Generate Required CSVs (2 hours)**
 
-- [ ] `TechArena_Phase2_Investment.csv`
-  - Columns: Country, WACC, inflation, yearly profits (years 1-10), yearly SOH, NPV, ROI
+1. **TechArena_Phase2_Configuration.csv**
+   - Best configuration analysis
+   - Columns: Country, C_rate, Daily_Cycles, Annual_Revenue, Degradation_Cost, Net_Profit, NPV, ROI
 
-- [ ] `TechArena_Phase2_Operation.csv` (best scenario)
-  - Columns: Timestamp, Stored Energy [MWh], SoC [-], Charge [MWh], Discharge [MWh], FCR bid [MW], aFRR pos/neg bid [MW], aFRR energy activation [MWh]
+2. **TechArena_Phase2_Investment.csv**
+   - 10-year cash flow projection
+   - Columns: Country, Year, Revenue, Degradation_Cost, Net_CF, SOH, NPV, WACC, Inflation
 
-**Code Package:**
-- [ ] All Python scripts with docstrings
-- [ ] Dashboard source code
-- [ ] requirements.txt
-- [ ] README.md with setup instructions
-- [ ] Example notebook demonstrating key functionality
+3. **TechArena_Phase2_Operation.csv**
+   - Best scenario operational schedule (full year)
+   - Columns: Timestamp, SOC, Energy_Stored, Charge, Discharge, FCR_Bid, aFRR_Pos_Bid, aFRR_Neg_Bid, aFRR_Energy_Pos, aFRR_Energy_Neg
 
-**Documentation:**
-- [ ] Technical report (PDF)
-- [ ] Methodology document (degradation model)
-- [ ] Dashboard user guide
+**Task 9.2: Code Package (2 hours)**
+- [ ] Create `README.md` with setup instructions
+- [ ] Update `requirements.txt`
+- [ ] Add docstrings to all new functions
+- [ ] Create example notebook: `example_phase2_usage.ipynb`
 
-**Submission Structure:**
+#### Afternoon Session (3 hours): Final Checks & Submit
+
+**Task 9.3: Validation (1.5 hours)**
+- [ ] Run end-to-end test with fresh Python environment
+- [ ] Verify all CSVs open correctly
+- [ ] Proofread report (spell check, equation numbering)
+- [ ] Check code runs without errors
+
+**Task 9.4: Create Submission ZIP (0.5 hours)**
+
 ```
 TechArena2025_Phase2_Submission.zip
 ├── code/
 │   ├── py_script/
-│   │   ├── model_phase2.py
-│   │   ├── battery_degradation.py
-│   │   ├── market_da.py
-│   │   └── investment_analysis.py
-│   ├── dashboard/
-│   │   ├── app.py
-│   │   ├── layouts/
-│   │   └── assets/
+│   │   ├── model.py                    # Phase 1 (validated)
+│   │   ├── model_phase2.py             # Phase 2 (NEW)
+│   │   ├── battery_degradation.py      # Degradation model (NEW)
+│   │   ├── market_da.py                # Data loading + viz
+│   │   ├── viz_config.py               # McKinsey styling
+│   │   ├── process_phase2_data.py      # Data pipeline
+│   │   ├── investment_analysis.py      # Updated for degradation
+│   │   └── run_phase2_scenarios.py     # Scenario runner (NEW)
+│   ├── notebooks/
+│   │   ├── phase2_results_master.ipynb # Main results notebook
+│   │   └── example_phase2_usage.ipynb  # Usage demo
 │   ├── requirements.txt
 │   └── README.md
 ├── output/
@@ -834,416 +945,293 @@ TechArena2025_Phase2_Submission.zip
 │   ├── TechArena_Phase2_Investment.csv
 │   └── TechArena_Phase2_Operation.csv
 ├── docs/
-│   ├── Technical_Report.pdf
-│   ├── Degradation_Model_Documentation.pdf
-│   └── Dashboard_User_Guide.pdf
-├── results/
-│   ├── scenario_analysis.csv
-│   ├── degradation_metrics.csv
-│   └── plots/ (selected key visualizations as PNG)
-└── README.txt (submission instructions)
+│   └── Technical_Report_Phase2.pdf
+└── README.txt                          # Submission instructions
 ```
 
-**Final Actions:**
-- [ ] Proofread report one last time
-- [ ] Test submission files open correctly
-- [ ] Create submission archive
+**Task 9.5: SUBMIT (1 hour)**
 - [ ] Upload to submission portal
-- [ ] Confirm submission received
-- [ ] <→ CELEBRATE! <→
+- [ ] Confirm receipt
+- [ ] 🎉 **CELEBRATE!** 🎉
 
 ---
 
-## 5. Risk Management
+## 6. Risk Management (UPDATED)
 
-### Critical Risks & Mitigation Strategies
+### Critical Risks
 
-| Risk | Impact | Likelihood | Mitigation | Contingency |
-|------|--------|------------|------------|-------------|
-| **Degradation model too complex** | High (30% grade) | Medium | Start with simplified ORC (P1 factors only) | Use cycle counting fallback |
-| **Solver timeout/memory issues** | High (can't run 54 scenarios) | Medium | Increase MIP gap to 2%, reduce time limit | Run top 3 countries only (27 scenarios) |
-| **Dashboard dev takes too long** | Medium (affects demo) | High | Use Plotly Dash (fast), minimal Week 1 scope | Use Python plots in slides instead |
-| **Intraday aFRR data issues** | Medium (affects revenue) | Low | Validate data early (Day 3) | Fall back to capacity-only if needed |
-| **Negative expert feedback** | Low-Medium | Medium | Build in flexibility to pivot | Have 2 days buffer in Week 2 to adapt |
-| **Degradation model doesn't integrate well into Pyomo** | High | Medium | Use iterative approach (solve, calculate, re-solve) | Use penalty-based soft constraints |
+| Risk | Likelihood | Impact | Mitigation | Status |
+|------|-----------|--------|------------|--------|
+| **Model doesn't solve** | HIGH | CRITICAL | Accept 5% MIP gap; simplify degradation | ACTIVE |
+| **Scenarios don't finish** | MEDIUM | HIGH | Plan for 45 scenarios; can reduce to 30 if needed | MITIGATED |
+| **Parameter extraction unclear** | MEDIUM | MEDIUM | Use simplified assumptions from literature reviews | ACTIVE |
+| **Integration bugs** | HIGH | MEDIUM | 50% time buffer in Days 2-3; extensive testing | PLANNED |
+| **Dashboard complexity** | MEDIUM | LOW | Use existing viz functions; prioritize core features | PLANNED |
+| **Report quality suffers** | LOW | MEDIUM | Reuse Phase 1 report structure | MITIGATED |
 
 ### Contingency Decision Points
 
-**If behind schedule by Nov 3:**
-1. Reduce scenarios: Top 3 countries only (DE, AT, CH) = 27 scenarios
-2. Simplify degradation: Cycle counting only (no calendar aging)
-3. Dashboard: Skip Tab 3, use Python plots in report
-4. Report: 10 pages minimum instead of 15-20
+**If behind schedule by Nov 6:**
+1. Reduce to 30 scenarios (top configs per country)
+2. Simplify dashboard to 2 tabs instead of 3
+3. Skip Pareto frontier analysis
+4. Accept degradation model without calendar aging (cyclic only)
 
-**If ahead of schedule:**
-1. Add temperature degradation factor (use regional climate data)
-2. Implement 4-second aFRR activation (bonus challenge)
-3. Add Monte Carlo simulation for price uncertainty
-4. Deploy dashboard publicly (Render/Heroku free tier)
+**Quick Wins Available:**
+- Reuse Phase 1 validation plots in report
+- Reuse Phase 1 report methodology sections
+- Use existing Oct 26 visualization functions directly
+- Leverage validated Phase 1 model (minimal changes needed)
 
 ---
 
-## 6. Success Metrics
+## 7. Success Metrics (REVISED)
 
-### Demo Success (Oct 31)
-- [ ] Industry expert provides positive feedback
-- [ ] Dashboard impresses (professional appearance)
-- [ ] Degradation model deemed reasonable
-- [ ] Clear next steps identified for Week 2
+### Today's Demo (Oct 31)
+
+**Achievable Goals:**
+- ✅ Show Phase 1 validation results (impressive plots exist)
+- ✅ Present Phase 2 mathematical design (LaTeX document ready)
+- ✅ Demonstrate View 1 visualizations (Oct 26 work)
+- ✅ Outline realistic Week 2 sprint plan
+
+**Key Message:** "We prioritized correctness over speed in Week 1. Our Phase 1 foundation is bulletproof, our Phase 2 design is complete, and we're ready for focused execution."
 
 ### Submission Success (Nov 9)
-- [ ] All required files submitted on time
-- [ ] Code runs without errors when tested
-- [ ] Report is professional and comprehensive
-- [ ] Results are validated and reasonable
 
-### Grading Target
-| Criterion | Target Score | Strategy |
-|-----------|--------------|----------|
-| Revenue Maximization (30%) | 85%+ | Intraday aFRR + optimized operation |
-| Battery Degradation (30%) | 90%+ | Robust ORC model with P1 factors |
-| Investment Optimization (10%) | 85%+ | Degradation-adjusted DCF, clear recommendations |
-| Configuration Optimization (10%) | 85%+ | Systematic analysis, trade-off quantification |
-| Code Quality (20%) | 90%+ | Dashboard + documentation + clean code |
+**Target Submission:**
+- ✅ Working Phase 2 model with degradation integration
+- ✅ 45 scenarios with results (acceptable: 40+ scenarios)
+- ✅ Degradation analysis showing cost impact
+- ✅ Investment recommendation with NPV across all countries
+- ✅ Interactive web dashboard for results visualization
+- ✅ 15-page technical report
+- ✅ All required CSV files
+- ✅ Clean, documented code with dashboard
 
-**Overall Target:** 87%+ (Top 10% of submissions)
+### Grading Target (UPDATED)
+
+| Criterion | Original | Updated | Strategy |
+|-----------|----------|---------|----------|
+| Revenue (30%) | 85% | 85% | aFRR energy + comprehensive optimization |
+| Degradation (30%) | 90% | 80% | Simplified but theoretically sound model |
+| Investment (10%) | 85% | 85% | Keep high - DCF across 5 countries |
+| Configuration (10%) | 85% | 90% | 9 configs × 5 countries = comprehensive |
+| Code Quality (20%) | 90% | 90% | Dashboard + notebooks + docs score high |
+| **Overall** | **87%** | **85%** | **Strong and competitive** |
 
 ---
 
-## 7. Tools & Technology Stack
+## 8. Tools & Technology Stack (UPDATED)
 
 ### Core Python Environment
+
 ```txt
-# Optimization
+# Optimization (Phase 1 + Phase 2)
 pyomo>=6.6.0
-cplex>=22.1.0 or gurobipy>=10.0.0
+cbc>=2.10.0 or gurobi>=10.0.0
 
 # Data Processing
 pandas>=2.0.0
 numpy>=1.24.0
 
-# Visualization (Development)
+# Visualization (Already implemented - Oct 26)
 plotly>=5.14.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
+dash>=2.14.0           # For web dashboard
+scipy>=1.10.0          # For KDE
+pyarrow>=14.0.0        # For Parquet (5.6x compression)
+
+# Notebook Environment
 jupyterlab>=3.6.0
 
-# Dashboard (Presentation)
-dash>=2.11.0
-dash-bootstrap-components>=1.4.0
-
-# Testing & Quality
-pytest>=7.3.0
-black>=23.3.0  # Code formatting
-flake8>=6.0.0  # Linting
+# Code Quality
+black>=23.3.0
+flake8>=6.0.0
 ```
 
-### Dashboard Framework: Why Plotly Dash?
+### Visualization Strategy (UPDATED)
 
-| Feature | Plotly Dash | Streamlit | Gradio |
-|---------|-------------|-----------|--------|
-| Code reuse from market_da.py | 80% | 50% | 30% |
-| Learning curve | Medium | Easy | Very Easy |
-| Customization | High | Medium | Low |
-| Time to MVP | 1-2 days | 0.5-1 day | 0.5 day |
-| Production-ready | ✅ Yes | ✅ Yes | ❌ Limited |
-| Multi-tab layouts | ✅ Native | ✅ Native | ❌ Limited |
-| **Recommendation** | ✅ **SELECTED** | Good backup | Not suitable |
+**DECISION:** Web dashboard + Jupyter notebooks for comprehensive presentation
 
-**Decision:** Use Dash for high code reuse and professional appearance.
+**Rationale:**
+- Oct 26 work provides presentation-ready McKinsey-style plots as foundation
+- All 4 View 1 modules already implemented - can be directly integrated into dashboard
+- Dashboard enhances code quality score (target 90%+)
+- Notebooks complement dashboard for detailed technical analysis
+
+**Implementation Plan:**
+- **Day 8 (Nov 8):** Build interactive Plotly Dash web app (4 hours)
+  - Tab 1: Market Data Explorer
+  - Tab 2: Scenario Results Comparison
+  - Tab 3: Investment Analysis
+- Leverage existing functions from `viz_config.py` and `market_da.py`
+- Use notebooks for additional detailed analysis and documentation
+
+**Files to Use:**
+- `viz_config.py` - McKinsey styling
+- `market_da.py` - All plot functions (`plot_*_mckinsey()`)
+- `test_phase2_visualizations.ipynb` - Example usage and detailed analysis
 
 ---
 
-## 8. Best Practices & Quality Standards
+## 9. Implementation Checklist (DAILY TRACKING)
 
-### Version Control
-```bash
-# Daily commits with descriptive messages
-git commit -m "feat: Add ORC degradation model with P1 factors"
-git commit -m "fix: Correct cycle counting in degradation calculation"
-git commit -m "docs: Update README with Phase 2 changes"
+### ✅ Completed (Oct 25-31)
 
-# Tag milestones
-git tag -a v2.0-demo -m "Oct 31 demo version"
-git tag -a v2.0-submission -m "Nov 9 final submission"
+**Phase 1 Foundation:**
+- [x] Model refactoring and optimization
+- [x] Comprehensive 45-scenario validation
+- [x] Performance testing and constraint verification
 
-# Branching strategy
-main                    # Stable, Phase 1 baseline
-   feature/degradation # Battery degradation work
-   feature/dashboard├── # Dashboard development
-   feature/phase2-opt  # Phase 2 optimization model
-```
+**Phase 2 Design:**
+- [x] Mathematical formulation (`p2_model_ggdp.tex`)
+- [x] Degradation modeling approach
+- [x] aFRR energy market integration design
 
-### Code Quality Standards
-- **Docstrings:** Google style for all functions/classes
-- **Type Hints:** All new functions
-- **Testing:** Unit tests for degradation calculations
-- **Formatting:** Black (line length 100)
-- **Linting:** Flake8 (ignore E501 for long equations)
+**Data & Visualization Infrastructure:**
+- [x] Data processing pipeline (`process_phase2_data.py`)
+- [x] View 1 visualizations (all 4 modules)
+- [x] McKinsey styling configuration (`viz_config.py`)
+- [x] Custom exceptions for error handling
 
-Example:
-```python
-def calculate_cycle_aging(
-    soc_profile: np.ndarray,
-    power_profile: dict,
-    temperature: float = 25.0
-) -> float:
-    """Calculate capacity fade due to battery cycling.
+### 📋 Week 2 Checklist (Nov 1-9)
 
-    Implements the ORC cycle aging model considering depth of discharge,
-    C-rate, and temperature effects.
+#### Day 1 (Nov 1): Degradation Model
+- [ ] Extract parameters from Collath et al. (2023)
+- [ ] Extract parameters from Xu et al. (2017)
+- [ ] Create `battery_degradation.py`
+- [ ] Implement `BatteryDegradationModel` class
+- [ ] Test with dummy data
+- [ ] Document assumptions
 
-    Args:
-        soc_profile: Array of State of Charge values (0-1) for each timestep.
-        power_profile: Dictionary with 'charge' and 'discharge' power arrays in kW.
-        temperature: Operating temperature in Celsius (default: 25°C)°C).
+#### Day 2 (Nov 2): Phase 2 Model Part 1
+- [ ] Create `model_phase2.py`
+- [ ] Extend `ImprovedBESSOptimizer` → `Phase2BESSOptimizer`
+- [ ] Add aFRR energy variables and constraints
+- [ ] Add SOC segmentation variables
+- [ ] Implement total power aggregation
 
-    Returns:
-        Capacity fade percentage (0-100) due to cycling degradation.
+#### Day 3 (Nov 3): Phase 2 Model Part 2
+- [ ] Add SOS2 calendar aging variables
+- [ ] Implement degradation cost in objective
+- [ ] Update cross-market constraints
+- [ ] **CRITICAL TEST:** DE, 0.5C, 2.0 must solve
+- [ ] Verify revenue higher, net profit accounts for degradation
 
-    Example:
-        >>> soc = np.array([0.5, 0.6, 0.7, 0.8])
-        >>> power = {'charge': [100, 100, 0, 0], 'discharge': [0, 0, 100, 100]}
-        >>> fade = calculate_cycle_aging(soc, power, temperature=25)
-        >>> print(f"Capacity fade: {fade:.2f}%")
-        Capacity fade: 0.15%
-    """
-    # Implementation here...
-```
+#### Day 4-6 (Nov 4-6): Scenarios & Analysis
+- [ ] Create `run_phase2_scenarios.py`
+- [ ] Run 45 scenarios (background process)
+- [ ] Handle failed scenarios
+- [ ] Analyze results (best configs, degradation impact)
+- [ ] Update investment analysis with NPV across all 5 countries
 
-### Documentation as You Go
-- **Daily log:** `doc/dev_plan/daily_log.md` - Track progress, decisions, blockers
-- **Assumptions:** Document immediately when made (don't rely on memory)
-- **Equations:** Include LaTeX in docstrings for complex math
-- **Screenshots:** Save interesting results as you go
-
-Example daily log entry:
-```markdown
-## 2025-10-26 (Day 2)
-
-###✅ Completed
-- ✅ Implemented ORC cycle aging model
-- ✅ Added rainflow counting for cycle depth
-- ✅ Validated against literature values
-
-### Decisions Made
-- Using simplified Arrhenius for temperature (saves 2 hours vs full model)
-- Calendar aging: linear interpolation between SOC points (good enough for now)
-
-### Blockers / Issues
-- € Unclear if organizers use same Arrhenius parameters
-- € Need to validate cycle counting algorithm
-
-### Tomorrow
-- Integrate degradation into Pyomo model
-- Test with single scenario
-```
-
-### Time Management
-- **Pomodoro Technique:** 2-hour focus blocks with 15-min breaks
-- **Daily Standup (10 min):**
-  - What did I accomplish yesterday?
-  - What will I do today?
-  - Any blockers?
-- **Buffer Time:** 20% slack for unexpected issues
-- **No perfectionism:** "Good enough" beats "perfect but late"
+#### Day 7-9 (Nov 7-9): Documentation & Dashboard
+- [ ] Create master results notebook
+- [ ] Generate all visualizations
+- [ ] Build interactive web dashboard (Plotly Dash, 3 tabs)
+- [ ] Integrate existing McKinsey-style plot functions
+- [ ] Write 15-page technical report
+- [ ] Prepare submission CSVs
+- [ ] Package code with documentation and dashboard
+- [ ] Final validation & submission
 
 ---
 
-## 9. Key Contacts & Resources
+## 10. Key Contacts & Resources
 
 ### Official Resources
 - **Phase 2 Q&A:** [Google Doc](https://docs.google.com/document/d/1NHbycnyq_boqihHSY8Gw4GtrUCdVqaBkwO1my5SLUsY/edit)
-- **PICASSO 4-sec Data:** https://www.transnetbw.de/en/energy-market/ancillary-services/picasso
+- **PICASSO 4-sec Data:** https://www.transnetbw.de/en/energy-market/ancillary-services/picasso (DESCOPED)
 - **Phase 2 Slides:** `doc/official_instruction_docs/round2_intro_slides.md`
-- **Degradation Image:** `doc/official_instruction_docs/Battery_degradation.png`
 
 ### Key Literature
 1. **Collath et al. (2023):** "Increasing the lifetime profitability of battery energy storage systems through aging aware operation" - Applied Energy 348, 121531
-2. **Xu et al. (2018):** "Modeling of lithium-ion battery degradation for cell life assessment" - IEEE Transactions
-3. **TechArena Instructions:** Official submission guidelines
+   - Focus: Calendar aging model (Section 2.2)
+2. **Xu et al. (2017):** "Factoring the Cycle Aging Cost of Batteries Participating in Electricity Markets" - arXiv:1707.04567v2
+   - Focus: Piecewise-linear cyclic aging (Section III)
+3. **ORC Battery Degradation Model:** Official competition documentation (if available)
 
-### Technical Documentation
-- **Pyomo:** https://pyomo.readthedocs.io/
-- **Plotly Dash:** https://dash.plotly.com/
-- **Battery Degradation Fundamentals:** NASA Battery Reference Manual
-
----
-
-## 10. Post-Submission Checklist
-
-### Immediate (Nov 9-10)
-- [ ] Confirm submission received
-- [ ] Backup all code and data (multiple locations)
-- [ ] Celebrate completion! <→
-
-### Optional Enhancements (Nov 10+)
-- [ ] Deploy dashboard publicly (Render/Heroku/Railway free tier)
-- [ ] Write blog post on Medium/LinkedIn
-  - "How I Optimized a €900K Battery System Using Python"
-  - "Battery Degradation Modeling for Revenue Optimization"
-- [ ] Add to portfolio/resume
-- [ ] Share dashboard link with peers
-
-### Retrospective (When results come back)
-- [ ] What worked well?
-- [ ] What would I do differently?
-- [ ] What did I learn about:
-  - Battery optimization
-  - Degradation modeling
-  - Dashboard development
-  - Time management under pressure
-- [ ] Document lessons learned for future projects
+### Internal Documentation
+- `doc/whole_project_description.md` - Complete project overview
+- `doc/gg_dp_p2_model.tex/p2_model_ggdp.tex` - Phase 2 mathematical model
+- `doc/dev_summary/Phase2_implementation_summary.md` - Oct 26 infrastructure work
+- `doc/dev_plan/data_result_dashboard.md` - Original dashboard specs
 
 ---
 
-## Appendix A: Dashboard Requirements (from data_result_dashboard.md)
+## Conclusion & Immediate Next Steps
 
-### View 1: Market Data Exploration
+### Honest Post-Week 1 Assessment
 
-**Global Controls:**
-- Country selector: DE, AT, CH, HU, CZ
-- Time range selector: Full year, Q1-Q4, specific month
+**What Went Right:**
+- Phase 1 model is production-grade (comprehensive validation)
+- Phase 2 is fully designed mathematically
+- Visualization infrastructure is ready to use
+- Foundation is solid - no technical debt
 
-**Modules:**
-1. **Time Series Chart:** DA, FCR, aFRR prices (multi-series line chart)
-2. **Price Distribution:** Histogram/KDE of DA prices
-3. **Price Heatmap:** Hour-of-day vs Month (2D heatmap)
-4. **Statistics Table:** Mean, median, std dev, min, max
+**What Went Wrong:**
+- Zero implementation progress on degradation (30% of grade)
+- Zero implementation on Phase 2 optimization
+- Web dashboard doesn't exist (only backend functions)
 
-### View 2: Optimization Results
+**Critical Insight:** You chose quality over quantity in Week 1. This was defensible but creates intense Week 2 pressure.
 
-**Global Controls:**
-- Country selector
-- Scenario selector (9 configurations)
+### The Path Forward (9 Days)
 
-**Modules:**
-1. **KPI Cards:** Total profit, ROI, NPV, SOH
-2. **Operation Schedule:** Charge/discharge + SoC + DA price (composite chart, 1 week sample)
-3. **Revenue Breakdown:** Pie chart (DA, FCR, aFRR capacity, aFRR energy)
-4. **Profit Comparison:** Bar chart (all 9 configs for selected country)
+**Ambitious but Achievable IF:**
+1. You work focused 8-hour days
+2. You leverage existing work (validation plots, viz functions, Phase 1 code)
+3. You prioritize efficiently (degradation model first, then scenarios)
+4. You use parallel processing for scenario runs
 
-### View 3: Degradation Analysis (Phase 2 Addition)
+**Non-Negotiables:**
+- Degradation model must work (30% of grade)
+- aFRR energy must be integrated (part of 30% revenue grade)
+- 45 scenarios across all 5 countries must complete
+- Interactive web dashboard for strong code quality score
+- Professional technical report
 
-**Modules:**
-1. **SOH Evolution:** 10-year trajectory (line chart, all scenarios)
-2. **Degradation Breakdown:** Cycle vs calendar aging (stacked bar)
-3. **Factor Analysis:** C-rate, SoC, DoD distributions (histograms)
-4. **Trade-off Plot:** Revenue vs SOH scatter with Pareto frontier
+**Smart Simplifications:**
+- 5 SOC segments (not 10) for degradation modeling
+- Temperature effects marked [?] - optional if time permits
+- Accept 3-5% MIP gap for solver efficiency
+- Leverage existing visualization infrastructure
 
----
+### Immediate Actions (Next 2 Hours Before Demo)
 
-## Appendix B: File Structure (Final)
+1. **Prepare Demo Materials (90 minutes):**
+   - Create notebook showing Phase 1 validation plots
+   - Add markdown explaining Phase 2 design (embed LaTeX equations as images)
+   - Show View 1 visualizations (use Oct 26 test notebook)
+   - Add "Week 2 Sprint Plan" section with revised timeline
 
-```
-TechArena2025_EMS/
-├── py_script/
-│   ├── market_da.py                # Market data + plotting (Phase 1, extended)
-│   ├── model.py                    # Phase 1 optimization model
-│   ├── model_phase2.py             # Phase 2 with degradation (NEW)
-│   ├── battery_degradation.py      # Degradation calculations (NEW)
-│   ├── investment_analysis.py      # DCF with degradation (UPDATED)
-│   └── requirements.txt
-├── dashboard/
-│   ├── app.py                      # Main Dash app (NEW)
-│   ├── layouts/
-│   │   ├── market_tab.py           # Market data visualizations (NEW)
-│   │   ├── optimization_tab.py     # Results display (NEW)
-│   │   └── degradation_tab.py      # Degradation analysis (NEW)
-│   ├── callbacks/
-│   │   ├── market_callbacks.py     # Interactive logic for Tab 1 (NEW)
-│   │   ├── results_callbacks.py    # Interactive logic for Tab 2 (NEW)
-│   │   └── degradation_callbacks.py # Interactive logic for Tab 3 (NEW)
-│   ├── data/
-│   │   └── cache.pkl               # Pre-computed results for fast loading (NEW)
-│   ├── assets/
-│   │   ├── style.css               # Custom styling (NEW)
-│   │   └── logo.png                # TechArena logo (optional)
-│   └── README.md                   # Dashboard setup instructions (NEW)
-├── data/
-│   ├── TechArena2025_Phase2_data.xlsx
-│   ├── TechArena2025_data_tidy.jsonl
-│   └── degradation_parameters.json  # ORC model params (NEW)
-├── results/
-│   ├── phase1/                     # Baseline from Phase 1
-│   │   └── scenario_analysis.csv
-│   ├── phase2/                     # Phase 2 results (NEW)
-│   │   ├── scenario_analysis.csv       # All 54 scenarios
-│   │   ├── degradation_metrics.csv     # SOH, fade %, etc.
-│   │   ├── investment_analysis.csv     # NPV, ROI with degradation
-│   │   └── best_operation_schedule.csv # Winning scenario details
-│   └── plots/                      # Generated visualizations
-│       ├── soh_evolution.png
-│       ├── revenue_vs_degradation.png
-│       └── pareto_frontier.png
-├── doc/
-│   ├── dev_plan/
-│   │   ├── Phase2_dev_plan.md      # This document
-│   │   ├── data_result_dashboard.md # Dashboard specs
-│   │   └── daily_log.md            # Development journal (NEW)
-│   ├── official_instruction_docs/
-│   │   ├── round2_intro_slides.md
-│   │   └── Battery_degradation.png
-│   ├── Technical_Report.pdf        # Final submission report (NEW)
-│   └── Degradation_Model_Documentation.pdf # Model details (NEW)
-├── tests/
-│   ├── test_degradation.py         # Unit tests for degradation (NEW)
-│   ├── test_model_phase2.py        # Integration tests (NEW)
-│   └── fixtures/                   # Test data
-├── archive_old_files/              # Phase 1 legacy code
-├── .gitignore
-├── requirements.txt
-└── README.md                       # Updated for Phase 2
-```
+2. **Prepare Talking Points (30 minutes):**
+   - "Week 1 focused on foundation: validated Phase 1, designed Phase 2, built viz infrastructure"
+   - "Trade-off: Depth over breadth - ensuring correctness before extension"
+   - "Week 2: Pure execution mode - implementation, scenarios, documentation"
+   - "Realistic target: 80% overall score (competitive), not 87% (unrealistic)"
+
+### After Demo
+
+- **Today (Oct 31 evening):** Rest and prepare mentally
+- **Tomorrow (Nov 1):** START DAY 1 IMMEDIATELY - degradation model is critical path
+- **Daily check-ins:** Review progress against checklist above
+- **Decision point Nov 3 evening:** If model doesn't solve, implement contingency (soft constraints instead of hard degradation costs)
 
 ---
 
-## Conclusion
+**You can do this.** The math is done. The foundation is validated. The infrastructure exists. Now it's focused execution with clear deliverables.
 
-This plan gives you a **realistic, actionable roadmap** to complete Phase 2 successfully in 15 days.
-
-### Key Takeaways
-
-**1. Prioritization is Everything**
-- Battery degradation (30%) + Revenue (30%) = 60% of grade € Focus here first
-- Dashboard is important (supports 20% code quality grade) but is a **presentation tool**, not the core work
-
-**2. Use the Right Tool for the Job**
-- **Python/Jupyter:** For development, testing, validation (fast iteration)
-- **Web Dashboard:** For demo, presentation, final submission (professional appearance)
-- Don't try to do everything in the dashboard - it's not a development environment
-
-**3. Agile > Perfect**
-- Week 1:✅ Working MVP (degradation model + minimal dashboard)
-- Week 2: Refinement based on feedback
-- This beats trying to build everything perfectly from the start
-
-**4. Timeline is Tight but Achievable**
-- 6 days to demo: Possible with focused execution
-- 15 days to submission: Requires discipline and time management
-- Buffer built in for unexpected issues
-
-### Final Advice
-
-**What will make you succeed:**
-- Start TODAY on degradation model (highest risk, highest value)
-- Test frequently in Jupyter (catch errors early)
-- Build dashboard incrementally (don't try to finish in one session)
-- Document as you go (don't leave it for Day 14)
-- Ask for expert feedback Oct 31 (use it to improve Week 2)
-
-**What will make you fail:**
-- Perfectionism (spending 3 days on dashboard styling)
-- Big-bang development (building everything then testing at the end)
-- Scope creep (adding non-essential features)
-- Poor time management (not tracking progress daily)
-
-**You've got this!** The foundation from Phase 1 is solid. Phase 2 is about adding degradation intelligence and presenting results professionally. Follow this plan, stay focused, and you'll deliver a top-tier submission.
-
-Good luck! =→=
+**Remember:** 85% is a strong grade. Work smart with existing infrastructure. Execute efficiently. 🚀
 
 ---
 
-**Document Version:** 1.0
-**Last✅ Updated:** 2025-10-25
-**Next Review:** After Oct 31 demo (incorporate expert feedback)
+**Document Version:** 2.0 - Post-Week 1 Reality Check
+**Previous Version:** 1.0 (Oct 25) - Original optimistic plan
+**Last Updated:** October 31, 2025
+**Next Review:** After implementation milestone (Nov 3 evening) or if major blocker occurs
+**Author:** Gen Li (Team SoloGen) with Claude Code assistance
+
+---
+
+**END OF REVISED PLAN**
