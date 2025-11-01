@@ -66,6 +66,7 @@ ValidationTest_*/TechArena_Phase1_Operation.xlsx
 # Phase 1 specific patterns
 **/Phase1_*
 **/submission_phase1_*
+**/py_script/p1_model_validation_WeekScale_results/
 
 # Excel temp files
 ~$*.xlsx
@@ -76,3 +77,16 @@ ValidationTest_*/TechArena_Phase1_Operation.xlsx
 
 # Validation logs
 validation_*.log
+
+# Result directories (reorganized structure)
+py_script/**/results/
+py_script/**/*_results/
+results/phase1_validation/
+results/phase2_validation/
+**/validation_week_results/
+**/final_45_scenarios_results/
+final_submission_csvs/
+
+# Script-generated progress files
+**/progress.json
+**/*_progress.json
