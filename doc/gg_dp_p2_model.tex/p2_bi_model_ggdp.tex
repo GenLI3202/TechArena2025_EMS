@@ -68,10 +68,100 @@ The Phase I model established a strong foundation for co-optimizing BESS bids ac
 
 This document presents the revised mathematical formulation. It is designed to build directly upon the Phase I model, modifying existing constraints and adding new logic, rather than starting from a new, incompatible framework.
 
-\section{Phase II Model Derivation}
-We extend the Phase I MILP by modifying the objective function and relevant constraints.
+\section{Phase I Model - Base Model}
 
-\subsection{Integrating the aFRR Energy Market}
+\subsection*{Objective Function}
+
+The objective is to maximize the total net profit over the one-year horizon. This is the sum of day-ahead energy arbitrage revenue and ancillary service capacity payments, minus the cost of energy purchased for charging.
+
+\begin{align}
+\max\; Z
+&= \sum_{t\in T} \Bigg( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \Bigg)\, \Delta t \notag \\
+&\quad + \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, \Delta b
+\end{align}
+
+\begin{itemize}
+  \item The first term is day-ahead net profit. $p_{\mathrm{dis}}(t)$ and $p_{\mathrm{ch}}(t)$ are in kW, $P_{DA}(t)$ is in EUR/MWh; division by 1000 converts kW to MW. Multiplying by $\Delta t$ (0.25 h) yields EUR per interval.
+  \item The second term is ancillary service capacity revenue. Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW for each 4-hour block; multiplying by $\Delta b$ (4 h) yields EUR per block.
+\end{itemize}
+
+\subsection*{Constraint Equations with Detailed Explanations}
+
+The optimization is subject to the following constraints.
+
+\begin{enumerate}
+  \item \textbf{State of Charge (SOC) Dynamics:} Energy balance of the BESS.
+  \begin{align}
+    e_{\mathrm{soc}}(t) &= e_{\mathrm{soc}}(t-1) + \Big( p_{\mathrm{ch}}(t)\,\eta_{\mathrm{ch}} - \frac{p_{\mathrm{dis}}(t)}{\eta_{\mathrm{dis}}} \Big)\, \Delta t
+    \qquad \forall t\in T
+  \end{align}
+  For $t=1$, use the initial SOC:
+  \begin{align}
+    e_{\mathrm{soc}}(1) &= e^{\mathrm{init}}_{\mathrm{soc}} + \Big( p_{\mathrm{ch}}(1)\,\eta_{\mathrm{ch}} - \frac{p_{\mathrm{dis}}(1)}{\eta_{\mathrm{dis}}} \Big)\, \Delta t.
+  \end{align}
+
+  \item \textbf{SOC Limits:} Stay within operational boundaries.
+  \begin{align}
+    SOC_{\min}\,E_{\mathrm{nom}} \le e_{\mathrm{soc}}(t) \le SOC_{\max}\,E_{\mathrm{nom}} \qquad \forall t\in T
+  \end{align}
+
+  \item \textbf{Power Limits:} Binary–continuous linking to configured power.
+  \begin{align}
+    p_{\mathrm{ch}}(t) &\le y_{\mathrm{ch}}(t)\, P^{\mathrm{config}}_{\max} \qquad \forall t\in T \\
+    p_{\mathrm{dis}}(t) &\le y_{\mathrm{dis}}(t)\, P^{\mathrm{config}}_{\max} \qquad \forall t\in T
+  \end{align}
+
+  \item \textbf{Simultaneous Operation Prevention:} No charge and discharge at the same time.
+  \begin{align}
+    y_{\mathrm{ch}}(t) + y_{\mathrm{dis}}(t) \le 1 \qquad \forall t\in T
+  \end{align}
+
+  \item \textbf{Market Co-optimization Power Limits:} Allocate total power between energy and reserves (convert MW bids to kW by $\times 1000$).
+  \begin{align}
+    p_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b) &\le P^{\mathrm{config}}_{\max} \qquad \forall b\in B,\, \forall t\in b \\
+    p_{\mathrm{dis}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b) &\le P^{\mathrm{config}}_{\max} \qquad \forall b\in B,\, \forall t\in b
+  \end{align}
+
+  \item \textbf{Daily Cycle Limit:} Limit the total daily discharged energy.
+  \begin{align}
+    \sum_{t\in d} p_{\mathrm{dis}}(t)\,\Delta t \;\le\; N_{\mathrm{cycles}}\,E_{\mathrm{nom}}
+    \qquad \forall d\in D
+  \end{align}
+
+  \item \textbf{Ancillary Service Energy Reserve:} Maintain sufficient energy to deliver awarded capacity for 15 minutes ($\Delta t=0.25$ h).
+  \begin{align}
+    e_{\mathrm{soc}}(t) &\ge SOC_{\min}\,E_{\mathrm{nom}} + \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b)\big)\,\Delta t
+    && \forall b\in B,\, \forall t\in b \\
+    e_{\mathrm{soc}}(t) &\le SOC_{\max}\,E_{\mathrm{nom}} - \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b)\big)\,\Delta t
+    && \forall b\in B,\, \forall t\in b
+  \end{align}
+
+  \item \textbf{Minimum Bid Size Constraints:} Bids can be non-zero only if the corresponding binary is 1; if non-zero, they must satisfy minimum size and available power.
+  \begin{align}
+    c_{fcr}(b) &\ge y_{fcr}(b)\,\text{MinBid}_{fcr} && \forall b\in B \\
+    c_{fcr}(b) &\le y_{fcr}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B \\
+    c^{\mathrm{pos}}_{aFRR}(b) &\ge y^{\mathrm{pos}}_{aFRR}(b)\,\text{MinBid}_{afrr} && \forall b\in B \\
+    c^{\mathrm{pos}}_{aFRR}(b) &\le y^{\mathrm{pos}}_{aFRR}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B \\
+    c^{\mathrm{neg}}_{aFRR}(b) &\ge y^{\mathrm{neg}}_{aFRR}(b)\,\text{MinBid}_{afrr} && \forall b\in B \\
+    c^{\mathrm{neg}}_{aFRR}(b) &\le y^{\mathrm{neg}}_{aFRR}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B
+  \end{align}
+
+  \item \textbf{Ancillary Service Market Mutual Exclusivity:} Prevent simultaneous bidding in multiple ancillary service markets for the same block.
+  \begin{align}
+    y_{fcr}(b) + y^{\mathrm{pos}}_{aFRR}(b) + y^{\mathrm{neg}}_{aFRR}(b) \le 1 \qquad \forall b\in B
+  \end{align}
+\end{enumerate}
+
+\section{Phase II Model Derivation}
+We extend the Phase I MILP (Base Model) by modifying the objective function and relevant constraints.
+% Set a TODO box here, say writing the cyclic and calendar aging models as model (ii) and (iii) step by step
+\begin{itemize}
+    \item[√] \textbf{Model (i):} Base Model + aFRR Energy Market
+    \item[X] \textbf{Model (ii):} Model (i) + Cyclic Aging Cost
+    \item[X] \textbf{Model (iii):} Model (ii) + Calendar Aging Cost = Full Phase II Model  
+\end{itemize}
+
+\subsection{Model (i): Base Model + aFRR Energy Market}
 The aFRR Energy market (15-min granularity) operates similarly to the DA market as a price-taker energy market. We introduce new variables for bidding in this market and update all constraints that manage power and energy.
 
 \begin{itemize}
@@ -113,7 +203,6 @@ This formulation directly penalizes holding the battery at high SOC, as prioriti
 
 \section{Phase II Mathematical Formulation}
 
-\subsection{Nomenclature}
 \subsubsection{Sets and Indices}
 \begin{tabular}{@{}ll}
 \toprule

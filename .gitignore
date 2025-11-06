@@ -10,13 +10,13 @@ __pycache__/
 #SoloGen_TechArena2025_Phase1/output/
 
 # Ignore generated documentation files
-# documentation/*.pdf
-documentation/*.log
-documentation/*.aux
-documentation/*.out
-documentation/*.fls
-documentation/*.fdb_latexmk
-documentation/*.synctex.gz
+# doc/*.pdf
+doc/*.log
+doc/*.aux
+doc/*.out
+doc/*.fls
+doc/*.fdb_latexmk
+doc/*.synctex.gz
 
 # Ignore Jupyter Notebook checkpoints
 .ipynb_checkpoints/

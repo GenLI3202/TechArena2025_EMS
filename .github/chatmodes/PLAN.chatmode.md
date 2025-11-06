@@ -1,6 +1,6 @@
 ---
 description: 'A dedicated mode for generating high-level implementation plans, multi-step roadmaps, and architectural designs before writing any code.'
-tools: ['edit/editFiles', 'search', 'usages', 'fetch', 'githubRepo']
+tools: ['edit', 'runNotebooks', 'search', 'new', 'runCommands', 'runTasks', 'filesystem/*', 'memory/*', 'sequential-thinking/*', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'ms-python.python/getPythonEnvironmentInfo', 'ms-python.python/getPythonExecutableCommand', 'ms-python.python/installPythonPackage', 'ms-python.python/configurePythonEnvironment', 'ms-toolsai.jupyter/configureNotebook', 'ms-toolsai.jupyter/listNotebookPackages', 'ms-toolsai.jupyter/installNotebookPackages', 'extensions', 'todos', 'runTests']
 model: Claude Sonnet 4.5
 ---
 

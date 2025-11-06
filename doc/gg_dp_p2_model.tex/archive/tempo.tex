@@ -1,0 +1,204 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- UNIVERSAL PREAMBLE BLOCK ---
+% (Based on p2_bi_model_ggdp.tex)
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
+\usepackage{fontspec}
+\usepackage[english, bidi=basic, provide=*]{babel}
+\babelprovide[import, onchar=ids fonts]{english}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{parskip} % Adds space between paragraphs
+\usepackage{enumitem} % For better lists
+\usepackage[
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+]{hyperref}
+
+% --- PAGE STYLE ---
+\pagestyle{fancy}
+\fancyhf{} % Clear all header and footer fields
+\fancyhead[L]{Huawei TechArena 2025: Phase II Documentation Prompt}
+\fancyhead[R]{Gen Li (Team SoloGen)}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% --- TITLE ---
+\title{Prompt for Research Assistant (Draft Writing) \\ \large Refactoring the Phase II Model into a Progressive Narrative}
+\author{Gen Li (Team SoloGen)}
+\date{\today}
+
+% --- DOCUMENT START ---
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+% --- Memo Header ---
+\begin{center}
+\begin{tabular}{@{}ll}
+    \textbf{TO:} & Research Assistant (Draft Writing) \\
+    \textbf{FROM:} & Gen Li (Team SoloGen) \\
+    \textbf{SUBJECT:} & Refactoring \texttt{p2\_bi\_model\_ggdp.tex} into a Progressive Narrative \\
+    & for Phase II Documentation and Presentation \\
+\end{tabular}
+\end{center}
+\vspace{1em}
+\hrule
+\vspace{1em}
+
+\section{Objective}
+Your task is to take the final, comprehensive mathematical model described in our draft file \texttt{p2\_bi\_model\_ggdp.tex} and rewrite its description.
+
+Instead of presenting it as one final, monolithic model, you must restructure the narrative to show a \textbf{logical, three-stage development process}. This narrative will be the backbone of our final report and presentation, demonstrating a rigorous, step-by-step approach to balancing model accuracy with computational feasibility, as required by the competition \cite{huawei2025}.
+
+We must tell a "story" of how we built our solution.
+
+\section{Core Narrative \& Guiding Philosophy}
+Our core philosophy is driven by the competition's "black box" evaluation (the "ORC Battery Degradation Model") and the severe computational demand of "meta-optimization" (finding the optimal 10-year ROI).
+
+\textbf{Our story is:} We didn't just *guess* the right model. We scientifically *built up* from a simple baseline to a "gold standard" academic model. We analyzed the trade-offs at each step and ultimately selected the model that provides the \textbf{best practical balance of speed, accuracy, and profitability} for the fixed 10-year horizon.
+
+\section{The Three-Stage Narrative (Actionable Plan)}
+Please structure the new document (and our presentation slides) around these three progressive models. The way of introducing models (i)-(iii) in \cite{collath2023} can be a good reference for you to write our model progression narrative.
+
+\subsection{Model (i): The Baseline (The Phase I Model) + aFRR energy Markets part}
+\begin{itemize}
+    \item \textbf{Description:} Start by translating the markdown syntax of the Phase I model described in \texttt{whole\_project\_description.md} \cite{huawei2025} into LaTeX syntax, while considering the addition of aFRR energy market dynamics described in the LaTeX file \texttt{p2\_bi\_model\_ggdp.tex}. This will form the basis of Model (i).
+    \item \textbf{Core Function:} It co-optimizes Day-Ahead, and aFRR energy markets, as well as FCR, and aFRR Capacity markets.
+    \item \textbf{Key Flaw to Highlight:} Its \emph{only} degradation-aware component was the rigid \textbf{"Daily Cycle Limit"} constraint (our old Cst-5).
+    \item \textbf{Punchline:} This is a "naive" approach. It's economically sub-optimal because it treats all cycles (deep vs. shallow) as equally costly and ignores calendar aging entirely.
+\end{itemize}
+
+\subsection{Model (ii): The "Practical" Upgrade (Model (i) + Xu-Cyclic)}
+\begin{itemize}
+    \item \textbf{Description:} This is our first major Phase II contribution. We replace the rigid "Daily Cycle Limit" with a flexible, *economic* cost function: $C^{\mathrm{cyc}}$, and also integrate the aFRR energy market dynamics. The approach to do this part is basically take the LaTeX file \texttt{p2\_bi\_model\_ggdp.tex} and extract the relevant parts that describe Model (ii) only (i.e., the Phase II model described there without calendar aging).
+    
+    \item \textbf{Methodology:} Explain that this model is based on the \textbf{Xu et al. (2017) methodology} \cite{xu2017}.
+    \item \textbf{Key Insights to Emphasize (The "Magic" of this model):}
+    \begin{enumerate}
+        \item \textbf{"Virtual Segments":} We divide the BESS capacity *virtually* into $J$ segments $e_{\mathrm{soc},j}(t)$, each with a distinct marginal cost $c^{\mathrm{cost}}_{j}$.
+        \item \textbf{LP Core:} This model's *aging logic* is a \textbf{pure LP}. The optimizer, by simply minimizing cost, will *automatically* use the "cheapest" (shallowest) segments $j$ first.
+        \item \textbf{The Result:} It perfectly mimics the non-linear "Rainflow" (DOC) cost (deeper cycles = exponentially more expensive) \textbf{without} the computational burden of SOS2 constraints.
+        \item \textbf{Practicality:} It directly tackles our highest (P1) priorities (DOC, C-rate, SoC Range) and its data (a simple DOC vs. Cycle-life curve) is relatively easier to obtain.
+    \end{enumerate}
+    \item \textbf{Punchline:} This model is our "fast, practical workhorse." It captures the most significant (P1) degradation factors while remaining computationally lightweight (an LP-core MILP).
+\end{itemize}
+
+\subsection{Model (iii): The "Academic" Upgrade (Model (ii) + Calendar Aging)}
+\begin{itemize}
+    \item \textbf{Description:} Here, we push for maximum academic accuracy by adding the P2 priority: \textbf{Calendar Aging ($C^{\mathrm{cal}}$)}.
+    
+    \item \textbf{Branch (iii-a): The "Gold Standard" (Collath SOS2 Method)}
+    \begin{itemize}
+        \item \textbf{Methodology:} This is the model *currently described* in our \texttt{p2\_bi\_model\_ggdp.tex}. Explain that we add the $C^{\mathrm{cal}}$ term based on Collath et al. (2023) \cite{collath2023}.
+        \item \textbf{Key Insight (The Cost):} This introduces the \textbf{SOS2 constraint}. This is the "gold standard" for accuracy, but it comes at a \textbf{severe computational cost}.
+        \item \textbf{The Trade-off:} We must explicitly state this trade-off: "While Model (iii-a) is the most accurate in theory, its reliance on SOS2 transforms our fast model into a complex, slow MILP. This severely hinders our ability to perform the crucial 'meta-optimization' (the $\alpha$-sweep)."
+        \item Also, highlight the "epic" data requirement (the multi-dimensional (T, SoC, $Q^{\mathrm{loss}}$) lookup table).
+    \end{itemize}
+    
+    \item \textbf{Branch (iii-b): The "Engineer's Compromise" (QP Method)}
+    \begin{itemize}
+        \item \textbf{Methodology:} As a pragmatic alternative to (iii-a), we propose a simplified penalty.
+        \item \textbf{Example}: A Quadratic Programming (QP) cost: $C^{\mathrm{cal}} = \alpha_{\mathrm{cal}} \cdot (e_{\mathrm{soc}}(t) - SOC_{target})^2$.
+        \item \textbf{The Trade-off:} "This model (iii-b) still correctly penalizes high SOC, but avoids the SOS2 bottleneck. It is a robust engineering compromise, faster than (iii-a) but slower than (ii)."
+    \end{itemize}
+\end{itemize}
+
+\section{The "Meta-Algorithm": The Real Solution Framework}
+The documentation *must* explain that the "model" (i, ii, or iii) is just the "engine." The "car" that actually wins the race is our **Meta-Algorithm Framework** (from \texttt{p2\_bi\_model\_ggdp.tex}, Sections 4.1 \& 4.2).
+
+\section{Implementation Strategy: A Two-Stage Meta-Optimization}
+The mathematical formulation defines our "inner-loop" solver. However, the competition's objectives---maximizing a 10-Year ROI by balancing revenue (30\%) and degradation (30\%)---present a bi-objective problem that is computationally infeasible to solve naively.
+
+\subsection{The Computational Challenge: Infeasibility of Naive Meta-Optimization}
+The core task is to solve the bi-objective function \cite{huawei2025}:
+$$ \max \; \mathbb{P} - \alpha \cdot C^{\mathrm{Degradation}} $$
+Finding the optimal trade-off parameter, $\alpha^*$, requires a "meta-optimization" loop (i.e., an $\alpha$-sweep) \cite{828-834}.
+
+A naive implementation would run a full 365-day Rolling Horizon (MPC) simulation for *each* $\alpha$ value. As our analysis shows, this is computationally impossible:
+\begin{itemize}
+    \item A 4-hour execution step ($T_{exec}=4h$) requires $(365 \text{ days} \times 6 \text{ rolls/day}) = 2190$ MILP solves.
+    \item Assuming a modest 30 seconds per solve, the total time for \emph{one} $\alpha$ value is $2190 \times 30s \approx 1095$ minutes, or \textbf{over 18 hours}.
+    \item This makes an $\alpha$-sweep (e.g., 20+ values) across 5 countries intractable.
+\end{itemize}
+
+\subsection{The Two-Stage Solution: Sampled $\alpha$-Sweep and Full-Horizon Run}
+To solve this, we decouple the "search" for $\alpha^*$ from the "final execution" of the model.
+
+\subsubsection{Stage 1: Sample-Based Meta-Optimization (Finding $\alpha^*$)}
+Instead of running the full 365-day simulation for every $\alpha$, we find $\alpha^*$ using a computationally "cheap" proxy.
+\begin{enumerate}
+    \item \textbf{Select Sample Data:} We select a small number of "representative" periods (e.g., 3-4 individual weeks) from the 2024 dataset that capture high volatility (winter), low volatility (summer), and average conditions.
+    \item \textbf{Run Fast $\alpha$-Sweep:} We execute our MPC meta-optimization loop (sweeping 20-30 $\alpha$ values) \emph{only} on these sample weeks.
+    \item \textbf{Extrapolate \& Select:} We extrapolate the (Profit vs. Degradation) results from these samples to a full year, calculate the 10-Year ROI for each $\alpha$, and select the $\alpha^*$ that yields the highest \emph{extrapolated} ROI.
+\end{enumerate}
+This "sample-based" search can be completed within our 2-hour computational budget.
+
+\subsubsection{Stage 2: Full-Year Rolling Horizon (Final Run)}
+Once the \emph{single} optimal $\alpha^*$ is identified in Stage 1, we perform \emph{one} high-fidelity, full 365-day MPC simulation to generate our final submission files. For this single run, we optimize the MPC window parameters for accuracy and speed:
+
+\begin{itemize}
+    \item \textbf{Execution Step ($T_{exec}$): 24 hours (1 roll per day).}
+    \begin{itemize}
+        \item \textbf{Justification:} This is our primary time-saving measure. It reduces the total MILP solves from $\sim$2190 (for a 4h-roll) to just \textbf{365 solves}. Given that the competition provides deterministic data (perfect foresight), the main benefit of a shorter rolling window---managing uncertainty---is not applicable.
+    \end{itemize}
+    \item \textbf{Planning Horizon ($T_{horizon}$): 48 hours (2-day lookahead).}
+    \begin{itemize}
+        \item \textbf{Justification:} A 24-hour horizon is "myopic" and will make poor decisions at the end of the day (e.g., failing to prepare for the next morning's price changes). A 48-hour horizon ensures the model can see at least one full 24-hour cycle ahead, allowing it to optimize across daily market cycles effectively.
+    \end{itemize}
+\end{itemize}
+This two-stage strategy allows us to find the optimal profit-degradation trade-off ($\alpha^*$) in a feasible timeframe (Stage 1) and then generate an accurate, high-quality result using that parameter (Stage 2).
+
+\subsection{Solving the Bi-Objective Problem: The $\alpha$-Sweep}
+\begin{itemize}
+    \item Explain that the 30\%/30\% (Revenue/Degradation) weighting makes this a bi-objective problem \cite{huawei2025}.
+    \item Our solution is the \textbf{Weighted Sum Method}: $\max \Big( \text{Profit} - \alpha \cdot (\text{Degradation Cost}) \Big)$.
+    \item The "magic number" $\alpha$ is our tuning knob. We find the *best* $\alpha^*$ by running a \textbf{meta-optimization loop}: We run the *entire* 365-day MPC simulation for many different $\alpha$ values and pick the one that gives the \textbf{maximum 10-Year ROI}.
+\end{itemize}
+
+\section{Final Narrative \& Conclusion for the Report}
+Please conclude the documentation with this strategic narrative:
+
+"Our development was a quest for the optimal \emph{practical} trade-off.
+\begin{itemize}
+    \item \textbf{Model (i)} was too simple.
+    \item \textbf{Model (iii-a) (Xu+Collath)} is academically perfect but computationally prohibitive, making the required $\alpha$-sweep (and thus, finding the true 10-Year ROI) infeasible within the competition's time limits.
+    \item \textbf{Model (ii) (Xu-Only)} provides the "sweet spot." It captures the \emph{dominant} P1 degradation factors (DOC/C-rate) with a high-speed, LP-core logic. This speed is a \emph{strategic advantage}, as it allows us to run a far more granular $\alpha$-sweep (e.g., 50 $\alpha$-values vs. 5) to find the \emph{true} 10-Year optimal balance.
+\end{itemize}
+
+Given the "black box" nature of the ORC evaluation, a fast, robust, and 'directionally-correct' model (Model ii) that can be optimized \emph{perfectly} (via the $\alpha$-sweep) is superior to a 'theoretically-perfect' model (Model iii-a) that is too slow to optimize at all."
+
+\section{Action Items}
+\begin{itemize}
+    \item[$\square$] Create a new LaTeX document for the final report in the same document formatting as the LaTeX file \texttt{p2\_bi\_model\_ggdp.tex}.
+    \item[$\square$] Use \texttt{p2\_bi\_model\_ggdp.tex} as the source for the math equations.
+    \item[$\square$] Restructure the narrative according to the 3-Stage plan above.
+    \item[$\square$] Integrate the "Meta-Algorithm" (MPC + $\alpha$-sweep) as the overarching solution framework.
+    \item[$\square$] Emphasize all "Key Insights" and "Trade-offs" described above.
+\end{itemize}
+
+
+% --- Bibliography (copied from p2_bi_model_ggdp.tex) ---
+\begin{thebibliography}{9}
+    \bibitem{xu2017}
+    B. Xu, J. Zhao, T. Zheng, E. Litvinov, and D. S. Kirschen. (2017). "Factoring the Cycle Aging Cost of Batteries Participating in Electricity Markets." \textit{arXiv:1707.04567v2}.
+    
+    \bibitem{collath2023}
+    N. Collath, M. Cornejo, V. Engwerth, H. Hesse, and A. Jossen. (2023). "Increasing the lifetime profitability of battery energy storage systems through aging aware operation." \textit{Applied Energy}, 348, 121531.
+    
+    \bibitem{huawei2025}
+    Gen Li. (2025). "Huawei TechArena 2025: BESS Energy Management System." \textit{Internal Project Document}.
+\end{thebibliography}
+
+\end{document}
