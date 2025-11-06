@@ -72,85 +72,151 @@ This document presents the revised mathematical formulation. It is designed to b
 
 \subsection*{Objective Function}
 
-The objective is to maximize the total net profit over the one-year horizon. This is the sum of day-ahead energy arbitrage revenue and ancillary service capacity payments, minus the cost of energy purchased for charging.
+The objective is to maximize the total net profit over the one-year horizon. This is the sum of day-ahead energy arbitrage revenue and ancillary service capacity payments (FCR + aFRR), minus the cost of energy purchased for charging.
 
-\begin{align}
-\max\; Z
-&= \sum_{t\in T} \Bigg( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \Bigg)\, \Delta t \notag \\
-&\quad + \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, \Delta b
-\end{align}
+\begin{equation}
+\max \; Z = \mathbb{P}^{DA} + \mathbb{P}^{ANCI}  
+\end{equation}
+
+Where:
+\begin{equation}
+\mathbb{P}^{DA} = \sum_{t\in T} \Bigg( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \Bigg)\, \Delta t    
+\end{equation}
+
+\begin{equation}
+\mathbb{P}^{ANCI} = \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)
+\end{equation}
 
 \begin{itemize}
-  \item The first term is day-ahead net profit. $p_{\mathrm{dis}}(t)$ and $p_{\mathrm{ch}}(t)$ are in kW, $P_{DA}(t)$ is in EUR/MWh; division by 1000 converts kW to MW. Multiplying by $\Delta t$ (0.25 h) yields EUR per interval.
-  \item The second term is ancillary service capacity revenue. Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW for each 4-hour block; multiplying by $\Delta b$ (4 h) yields EUR per block.
+  \item Where $T$ is the set of 15-minute intervals in 2024 (35,040 intervals); $B$ is the set of 4-hour blocks (6 blocks/day $\times$ 365 days = 2,190 blocks), and $t \in b$ denotes the set of 16 consecutive 15-minute intervals within block $b$.
+  \item The first term $\mathbb{P}^{DA}$ is day-ahead net profit.
+  \begin{itemize}
+    \item $p_{\mathrm{dis}}(t)$ and $p_{\mathrm{ch}}(t)$ are the nominal discharge and charge power (bids) at time $t$ (kW), respectively.
+    \item $P_{DA}(t)$ is the day-ahead market price at time $t$ (EUR/MWh).
+    \item $\Delta t$ is the time step duration (hours).
+  \end{itemize}
+  \item The second term $\mathbb{P}^{ANCI}$ is ancillary service capacity profit.
+  \begin{itemize}
+    \item Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW for each 4-hour block $b$.
+  \end{itemize}
 \end{itemize}
 
-\subsection*{Constraint Equations with Detailed Explanations}
+\subsection*{Constraints}
 
 The optimization is subject to the following constraints.
 
-\begin{enumerate}
-  \item \textbf{State of Charge (SOC) Dynamics:} Energy balance of the BESS.
-  \begin{align}
-    e_{\mathrm{soc}}(t) &= e_{\mathrm{soc}}(t-1) + \Big( p_{\mathrm{ch}}(t)\,\eta_{\mathrm{ch}} - \frac{p_{\mathrm{dis}}(t)}{\eta_{\mathrm{dis}}} \Big)\, \Delta t
-    \qquad \forall t\in T
-  \end{align}
-  For $t=1$, use the initial SOC:
-  \begin{align}
-    e_{\mathrm{soc}}(1) &= e^{\mathrm{init}}_{\mathrm{soc}} + \Big( p_{\mathrm{ch}}(1)\,\eta_{\mathrm{ch}} - \frac{p_{\mathrm{dis}}(1)}{\eta_{\mathrm{dis}}} \Big)\, \Delta t.
-  \end{align}
+\subsubsection*{(Cst-0): Variable Domains}
+\begin{align}
+p_{\mathrm{ch}}(t) \ge 0,\quad p_{\mathrm{dis}}(t) \ge 0 && \forall t\in T \\
+c_{fcr}(b) \ge 0,\quad c^{\mathrm{pos}}_{aFRR}(b) \ge 0,\quad c^{\mathrm{neg}}_{aFRR}(b) \ge 0 && \forall b\in B \\
+y_{\mathrm{ch}}(t), y_{\mathrm{dis}}(t) \in \{0,1\} && \forall t\in T \\
+y_{fcr}(b), y^{\mathrm{pos}}_{aFRR}(b), y^{\mathrm{neg}}_{aFRR}(b) \in \{0,1\} && \forall b\in B
+\end{align}
 
-  \item \textbf{SOC Limits:} Stay within operational boundaries.
-  \begin{align}
-    SOC_{\min}\,E_{\mathrm{nom}} \le e_{\mathrm{soc}}(t) \le SOC_{\max}\,E_{\mathrm{nom}} \qquad \forall t\in T
-  \end{align}
+\subsubsection*{(Cst-1): Energy Balance (SOC Dynamics)}
+Update SOC based on charge/discharge actions considering efficiencies:
+\begin{equation}
+e_{\mathrm{soc}}(t) = e_{\mathrm{soc}}(t-1) + \Big( p_{\mathrm{ch}}(t)\,\eta_{\mathrm{ch}} - \frac{p_{\mathrm{dis}}(t)}{\eta_{\mathrm{dis}}} \Big)\, \Delta t
+    \qquad \forall t\in T    
+\end{equation}
 
-  \item \textbf{Power Limits:} Binary–continuous linking to configured power.
-  \begin{align}
-    p_{\mathrm{ch}}(t) &\le y_{\mathrm{ch}}(t)\, P^{\mathrm{config}}_{\max} \qquad \forall t\in T \\
-    p_{\mathrm{dis}}(t) &\le y_{\mathrm{dis}}(t)\, P^{\mathrm{config}}_{\max} \qquad \forall t\in T
-  \end{align}
+For $t=1$, use the initial SOC:
+\begin{equation}
+e_{\mathrm{soc}}(1) = e_{\mathrm{soc}}^{\mathrm{init}} + \Big( p_{\mathrm{ch}}(1)\,\eta_{\mathrm{ch}} - \frac{p_{\mathrm{dis}}(1)}{\eta_{\mathrm{dis}}} \Big)\, \Delta t 
+\end{equation}
 
-  \item \textbf{Simultaneous Operation Prevention:} No charge and discharge at the same time.
-  \begin{align}
+Where $e_{\mathrm{soc}}$ is the state of charge, and $\eta_{\mathrm{ch}}$ and $\eta_{\mathrm{dis}}$ are the charging and discharging efficiencies, respectively.
+
+\subsubsection*{(Cst-2): SOC Limits}
+BESS energy stays within min/max SOC bounds:
+\begin{equation}
+SOC_{\min}\,E_{\mathrm{nom}} \le e_{\mathrm{soc}}(t) \le SOC_{\max}\,E_{\mathrm{nom}} \qquad \forall t\in T
+\end{equation}
+
+Where $E_{\mathrm{nom}}$ is the nominal energy capacity of the BESS.
+
+\subsubsection*{(Cst-3): Simultaneous Operation Prevention}
+No charge and discharge at the same time:
+\begin{equation}
     y_{\mathrm{ch}}(t) + y_{\mathrm{dis}}(t) \le 1 \qquad \forall t\in T
-  \end{align}
+\end{equation}
 
-  \item \textbf{Market Co-optimization Power Limits:} Allocate total power between energy and reserves (convert MW bids to kW by $\times 1000$).
-  \begin{align}
-    p_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b) &\le P^{\mathrm{config}}_{\max} \qquad \forall b\in B,\, \forall t\in b \\
-    p_{\mathrm{dis}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b) &\le P^{\mathrm{config}}_{\max} \qquad \forall b\in B,\, \forall t\in b
-  \end{align}
+\subsubsection*{(Cst-4): Market Co-optimization Power Limits}
+Set total power limits on both energy bids and reserved ancillary service capacities. The total committed power in either direction (charge or discharge) must not exceed the BESS power rating.
 
-  \item \textbf{Daily Cycle Limit:} Limit the total daily discharged energy.
-  \begin{align}
-    \sum_{t\in d} p_{\mathrm{dis}}(t)\,\Delta t \;\le\; N_{\mathrm{cycles}}\,E_{\mathrm{nom}}
+\textbf{Total Discharge Power Limit:} The sum of any discharge bid in the DA market plus any reserved capacity for services that require discharging (FCR is symmetric, positive aFRR is discharge) must not exceed the maximum power rating.
+\begin{equation}
+    p_{\mathrm{dis}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b) \le P^{\mathrm{config}}_{\max} \qquad \forall b\in B,\, \forall t\in b
+\end{equation}
+
+\textbf{Total Charge Power Limit:} The sum of any charge bid in the DA market plus any reserved capacity for services that require charging (FCR is symmetric, negative aFRR is charge) must not exceed the maximum power rating.
+\begin{equation}
+    p_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b) \le P^{\mathrm{config}}_{\max} \qquad \forall b\in B,\, \forall t\in b
+\end{equation}
+
+Where we convert capacity bids (in MW) to kW by $\times 1000$.
+
+\subsubsection*{(Cst-5): Daily Cycle Limits}
+Limit the total daily discharged energy throughput from the battery. This is based on the energy drawn from the DC side, accounting for discharge inefficiency.
+\begin{equation}
+    \sum_{t\in d} \frac{p_{\mathrm{dis}}(t)}{\eta_{\mathrm{dis}}}\,\Delta t \;\le\; N_{\mathrm{cycles}}\,E_{\mathrm{nom}}
     \qquad \forall d\in D
-  \end{align}
+\end{equation}
 
-  \item \textbf{Ancillary Service Energy Reserve:} Maintain sufficient energy to deliver awarded capacity for 15 minutes ($\Delta t=0.25$ h).
-  \begin{align}
-    e_{\mathrm{soc}}(t) &\ge SOC_{\min}\,E_{\mathrm{nom}} + \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b)\big)\,\Delta t
-    && \forall b\in B,\, \forall t\in b \\
-    e_{\mathrm{soc}}(t) &\le SOC_{\max}\,E_{\mathrm{nom}} - \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b)\big)\,\Delta t
-    && \forall b\in B,\, \forall t\in b
-  \end{align}
+\subsubsection*{(Cst-6): Ancillary Service Energy Reserve}
+Maintain sufficient energy reserve for ancillary service activation, accounting for BESS efficiency. The parameter $\tau$ represents the assumed worst-case continuous activation duration for reserves (typically set to $\Delta t = 0.25$ hours for this model).
 
-  \item \textbf{Minimum Bid Size Constraints:} Bids can be non-zero only if the corresponding binary is 1; if non-zero, they must satisfy minimum size and available power.
-  \begin{align}
-    c_{fcr}(b) &\ge y_{fcr}(b)\,\text{MinBid}_{fcr} && \forall b\in B \\
-    c_{fcr}(b) &\le y_{fcr}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B \\
-    c^{\mathrm{pos}}_{aFRR}(b) &\ge y^{\mathrm{pos}}_{aFRR}(b)\,\text{MinBid}_{afrr} && \forall b\in B \\
-    c^{\mathrm{pos}}_{aFRR}(b) &\le y^{\mathrm{pos}}_{aFRR}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B \\
-    c^{\mathrm{neg}}_{aFRR}(b) &\ge y^{\mathrm{neg}}_{aFRR}(b)\,\text{MinBid}_{afrr} && \forall b\in B \\
-    c^{\mathrm{neg}}_{aFRR}(b) &\le y^{\mathrm{neg}}_{aFRR}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B
-  \end{align}
+\textbf{To provide upward regulation (discharge):} The available energy in the BESS must cover the energy drawn from the DC side.
+\begin{equation}
+    \frac{\big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b)\big)\,\tau}{\eta_{\mathrm{dis}}} \leq e_{\mathrm{soc}}(t) - SOC_{\min}\,E_{\mathrm{nom}}  
+    \qquad \forall b\in B,\, \forall t\in b
+\end{equation}
 
-  \item \textbf{Ancillary Service Market Mutual Exclusivity:} Prevent simultaneous bidding in multiple ancillary service markets for the same block.
-  \begin{align}
+\textbf{To provide downward regulation (charge):} The available headroom in the BESS must be able to store the energy delivered to the DC side.
+\begin{equation}
+    \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b)\big)\,\tau\,\eta_{\mathrm{ch}} \leq SOC_{\max}\,E_{\mathrm{nom}} - e_{\mathrm{soc}}(t)
+    \qquad \forall b\in B,\, \forall t\in b
+\end{equation}
+
+\subsubsection*{(Cst-7): Ancillary Service Market Mutual Exclusivity}
+Prevent simultaneous bidding in multiple markets for the same block:
+\begin{equation}
     y_{fcr}(b) + y^{\mathrm{pos}}_{aFRR}(b) + y^{\mathrm{neg}}_{aFRR}(b) \le 1 \qquad \forall b\in B
-  \end{align}
-\end{enumerate}
+\end{equation}
+
+\subsubsection*{(Cst-8): Cross-Market Mutual Exclusivity}
+To ensure physical feasibility, the BESS cannot commit to charging in one market while simultaneously committing to discharging in another for the same time interval. The following constraints prevent such conflicting bids between the Day-Ahead market (15-min interval $t$) and ancillary service capacity markets (4-hour block $b$).
+
+\begin{itemize}
+  \item A Day-Ahead discharge bid ($y_{\mathrm{dis}}(t)=1$) is incompatible with reserving capacity for charging services (FCR or negative aFRR).
+  \item A Day-Ahead charge bid ($y_{\mathrm{ch}}(t)=1$) is incompatible with reserving capacity for discharging services (FCR or positive aFRR).
+\end{itemize}
+
+\begin{align}
+    y_{\mathrm{dis}}(t) + y_{fcr}(b) + y^{\mathrm{neg}}_{aFRR}(b) &\le 1 \qquad \forall b\in B,\, \forall t\in b \\
+    y_{\mathrm{ch}}(t) + y_{fcr}(b) + y^{\mathrm{pos}}_{aFRR}(b) &\le 1 \qquad \forall b\in B,\, \forall t\in b
+\end{align}
+
+\subsubsection*{(Cst-9): Minimum and Maximum Bid Sizes}
+Bids can be non-zero only if the corresponding binary is 1; if non-zero, they must also satisfy minimum size and available power. $P^{\mathrm{config}}_{\max}$ is the configured maximum power rating of the BESS (kW).
+
+\textbf{Day-Ahead Energy Bids:}
+\begin{align}
+    y_{\mathrm{ch}}(t)\,\text{MinBid}_{da} \cdot 1000 &\le p_{\mathrm{ch}}(t) \le y_{\mathrm{ch}}(t)\,P^{\mathrm{config}}_{\max} && \forall t\in T \\
+    y_{\mathrm{dis}}(t)\,\text{MinBid}_{da} \cdot 1000 &\le p_{\mathrm{dis}}(t) \le y_{\mathrm{dis}}(t)\,P^{\mathrm{config}}_{\max} && \forall t\in T
+\end{align}
+Notice $p(t)$ is in kW, while $\text{MinBid}_{da}$ is in MW.
+
+\textbf{FCR Capacity Bids:}
+\begin{equation}
+    y_{fcr}(b)\,\text{MinBid}_{fcr} \le c_{fcr}(b) \le y_{fcr}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} \qquad \forall b\in B
+\end{equation}
+
+\textbf{aFRR Capacity Bids:}
+\begin{align}
+    y^{\mathrm{pos}}_{aFRR}(b)\,\text{MinBid}_{afrr} &\le c^{\mathrm{pos}}_{aFRR}(b) \le y^{\mathrm{pos}}_{aFRR}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B \\
+    y^{\mathrm{neg}}_{aFRR}(b)\,\text{MinBid}_{afrr} &\le c^{\mathrm{neg}}_{aFRR}(b) \le y^{\mathrm{neg}}_{aFRR}(b)\,\frac{P^{\mathrm{config}}_{\max}}{1000} && \forall b\in B
+\end{align}
 
 \section{Phase II Model Derivation}
 We extend the Phase I MILP (Base Model) by modifying the objective function and relevant constraints.
@@ -168,12 +234,19 @@ The aFRR Energy market (15-min granularity) operates similarly to the DA market 
     \item \textbf{New Variables:} $p^{\mathrm{pos}}_{aFRR,E}(t)$ (discharge/positive) and $p^{\mathrm{neg}}_{aFRR,E}(t)$ (charge/negative) for energy bids in the aFRR energy market.
     \item \textbf{New Binaries:} $y^{\mathrm{pos}}_{aFRR,E}(t)$ and $y^{\mathrm{neg}}_{aFRR,E}(t)$ to manage minimum bids.
     \item \textbf{Objective Function:} A new profit term $\mathbb{P}^{aFRR\_E}$ is added:
-    $$ \mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t $$
+    \begin{equation}
+    \mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t   
+    \end{equation}
+    
 \end{itemize}
 
 This requires revising the core physical constraints to prevent conflicts. We define new \textbf{total} charge/discharge variables:
-$$ p^{\mathrm{total}}_{\mathrm{ch}}(t) = p_{\mathrm{ch}}(t) + p^{\mathrm{neg}}_{aFRR,E}(t) \quad \forall t $$
-$$ p^{\mathrm{total}}_{\mathrm{dis}}(t) = p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{aFRR,E}(t) \quad \forall t $$
+
+\begin{align}
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &= p_{\mathrm{ch}}(t) + p^{\mathrm{neg}}_{aFRR,E}(t) \quad \forall t \\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{aFRR,E}(t) \quad \forall t 
+\end{align}
+
 These totals are then used to update the SOC, power, and mutual exclusivity constraints from Phase I.
 
 \subsection{Integrating Battery Degradation as a Linear Cost}
