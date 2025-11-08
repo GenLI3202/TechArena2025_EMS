@@ -63,10 +63,71 @@ The Phase II model introduces two key extensions:
 The resulting formulation remains a deterministic MILP, ensuring compatibility with open-source solvers while capturing the core economic and physical trade-offs of Phase II.
 \end{abstract}
 
+
 \section{Introduction}
 The Phase I model established a strong foundation for co-optimizing BESS bids across three markets: DA Energy, FCR Capacity, and aFRR Capacity. The primary goal of Phase II is to enhance this model's realism and profitability by integrating two new factors: the aFRR Energy Market and the economic impact of battery degradation.
 
 This document presents the revised mathematical formulation. It is designed to build directly upon the Phase I model, modifying existing constraints and adding new logic, rather than starting from a new, incompatible framework.
+
+
+
+\subsubsection*{Sets and Indices}
+\begin{tabular}{@{}ll}
+\toprule
+$T, t$ & Set and index for 15-minute time intervals $t \in \{1, ..., 35040\}$ \\
+$B, b$ & Set and index for 4-hour ancillary service blocks $b \in \{1, ..., 2190\}$ \\
+$J, j$ & Set and index for cycle degradation cost segments $j \in \{1, ..., J\}$ \\
+$I, i$ & Set and index for calendar degradation cost breakpoints $i \in \{1, ..., I\}$ \\
+\bottomrule
+\end{tabular}
+
+\subsubsection*{Parameters}
+\begin{tabular}{@{}lll}
+\toprule
+Symbol & Description & Unit \\
+\midrule
+$P_{DA}(t)$ & Day-ahead electricity price & EUR/MWh \\
+$P_{FCR}(b)$ & FCR capacity price & EUR/MW \\
+$P^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity price & EUR/MW \\
+$P^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity price & EUR/MW \\
+$P^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} Positive aFRR energy price & EUR/MWh \\
+$P^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} Negative aFRR energy price & EUR/MWh \\
+$E_{\mathrm{nom}}$ & Nominal energy capacity & kWh \\
+$P^{\mathrm{config}}_{\max}$ & Max charge/discharge power & kW \\
+$\eta_{\mathrm{ch}}, \eta_{\mathrm{dis}}$ & Charging/discharging efficiencies & - \\
+$SOC_{\min}, SOC_{\max}$ & Min/max SOC limits (fraction) & - \\
+$E^{\mathrm{seg}}_{j}$ & \textbf{(New)} Max energy capacity of segment $j$ & kWh \\
+$c^{\mathrm{cost}}_{j}$ & \textbf{(New)} Marginal cyclic degradation cost for segment $j$ & EUR/kWh \\
+$SOC^{\mathrm{point}}_i$ & \textbf{(New)} SOC breakpoint $i$ for calendar cost & kWh \\
+$Cost^{\mathrm{point}}_i$ & \textbf{(New)} Calendar degradation cost at breakpoint $i$ & EUR/hr \\
+$\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
+\bottomrule
+\end{tabular}
+
+\subsubsection*{Decision Variables}
+\begin{tabular}{@{}lll}
+\toprule
+Symbol & Description & Type \\
+\midrule
+$p_{\mathrm{ch}}(t), p_{\mathrm{dis}}(t)$ & DA charge/discharge power & Cont. $\ge 0$ \\
+$p^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} aFRR-E positive (discharge) power & Cont. $\ge 0$ \\
+$p^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} aFRR-E negative (charge) power & Cont. $\ge 0$ \\
+$c_{fcr}(b)$ & FCR capacity bid & Cont. $\ge 0$ \\
+$c^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity bid & Cont. $\ge 0$ \\
+$c^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity bid & Cont. $\ge 0$ \\
+$p^{\mathrm{total}}_{\mathrm{ch}}(t), p^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total charge/discharge power & Cont. $\ge 0$ \\
+$p^{\mathrm{ch}}_{j}(t), p^{\mathrm{dis}}_{j}(t)$ & \textbf{(New)} Charge/discharge power for segment $j$ & Cont. $\ge 0$ \\
+$e_{\mathrm{soc},j}(t)$ & \textbf{(New)} Energy stored in segment $j$ & Cont. $\ge 0$ \\
+$e_{\mathrm{soc}}(t)$ & \textbf{(New)} Total energy stored in BESS & Cont. $\ge 0$ \\
+$c^{\mathrm{cal}}_{\mathrm{cost}}(t)$ & \textbf{(New)} Calendar cost at time $t$ & Cont. $\ge 0$ \\
+$\lambda_{t,i}$ & \textbf{(New)} SOS2 variable for calendar cost & Cont. $\ge 0$ \\
+$y_{\mathrm{ch}}(t), y_{\mathrm{dis}}(t)$ & DA bid binaries & Binary \\
+$y_{fcr}(b), y^{\mathrm{pos}}_{aFRR}(b), ...$ & Ancillary service bid binaries & Binary \\
+$y^{\mathrm{pos}}_{aFRR,E}(t), ...$ & \textbf{(New)} aFRR-E bid binaries & Binary \\
+$y^{\mathrm{total}}_{\mathrm{ch}}(t), y^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total operation binaries & Binary \\
+\bottomrule
+\end{tabular}
+
 
 \section{Phase I Model - Base Model}
 
@@ -272,60 +333,57 @@ Based on the methodology from Xu et al. (2017), we model cyclic aging as a \text
     \item \textbf{Logic:} The marginal cost $c^{\mathrm{cost}}_{j}$ increases as $j$ increases (deeper discharge), e.g., $c_1 < c_2 < ... < c_J$. The optimizer will naturally prefer to discharge from the "cheapest" (shallowest) available segment first, perfectly modeling the non-linear cost of deep discharges in a linear framework.
 \end{itemize}
 
-\subsubsection{Calculation of the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
-The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the cost is distributed non-linearly based on a standard power-law model for LFP battery degradation, rather than using non-traceable coefficients from literature examples.
+\subsubsection{Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
+The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
+(Details refer to `doc\p2_model\aging_cost\cyclic_aging.tex`)
 
-\paragraph{Step 1: Select a Degradation Model}
-For LFP batteries, the relationship between cycle life and Depth of Discharge (DoD) is commonly described by a power-law model:
+\paragraph{Step 1: Re-evaluating the Cycle Life Parameter ($a$)}
+The relationship between cycle life and Depth of Discharge (DoD) is described by the power-law model $\text{CycleLife}(D) = a \cdot D^{-b}$, where $b=2$ is a behaviorally superior choice for an EMS as it strongly penalizes deep discharges. The parameter $a$ (cycle life at 100\% DoD) is derived from the LFP-specific commercial claim of 6,000 cycles at 80\% DoD:
 \begin{equation*}
-    \text{CycleLife}(D) = a \cdot D^{-b}
+    a = \text{CycleLife}(0.8) \times (0.8)^{-b} = 6000 \times (0.8)^{-2} = 3840 \text{ cycles}
 \end{equation*}
-Where $D$ is the DoD, and for LFP batteries, the exponent $b$ is typically in the range [1.8, 2.2]. We adopt a standard, conservative value of $b=2$. The parameter $a$ represents the cycle life at 100\% DoD ($D=1$), which we assume to be 6,000 cycles.
+This provides a traceable, LFP-specific value for the cycle life at 100\% DoD.
 
-\paragraph{Step 2: Derive Marginal Aging Weights}
-The cumulative aging stress from discharging to a depth $D$ can be modeled as being proportional to $D^b$. Therefore, the marginal stress (or aging weight) $w_j$ incurred by discharging the $j$-th segment of the battery (from DoD $D_{j-1}$ to $D_j$) is:
+\paragraph{Step 2: Recalculating the Cost per Full Cycle}
+The total BESS investment is $4472 \text{ kWh} \times 200 \text{ EUR/kWh} = 894,400 \text{ EUR}$. Amortizing this over the re-evaluated lifetime gives the new cost per full (100\% DoD) cycle:
 \begin{equation*}
-    w_j \propto D_j^b - D_{j-1}^b
+    \text{Cost per Full Cycle} = \frac{894,400 \text{ EUR}}{3840 \text{ cycles}} \approx 232.92 \text{ EUR/Cycle}
 \end{equation*}
-With $b=2$ and 10 segments ($D_j = j/10$), the weight for each segment is proportional to $w_j \propto (j/10)^2 - ((j-1)/10)^2$. These weights are calculated and normalized. The sum of these weights, $W = \sum w_j$, conveniently equals 1.0, meaning they are already self-normalized.
 
 \paragraph{Step 3: Calculate Final Marginal Costs}
-With normalized weights $w_j$, the marginal cost for discharging 1 kWh from segment $j$ is calculated by allocating the `Cost per Full Cycle` (€149.07) according to these weights.
+The marginal aging weights $w_j$ for each of the 10 segments are derived from the power-law model ($w_j \propto D_j^2 - D_{j-1}^2$) and are self-normalizing. The marginal cost for discharging 1 kWh from segment $j$ is then:
 \begin{equation*}
 c^{\mathrm{cost}}_{j} = \frac{\text{Cost per Full Cycle} \times w_j}{E_{\mathrm{nom}} \times \text{Segment Size}}
 \end{equation*}
-For example, for the first and shallowest segment ($j=1$), the marginal cost is calculated by plugging in the corresponding weight $w_1=0.01$:
+For example, for the first and shallowest segment ($j=1$), the marginal cost is:
 \begin{equation*}
-c^{\mathrm{cost}}_{1} = \frac{149.07 \text{ EUR/Cycle} \times 0.01}{4472 \text{ kWh} \times 0.1} \approx 0.0033 \text{ EUR/kWh}
+c^{\mathrm{cost}}_{1} = \frac{232.92 \text{ EUR/Cycle} \times 0.01}{4472 \text{ kWh} \times 0.1} \approx 0.0052 \text{ EUR/kWh}
 \end{equation*}
-Where the segment size is 0.1 (for 10\% segments). The resulting costs are detailed in Table \ref{tab:marginal_costs}.
+The resulting costs for all segments are detailed in Table \ref{tab:marginal_costs}.
 
 \begin{table}[h!]
 \centering
-\caption{Calculation of Marginal Cyclic Aging Costs ($c^{\mathrm{cost}}_{j}$) based on a Power-Law Model ($b=2$)}
+\caption{Re-parameterized Marginal Cyclic Aging Costs ($c^{\mathrm{cost}}_{j}$) for LFP}
 \label{tab:marginal_costs}
 \begin{tabular}{@{}cccc@{}}
 \toprule
 \textbf{Segment ($j$)} & \textbf{SOC Range} & \textbf{Multiplier ($w_j$)} & \textbf{Marginal Cost ($c^{\mathrm{cost}}_{j}$) [EUR/kWh]} \\ \midrule
-1 & 90-100\% & 0.01 & 0.0033 \\
-2 & 80-90\% & 0.03 & 0.0100 \\
-3 & 70-80\% & 0.05 & 0.0167 \\
-4 & 60-70\% & 0.07 & 0.0233 \\
-5 & 50-60\% & 0.09 & 0.0300 \\
-6 & 40-50\% & 0.11 & 0.0367 \\
-7 & 30-40\% & 0.13 & 0.0433 \\
-8 & 20-30\% & 0.15 & 0.0500 \\
-9 & 10-20\% & 0.17 & 0.0567 \\
-10 & 0-10\% & 0.19 & 0.0633 \\ \bottomrule
+1 & 90-100\% & 0.01 & 0.0052 \\
+2 & 80-90\% & 0.03 & 0.0156 \\
+3 & 70-80\% & 0.05 & 0.0260 \\
+4 & 60-70\% & 0.07 & 0.0364 \\
+5 & 50-60\% & 0.09 & 0.0469 \\
+6 & 40-50\% & 0.11 & 0.0573 \\
+7 & 30-40\% & 0.13 & 0.0677 \\
+8 & 20-30\% & 0.15 & 0.0781 \\
+9 & 10-20\% & 0.17 & 0.0885 \\
+10 & 0-10\% & 0.19 & 0.0990 \\ \bottomrule
 \end{tabular}
 \end{table}
-\textit{This approach ensures that the sum of costs incurred by discharging all 10 segments equals exactly one `Cost per Full Cycle` (€149.07), making the model economically consistent.}
-
-
+\textit{This approach ensures that the sum of costs incurred by discharging all 10 segments equals exactly one "Cost per Full Cycle" (€232.92), making the model economically consistent and physically traceable.}
 
 
 \subsection{Model (iii): Model (ii) + Calendar Aging Cost}
-% TODO: Write additional calendar aging cost modelling description here
 Based on Collath et al. (2023), calendar aging is a non-linear function of the average State of Charge (SOC). We linearize this cost using Special Ordered Sets of Type 2 (SOS2), a standard MILP technique.
 \begin{itemize}
     \item \textbf{New Variables:} $\lambda_{t,i}$ (weighting variables for linearization).
@@ -336,83 +394,51 @@ Based on Collath et al. (2023), calendar aging is a non-linear function of the a
 \end{itemize}
 This formulation directly penalizes holding the battery at high SOC, as prioritized in the project description.
 
-% \subsubsection{Calculation of Calendar Aging Breakpoints}
-% The breakpoints for the SOS2 linearization are derived from the "scaled" model presented in Collath et al. (2023), specifically from Figure 3, using the curve for 5\% past calendar capacity loss. The costs are monetized using the project's BESS investment cost of 200 EUR/kWh.
+\subsubsection{Calculation of the Calendar Aging Breakpoints}
+The breakpoints for the SOS2 linearization are derived from the "scaled" model presented in Collath et al. (2023), specifically from Figure 3. This approach uses a fixed linearization point (representing a mid-life aging state) for the entire BESS lifetime to better optimize for Net Present Value (NPV). The costs are monetized using the project's BESS investment cost.
 
-% \begin{table}[h!]
-% \centering
-% \caption{Calculation of Calendar Aging Breakpoints ($SOC^{\mathrm{point}}_i, Cost^{\mathrm{point}}_i$)}
-% \label{tab:calendar_costs}
-% \begin{tabular}{@{}cccc@{}}
-% \toprule
-% \textbf{Breakpoint ($i$)} & \textbf{SOC Level} & \textbf{SOC (`SOC_i^{\text{point}}`) [kWh]} & \textbf{Cost (`Cost_i^{\text{point}}`) [EUR/hr]} \\ \midrule
-% 1 & 0\% & 0 & 1.76 \\
-% 2 & 25\% & 1118 & 2.16 \\
-% 3 & 50\% & 2236 & 3.60 \\
-% 4 & 75\% & 3354 & 6.44 \\
-% 5 & 100\% & 4472 & 10.72 \\ \bottomrule
-% \end{tabular}
-% \end{table}
-% \textit{These values provide the concrete parameters for the SOS2 constraints (Eq. 44-47), ensuring the model accurately penalizes holding the battery at high states of charge.}
+\paragraph{Step 1: Extract Physical Degradation Data}
+We extract data from the linearized calendar degradation model in Collath et al. (2023, Fig. 3), using the "scaled" curve for a past calendar capacity loss of $Q_{\mathrm{loss,cal}} = 5\%$. This provides the physical relationship between SOC and the rate of capacity loss. We select five key breakpoints:
+
+\begin{itemize}
+    \item SOC 0\%: $\approx 0.00005\%$ capacity loss per 15 min
+    \item SOC 25\%: $\approx 0.00006\%$ capacity loss per 15 min
+    \item SOC 50\%: $\approx 0.00010\%$ capacity loss per 15 min
+    \item SOC 75\%: $\approx 0.00018\%$ capacity loss per 15 min
+    \item SOC 100\%: $\approx 0.00030\%$ capacity loss per 15 min
+\end{itemize}
+
+\paragraph{Step 2: Monetize the Degradation Cost}
+The physical capacity loss is converted into an hourly economic cost. The total BESS investment is $4472 \text{ kWh} \times 200 \text{ EUR/kWh} = 894,400 \text{ EUR}$. The hourly cost at each breakpoint is calculated by converting the 15-minute loss rate to an hourly rate.
+\begin{equation*}
+    \text{Hourly Cost} = \text{Total Investment} \times (\text{15-min Loss Rate} \times 4)
+\end{equation*}
+For example, for the 100\% SOC breakpoint:
+\begin{equation*}
+    \text{Cost}_{100\%} = 894,400 \text{ EUR} \times (0.00030\% \times 4) \approx 10.73 \text{ EUR/hr}
+\end{equation*}
+
+\paragraph{Step 3: Define Final Breakpoint Parameters}
+The calculated (SOC, Cost) pairs form the breakpoints for the SOS2 constraints. These values provide the concrete parameters for the model, ensuring it accurately penalizes holding the battery at high states of charge. The resulting parameters are detailed in Table \ref{tab_calendar_costs}.
+
+\begin{table}[h!]
+\centering
+\caption{Calculation of Calendar Aging Breakpoints ($SOC^{\mathrm{point}}_i, Cost^{\mathrm{point}}_i$)}
+\label{tab_calendar_costs}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{Breakpoint ($i$)} & \textbf{SOC Level} & \textbf{SOC ($SOC_i^{\mathrm{point}}$) [kWh]} & \textbf{Cost ($Cost_i^{\mathrm{point}}$) [EUR/hr]} \\ \midrule
+1 & 0\% & 0 & 1.79 \\
+2 & 25\% & 1118 & 2.15 \\
+3 & 50\% & 2236 & 3.58 \\
+4 & 75\% & 3354 & 6.44 \\
+5 & 100\% & 4472 & 10.73 \\ \bottomrule
+\end{tabular}
+\end{table}
+\textit{These values provide the concrete parameters for the SOS2 constraints, ensuring the model accurately penalizes holding the battery at high states of charge.}
 
 \section{Phase II - Model (iii) Mathematical Formulation}
 
-\subsubsection{Sets and Indices}
-\begin{tabular}{@{}ll}
-\toprule
-$T, t$ & Set and index for 15-minute time intervals $t \in \{1, ..., 35040\}$ \\
-$B, b$ & Set and index for 4-hour ancillary service blocks $b \in \{1, ..., 2190\}$ \\
-$J, j$ & Set and index for cycle degradation cost segments $j \in \{1, ..., J\}$ \\
-$I, i$ & Set and index for calendar degradation cost breakpoints $i \in \{1, ..., I\}$ \\
-\bottomrule
-\end{tabular}
-
-\subsubsection{Parameters}
-\begin{tabular}{@{}lll}
-\toprule
-Symbol & Description & Unit \\
-\midrule
-$P_{DA}(t)$ & Day-ahead electricity price & EUR/MWh \\
-$P_{FCR}(b)$ & FCR capacity price & EUR/MW \\
-$P^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity price & EUR/MW \\
-$P^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity price & EUR/MW \\
-$P^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} Positive aFRR energy price & EUR/MWh \\
-$P^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} Negative aFRR energy price & EUR/MWh \\
-$E_{\mathrm{nom}}$ & Nominal energy capacity & kWh \\
-$P^{\mathrm{config}}_{\max}$ & Max charge/discharge power & kW \\
-$\eta_{\mathrm{ch}}, \eta_{\mathrm{dis}}$ & Charging/discharging efficiencies & - \\
-$SOC_{\min}, SOC_{\max}$ & Min/max SOC limits (fraction) & - \\
-$E^{\mathrm{seg}}_{j}$ & \textbf{(New)} Max energy capacity of segment $j$ & kWh \\
-$c^{\mathrm{cost}}_{j}$ & \textbf{(New)} Marginal cyclic degradation cost for segment $j$ & EUR/kWh \\
-$SOC^{\mathrm{point}}_i$ & \textbf{(New)} SOC breakpoint $i$ for calendar cost & kWh \\
-$Cost^{\mathrm{point}}_i$ & \textbf{(New)} Calendar degradation cost at breakpoint $i$ & EUR/hr \\
-$\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
-\bottomrule
-\end{tabular}
-
-\subsubsection{Decision Variables}
-\begin{tabular}{@{}lll}
-\toprule
-Symbol & Description & Type \\
-\midrule
-$p_{\mathrm{ch}}(t), p_{\mathrm{dis}}(t)$ & DA charge/discharge power & Cont. $\ge 0$ \\
-$p^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} aFRR-E positive (discharge) power & Cont. $\ge 0$ \\
-$p^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} aFRR-E negative (charge) power & Cont. $\ge 0$ \\
-$c_{fcr}(b)$ & FCR capacity bid & Cont. $\ge 0$ \\
-$c^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity bid & Cont. $\ge 0$ \\
-$c^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity bid & Cont. $\ge 0$ \\
-$p^{\mathrm{total}}_{\mathrm{ch}}(t), p^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total charge/discharge power & Cont. $\ge 0$ \\
-$p^{\mathrm{ch}}_{j}(t), p^{\mathrm{dis}}_{j}(t)$ & \textbf{(New)} Charge/discharge power for segment $j$ & Cont. $\ge 0$ \\
-$e_{\mathrm{soc},j}(t)$ & \textbf{(New)} Energy stored in segment $j$ & Cont. $\ge 0$ \\
-$e_{\mathrm{soc}}(t)$ & \textbf{(New)} Total energy stored in BESS & Cont. $\ge 0$ \\
-$c^{\mathrm{cal}}_{\mathrm{cost}}(t)$ & \textbf{(New)} Calendar cost at time $t$ & Cont. $\ge 0$ \\
-$\lambda_{t,i}$ & \textbf{(New)} SOS2 variable for calendar cost & Cont. $\ge 0$ \\
-$y_{\mathrm{ch}}(t), y_{\mathrm{dis}}(t)$ & DA bid binaries & Binary \\
-$y_{fcr}(b), y^{\mathrm{pos}}_{aFRR}(b), ...$ & Ancillary service bid binaries & Binary \\
-$y^{\mathrm{pos}}_{aFRR,E}(t), ...$ & \textbf{(New)} aFRR-E bid binaries & Binary \\
-$y^{\mathrm{total}}_{\mathrm{ch}}(t), y^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total operation binaries & Binary \\
-\bottomrule
-\end{tabular}
 
 \subsection{Objective Function}
 The objective is to maximize the total profit, defined as market revenues minus degradation costs.
@@ -616,4 +642,3 @@ Gen Li. (2025). "Huawei TechArena 2025: BESS Energy Management System." \textit{
 \end{thebibliography}
 
 \end{document}
-
