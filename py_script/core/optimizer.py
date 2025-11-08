@@ -39,42 +39,67 @@ from datetime import datetime, timedelta
 import json
 import logging
 from typing import Dict, List, Tuple, Optional, Any
+from pathlib import Path
 import warnings
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class BESSOptimizerV2:
+class BESSOptimizerModelI:
     """
-    Battery Energy Storage System Optimizer - Version 2 (Phase II)
+    Battery Energy Storage System Optimizer - Phase II Model (i)
 
-    Phase II optimization model with enhanced constraint handling and performance.
+    Model (i): Base Model + aFRR Energy Market
+    ============================================
+
+    This is the first of three Phase II models, extending the Phase I base model by
+    integrating the aFRR Energy Market for real-time balancing revenue optimization.
+
+    Mathematical Formulation:
+    -------------------------
+    - Objective: max(P_DA + P_ANCI + P_aFRR_E)
+    - Markets: Day-Ahead Energy, FCR Capacity, aFRR Capacity, aFRR Energy (NEW)
+    - New Variables: p_afrr_pos_e, p_afrr_neg_e, p_total_ch, p_total_dis
+    - Total Power: p_total = p_DA + p_aFRR_E (co-optimization across energy markets)
+
+    Model Progression:
+    ------------------
+    ✓ Model (i): Base + aFRR Energy Market (THIS MODEL)
+    ○ Model (ii): Model (i) + Cyclic Aging Cost
+    ○ Model (iii): Model (ii) + Calendar Aging Cost = Full Phase II Model
 
     Key Features:
-    - Multi-market co-optimization (day-ahead energy, FCR, aFRR capacity markets)
-    - Advanced SOC dynamics with charging/discharging efficiency modeling
+    -------------
+    - Four-market co-optimization (DA energy, aFRR energy, FCR capacity, aFRR capacity)
+    - Advanced SOC dynamics with total charge/discharge power tracking
     - Reserve energy constraints with configurable activation durations
     - Daily cycle limits and power constraints based on C-rate configuration
-    - Cross-market exclusivity and minimum bid size enforcement
+    - Cross-market exclusivity preventing conflicting bids
+    - Minimum bid size enforcement across all markets
 
-    Version 2 Improvements:
+    Technical Improvements (from Phase I):
+    --------------------------------------
     - Constraint closure anti-patterns eliminated for better solver performance
     - Pre-computed index mappings for O(1) lookup efficiency
     - Memory-optimized data structures for full-year horizon
     - Comprehensive input validation and error handling
-    - Enhanced reserve duration modeling for Phase II requirements
+    - Enhanced reserve duration modeling
 
     Attributes:
         battery_params (dict): Battery technical specifications
-        market_params (dict): Market rules and constraints
+        market_params (dict): Market rules and constraints including aFRR energy min bid
         countries (list): Supported country markets
         c_rates (list): Available C-rate configurations
         daily_cycles (list): Available daily cycle limit options
+
+    References:
+        See doc/p2_model/p2_bi_model_ggdp.tex Section "Model (i)"
+        See doc/p2_model/p2_3models_formulation.tex Section "Model (i)"
     """
-    
+
     def __init__(self):
-        """Initialize the BESS Optimizer V2 with default Phase II parameters."""
+        """Initialize Phase II Model (i) optimizer with aFRR energy market integration."""
         # Battery specifications
         self.battery_params = {
             'capacity_kwh': 4472,
@@ -90,6 +115,7 @@ class BESSOptimizerV2:
             'min_bid_da': 0.1,    # MW
             'min_bid_fcr': 1.0,   # MW
             'min_bid_afrr': 1.0,  # MW
+            'min_bid_afrr_e': 0.1,  # MW - Phase II Model (i): aFRR energy market minimum bid
             'time_step_hours': 0.25,  # 15 minutes
             'block_duration_hours': 4.0,  # AS market blocks
             'reserve_duration_hours': 0.25, # Assumed activation duration for reserve calculation
@@ -106,8 +132,8 @@ class BESSOptimizerV2:
         self._block_to_times = {}
         self._time_to_block = {}
         self._day_to_times = {}
-        
-        logger.info("BESS Optimizer V2 (Phase II) initialized")
+
+        logger.info("BESS Optimizer - Phase II Model (i): Base + aFRR Energy Market initialized")
     
     def _validate_input_data(self, country_data: pd.DataFrame, blocks: List[int], 
                            days: List[int], T_data: List[int]) -> None:
@@ -121,9 +147,10 @@ class BESSOptimizerV2:
             T_data: List of time indices
         """
         logger.info("Validating input data...")
-        
-        # Check for missing data
-        required_cols = ['price_day_ahead', 'price_fcr', 'price_afrr_pos', 'price_afrr_neg', 
+
+        # Check for missing data (Phase II Model (i) includes aFRR energy)
+        required_cols = ['price_day_ahead', 'price_fcr', 'price_afrr_pos', 'price_afrr_neg',
+                        'price_afrr_energy_pos', 'price_afrr_energy_neg',  # Phase II Model (i)
                         'block_id', 'day_id']
         missing_cols = [col for col in required_cols if col not in country_data.columns]
         if missing_cols:
@@ -164,42 +191,47 @@ class BESSOptimizerV2:
         
         logger.info("Input validation completed")
     
-    def load_and_preprocess_data(self, data_file: str) -> pd.DataFrame:
+    def load_and_preprocess_data(self, data_file: str, afrr_energy_file: str = None) -> pd.DataFrame:
         """
-        Load and preprocess the market data from JSONL file.
-        Enhanced with additional validation and robustness checks.
+        Load and preprocess the market data from JSONL file and aFRR energy parquet file.
+        Enhanced for Phase II with aFRR energy market integration.
+
+        Args:
+            data_file: Path to JSONL file with DA, FCR, and aFRR capacity data
+            afrr_energy_file: Optional path to parquet file with aFRR energy prices.
+                            If None, will look in data/phase2_processed/parquet/afrr_energy.parquet
         """
         logger.info(f"Loading data from {data_file}")
-        
+
         # Read JSONL file
         data_list = []
         with open(data_file, 'r') as f:
             for line in f:
                 data_list.append(json.loads(line.strip()))
-        
+
         df = pd.DataFrame(data_list)
-        logger.info(f"Loaded {len(df)} data points")
-        
+        logger.info(f"Loaded {len(df)} data points from JSONL")
+
         # Convert timestamp to datetime and round to nearest 15-minute interval
         df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed')
         # CRITICAL FIX: Round timestamps to nearest 15-min to avoid misalignment
         df['timestamp'] = df['timestamp'].dt.round('15min')
-        
+
         # Create multi-level structure based on data source
         processed_dfs = []
-        
+
         # Process day-ahead data (15-min intervals)
         da_data = df[df['source'] == 'day_ahead'].copy()
         if not da_data.empty:
             da_pivot = da_data.pivot_table(
-                index='timestamp', 
-                columns='country', 
-                values='price_eur_mwh', 
+                index='timestamp',
+                columns='country',
+                values='price_eur_mwh',
                 aggfunc='first'
             )
             da_pivot.columns = pd.MultiIndex.from_product([da_pivot.columns, ['day_ahead'], ['']])
             processed_dfs.append(da_pivot)
-        
+
         # Process FCR data (4-hour blocks)
         fcr_data = df[df['source'] == 'fcr'].copy()
         if not fcr_data.empty:
@@ -211,56 +243,88 @@ class BESSOptimizerV2:
             )
             fcr_pivot.columns = pd.MultiIndex.from_product([fcr_pivot.columns, ['fcr'], ['']])
             processed_dfs.append(fcr_pivot)
-        
-        # Process aFRR data (4-hour blocks)
+
+        # Process aFRR capacity data (4-hour blocks)
         afrr_data = df[df['source'] == 'afrr'].copy()
         if not afrr_data.empty:
             # Pivot for both positive and negative
             afrr_pos = afrr_data[afrr_data['direction'] == 'positive'].pivot_table(
                 index='timestamp',
-                columns='country', 
+                columns='country',
                 values='price_eur_mw',
                 aggfunc='first'
             )
             afrr_neg = afrr_data[afrr_data['direction'] == 'negative'].pivot_table(
                 index='timestamp',
                 columns='country',
-                values='price_eur_mw', 
+                values='price_eur_mw',
                 aggfunc='first'
             )
-            
+
             afrr_pos.columns = pd.MultiIndex.from_product([afrr_pos.columns, ['afrr'], ['positive']])
             afrr_neg.columns = pd.MultiIndex.from_product([afrr_neg.columns, ['afrr'], ['negative']])
-            
+
             processed_dfs.extend([afrr_pos, afrr_neg])
-        
+
+        # PHASE II: Load aFRR energy data (15-min intervals)
+        if afrr_energy_file is None:
+            # Default path
+            from pathlib import Path
+            base_dir = Path(data_file).parent
+            afrr_energy_file = base_dir / 'phase2_processed' / 'parquet' / 'afrr_energy.parquet'
+
+        if Path(afrr_energy_file).exists():
+            logger.info(f"Loading aFRR energy data from {afrr_energy_file}")
+            afrr_energy_df = pd.read_parquet(afrr_energy_file)
+            afrr_energy_df['timestamp'] = pd.to_datetime(afrr_energy_df['timestamp'])
+            afrr_energy_df['timestamp'] = afrr_energy_df['timestamp'].dt.round('15min')
+            afrr_energy_df = afrr_energy_df.set_index('timestamp')
+
+            # Restructure to multi-index format
+            # Columns: DE_Pos, DE_Neg, AT_Pos, AT_Neg, CH_Pos, CH_Neg, HU_Pos, HU_Neg, CZ_Pos, CZ_Neg
+            afrr_energy_processed = pd.DataFrame(index=afrr_energy_df.index)
+
+            for col in afrr_energy_df.columns:
+                if '_Pos' in col:
+                    country = col.replace('_Pos', '')
+                    afrr_energy_processed[(country, 'afrr_energy', 'positive')] = afrr_energy_df[col]
+                elif '_Neg' in col:
+                    country = col.replace('_Neg', '')
+                    afrr_energy_processed[(country, 'afrr_energy', 'negative')] = afrr_energy_df[col]
+
+            afrr_energy_processed.columns = pd.MultiIndex.from_tuples(afrr_energy_processed.columns)
+            processed_dfs.append(afrr_energy_processed)
+            logger.info(f"Loaded {len(afrr_energy_df)} aFRR energy price points")
+        else:
+            logger.warning(f"aFRR energy file not found at {afrr_energy_file}. Model (i) requires this data!")
+
         # Combine all data
         if processed_dfs:
             combined_df = pd.concat(processed_dfs, axis=1)
         else:
             raise ValueError("No valid data found in input file")
-        
+
         # FIXED: Since timestamps are already rounded to 15-min, just ensure complete timeline
         # Get the full time range from the data
         start_time = combined_df.index.min()
         end_time = combined_df.index.max()
-        
+
         # Create a complete 15-minute frequency index
         full_index = pd.date_range(start=start_time, end=end_time, freq='15min')
-        
+
         # Reindex to ensure all 15-min slots are present and forward fill
         combined_df = combined_df.reindex(full_index).ffill()
-        
+
         # Verify the fix: ensure timestamps are aligned
         logger.info(f"Time range: {combined_df.index.min()} to {combined_df.index.max()}")
         logger.info(f"Index frequency: {pd.infer_freq(combined_df.index)}")
-        
+
         # Sort by timestamp
         combined_df = combined_df.sort_index()
-        
+
         logger.info(f"Data preprocessed. Shape: {combined_df.shape}")
         logger.info(f"Date range: {combined_df.index.min()} to {combined_df.index.max()}")
-        
+
         return combined_df
     
     def build_optimization_model(self, country_data: pd.DataFrame, 
@@ -370,10 +434,12 @@ class BESSOptimizerV2:
         # Parameters - Minimum bid sizes
         model.min_bid_da = pyo.Param(initialize=self.market_params['min_bid_da'],
                                      doc="Minimum DA bid size (MW)")
-        model.min_bid_fcr = pyo.Param(initialize=self.market_params['min_bid_fcr'], 
+        model.min_bid_fcr = pyo.Param(initialize=self.market_params['min_bid_fcr'],
                                      doc="Minimum FCR bid size (MW)")
-        model.min_bid_afrr = pyo.Param(initialize=self.market_params['min_bid_afrr'], 
-                                      doc="Minimum aFRR bid size (MW)")
+        model.min_bid_afrr = pyo.Param(initialize=self.market_params['min_bid_afrr'],
+                                      doc="Minimum aFRR capacity bid size (MW)")
+        model.min_bid_afrr_e = pyo.Param(initialize=self.market_params['min_bid_afrr_e'],
+                                        doc="Minimum aFRR energy bid size (MW) - Phase II Model (i)")
         
         # BLOCK MAPPING PARAMETER (Addresses Critical Issue #2 - No more closures!)
         model.block_map = pyo.Param(model.T, initialize=time_to_block, 
@@ -382,60 +448,104 @@ class BESSOptimizerV2:
         # OPTIMIZED PRICE PARAMETERS
         # DA prices indexed by time (vary every 15 min)
         da_prices = {t: float(country_data['price_day_ahead'].iloc[t]) for t in T_data}
-        model.P_DA = pyo.Param(model.T, initialize=da_prices, 
+        model.P_DA = pyo.Param(model.T, initialize=da_prices,
                               doc="Day-ahead price (EUR/MWh)")
-        
-        # AS prices indexed by block (constant within 4h blocks) - MEMORY OPTIMIZED
-        model.P_FCR = pyo.Param(model.B, initialize=fcr_prices_by_block, 
+
+        # PHASE II Model (i): aFRR energy prices indexed by time (vary every 15 min)
+        afrr_energy_pos_prices = {t: float(country_data['price_afrr_energy_pos'].iloc[t]) for t in T_data}
+        afrr_energy_neg_prices = {t: float(country_data['price_afrr_energy_neg'].iloc[t]) for t in T_data}
+        model.P_aFRR_E_pos = pyo.Param(model.T, initialize=afrr_energy_pos_prices,
+                                      doc="aFRR energy positive price (EUR/MWh) - Phase II Model (i)")
+        model.P_aFRR_E_neg = pyo.Param(model.T, initialize=afrr_energy_neg_prices,
+                                      doc="aFRR energy negative price (EUR/MWh) - Phase II Model (i)")
+
+        # AS capacity prices indexed by block (constant within 4h blocks) - MEMORY OPTIMIZED
+        model.P_FCR = pyo.Param(model.B, initialize=fcr_prices_by_block,
                                doc="FCR capacity price (EUR/MW/h)")
-        model.P_aFRR_pos = pyo.Param(model.B, initialize=afrr_pos_prices_by_block, 
+        model.P_aFRR_pos = pyo.Param(model.B, initialize=afrr_pos_prices_by_block,
                                     doc="aFRR positive capacity price (EUR/MW/h)")
-        model.P_aFRR_neg = pyo.Param(model.B, initialize=afrr_neg_prices_by_block, 
+        model.P_aFRR_neg = pyo.Param(model.B, initialize=afrr_neg_prices_by_block,
                                     doc="aFRR negative capacity price (EUR/MW/h)")
         
         # Decision Variables
-        # Continuous variables
-        model.p_ch = pyo.Var(model.T, bounds=(0, P_max_config), 
-                            doc="Charging power (kW)")
-        model.p_dis = pyo.Var(model.T, bounds=(0, P_max_config), 
-                             doc="Discharging power (kW)")
-        model.e_soc = pyo.Var(model.T, bounds=(self.battery_params['soc_min'] * self.battery_params['capacity_kwh'], 
-                                              self.battery_params['soc_max'] * self.battery_params['capacity_kwh']), 
+        # Continuous variables - Day-ahead market
+        model.p_ch = pyo.Var(model.T, bounds=(0, P_max_config),
+                            doc="DA charging power (kW)")
+        model.p_dis = pyo.Var(model.T, bounds=(0, P_max_config),
+                             doc="DA discharging power (kW)")
+        model.e_soc = pyo.Var(model.T, bounds=(self.battery_params['soc_min'] * self.battery_params['capacity_kwh'],
+                                              self.battery_params['soc_max'] * self.battery_params['capacity_kwh']),
                              doc="State of charge energy (kWh)")
-        
+
+        # PHASE II Model (i): aFRR energy market variables (kW)
+        model.p_afrr_pos_e = pyo.Var(model.T, bounds=(0, P_max_config),
+                                    doc="aFRR energy positive (discharge) power (kW) - Model (i)")
+        model.p_afrr_neg_e = pyo.Var(model.T, bounds=(0, P_max_config),
+                                    doc="aFRR energy negative (charge) power (kW) - Model (i)")
+
+        # PHASE II Model (i): Total power variables (kW)
+        model.p_total_ch = pyo.Var(model.T, bounds=(0, P_max_config),
+                                  doc="Total charging power (DA + aFRR-E neg) (kW) - Model (i)")
+        model.p_total_dis = pyo.Var(model.T, bounds=(0, P_max_config),
+                                   doc="Total discharging power (DA + aFRR-E pos) (kW) - Model (i)")
+
         # Ancillary service capacity variables (MW)
-        model.c_fcr = pyo.Var(model.B, bounds=(0, P_max_config/1000), 
+        model.c_fcr = pyo.Var(model.B, bounds=(0, P_max_config/1000),
                              doc="FCR capacity bid (MW)")
-        model.c_afrr_pos = pyo.Var(model.B, bounds=(0, P_max_config/1000), 
+        model.c_afrr_pos = pyo.Var(model.B, bounds=(0, P_max_config/1000),
                                   doc="aFRR positive capacity bid (MW)")
-        model.c_afrr_neg = pyo.Var(model.B, bounds=(0, P_max_config/1000), 
+        model.c_afrr_neg = pyo.Var(model.B, bounds=(0, P_max_config/1000),
                                   doc="aFRR negative capacity bid (MW)")
-        
-        # Binary variables for operational states
-        model.y_ch = pyo.Var(model.T, domain=pyo.Binary, 
-                            doc="Charging state binary")
-        model.y_dis = pyo.Var(model.T, domain=pyo.Binary, 
-                             doc="Discharging state binary")
-        
-        # Binary variables for market participation
-        model.y_fcr = pyo.Var(model.B, domain=pyo.Binary, 
+
+        # Binary variables for operational states - Day-ahead market
+        model.y_ch = pyo.Var(model.T, domain=pyo.Binary,
+                            doc="DA charging state binary")
+        model.y_dis = pyo.Var(model.T, domain=pyo.Binary,
+                             doc="DA discharging state binary")
+
+        # PHASE II Model (i): aFRR energy market binaries
+        model.y_afrr_pos_e = pyo.Var(model.T, domain=pyo.Binary,
+                                    doc="aFRR energy positive bid binary - Model (i)")
+        model.y_afrr_neg_e = pyo.Var(model.T, domain=pyo.Binary,
+                                    doc="aFRR energy negative bid binary - Model (i)")
+
+        # PHASE II Model (i): Total operation binaries
+        model.y_total_ch = pyo.Var(model.T, domain=pyo.Binary,
+                                  doc="Total charging binary - Model (i)")
+        model.y_total_dis = pyo.Var(model.T, domain=pyo.Binary,
+                                   doc="Total discharging binary - Model (i)")
+
+        # Binary variables for ancillary service capacity market participation
+        model.y_fcr = pyo.Var(model.B, domain=pyo.Binary,
                              doc="FCR market participation")
-        model.y_afrr_pos = pyo.Var(model.B, domain=pyo.Binary, 
-                                  doc="aFRR positive market participation")
-        model.y_afrr_neg = pyo.Var(model.B, domain=pyo.Binary, 
-                                  doc="aFRR negative market participation")
+        model.y_afrr_pos = pyo.Var(model.B, domain=pyo.Binary,
+                                  doc="aFRR positive capacity market participation")
+        model.y_afrr_neg = pyo.Var(model.B, domain=pyo.Binary,
+                                  doc="aFRR negative capacity market participation")
         
         # ============================================================================
         # CONSTRAINTS (Ordered to match documentation structure)
         # ============================================================================
 
-        # Cst-1: Energy Balance (SOC Dynamics)
-        # e_soc(t) = e_soc(t-1) + (p_ch(t)*η_ch - p_dis(t)/η_dis) * Δt
+        # PHASE II Model (i): Total Power Definition Constraints (NEW)
+        # Define total charge/discharge power as sum of DA and aFRR energy markets
+        def total_ch_def_rule(model, t):
+            return model.p_total_ch[t] == model.p_ch[t] + model.p_afrr_neg_e[t]
+        model.total_ch_def = pyo.Constraint(model.T, rule=total_ch_def_rule,
+                                           doc="Total charge power = DA charge + aFRR-E negative")
+
+        def total_dis_def_rule(model, t):
+            return model.p_total_dis[t] == model.p_dis[t] + model.p_afrr_pos_e[t]
+        model.total_dis_def = pyo.Constraint(model.T, rule=total_dis_def_rule,
+                                            doc="Total discharge power = DA discharge + aFRR-E positive")
+
+        # Cst-1: Energy Balance (SOC Dynamics) - UPDATED for Model (i)
+        # e_soc(t) = e_soc(t-1) + (p_total_ch(t)*η_ch - p_total_dis(t)/η_dis) * Δt
         def soc_dynamics_rule(model, t):
             if t == T_data[0]:
-                return model.e_soc[t] == model.E_soc_init + (model.eta_ch * model.p_ch[t] - model.p_dis[t] / model.eta_dis) * model.dt
+                return model.e_soc[t] == model.E_soc_init + (model.eta_ch * model.p_total_ch[t] - model.p_total_dis[t] / model.eta_dis) * model.dt
             else:
-                return model.e_soc[t] == model.e_soc[t-1] + (model.eta_ch * model.p_ch[t] - model.p_dis[t] / model.eta_dis) * model.dt
+                return model.e_soc[t] == model.e_soc[t-1] + (model.eta_ch * model.p_total_ch[t] - model.p_total_dis[t] / model.eta_dis) * model.dt
         model.soc_dynamics = pyo.Constraint(model.T, rule=soc_dynamics_rule)
 
         # Cst-2: SOC Limits
@@ -443,23 +553,34 @@ class BESSOptimizerV2:
         # Note: Already enforced via variable bounds (lines 375-377)
         # No explicit constraint needed - included in model.e_soc variable definition
 
-        # Cst-3: Simultaneous Operation Prevention
-        # y_ch(t) + y_dis(t) ≤ 1
-        def no_simultaneous_rule(model, t):
-            return model.y_ch[t] + model.y_dis[t] <= 1
-        model.no_simultaneous = pyo.Constraint(model.T, rule=no_simultaneous_rule)
+        # Cst-3: Simultaneous Operation Prevention - UPDATED for Model (i)
+        # Use total binaries to prevent charging and discharging simultaneously
+        def total_ch_binary_rule(model, t):
+            return model.p_total_ch[t] <= model.y_total_ch[t] * model.P_max_config
+        model.total_ch_binary = pyo.Constraint(model.T, rule=total_ch_binary_rule,
+                                              doc="Link total charge power to total charge binary")
 
-        # Cst-4: Market Co-optimization Power Limits
-        # Total discharge: p_dis(t) + 1000*c_fcr(b) + 1000*c_afrr_pos(b) ≤ P_max
-        # Total charge: p_ch(t) + 1000*c_fcr(b) + 1000*c_afrr_neg(b) ≤ P_max
+        def total_dis_binary_rule(model, t):
+            return model.p_total_dis[t] <= model.y_total_dis[t] * model.P_max_config
+        model.total_dis_binary = pyo.Constraint(model.T, rule=total_dis_binary_rule,
+                                               doc="Link total discharge power to total discharge binary")
+
+        def no_simultaneous_rule(model, t):
+            return model.y_total_ch[t] + model.y_total_dis[t] <= 1
+        model.no_simultaneous = pyo.Constraint(model.T, rule=no_simultaneous_rule,
+                                              doc="Prevent simultaneous charging and discharging")
+
+        # Cst-4: Market Co-optimization Power Limits - UPDATED for Model (i)
+        # Total discharge: p_total_dis(t) + 1000*c_fcr(b) + 1000*c_afrr_pos(b) ≤ P_max
+        # Total charge: p_total_ch(t) + 1000*c_fcr(b) + 1000*c_afrr_neg(b) ≤ P_max
         def power_dis_reserve_limit_rule(model, t):
             block = model.block_map[t]
-            return model.p_dis[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_pos[block] <= model.P_max_config
+            return model.p_total_dis[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_pos[block] <= model.P_max_config
         model.power_dis_reserve_limit = pyo.Constraint(model.T, rule=power_dis_reserve_limit_rule)
 
         def power_ch_reserve_limit_rule(model, t):
             block = model.block_map[t]
-            return model.p_ch[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_neg[block] <= model.P_max_config
+            return model.p_total_ch[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_neg[block] <= model.P_max_config
         model.power_ch_reserve_limit = pyo.Constraint(model.T, rule=power_ch_reserve_limit_rule)
 
         # Cst-5: Daily Cycle Limits
@@ -490,17 +611,17 @@ class BESSOptimizerV2:
             return model.y_fcr[b] + model.y_afrr_pos[b] + model.y_afrr_neg[b] <= 1
         model.as_market_exclusivity = pyo.Constraint(model.B, rule=as_market_exclusivity_rule)
 
-        # Cst-8: Cross-Market Mutual Exclusivity
-        # y_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no discharge bid with charging AS)
-        # y_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no charge bid with discharging AS)
+        # Cst-8: Cross-Market Mutual Exclusivity - UPDATED for Model (i)
+        # y_total_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no total discharge with charging AS)
+        # y_total_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no total charge with discharging AS)
         def cross_market_exclusivity_rule_1(model, t):
             block = model.block_map[t]
-            return model.y_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
+            return model.y_total_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
         model.cross_market_exclusivity1 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_1)
 
         def cross_market_exclusivity_rule_2(model, t):
             block = model.block_map[t]
-            return model.y_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
+            return model.y_total_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
         model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2)
 
         # Cst-9: Minimum and Maximum Bid Size Constraints
@@ -546,22 +667,63 @@ class BESSOptimizerV2:
         def afrr_neg_max_bid_rule(model, b):
             return model.c_afrr_neg[b] <= model.y_afrr_neg[b] * (model.P_max_config / 1000)
         model.afrr_neg_max_bid = pyo.Constraint(model.B, rule=afrr_neg_max_bid_rule)
-        
-        # OPTIMIZED OBJECTIVE FUNCTION (Addresses Critical Issue #3)
+
+        # PHASE II Model (i): aFRR Energy Market Bid Constraints (NEW)
+        def afrr_pos_e_min_bid_rule(model, t):
+            return model.p_afrr_pos_e[t] >= model.y_afrr_pos_e[t] * model.min_bid_afrr_e * 1000
+        model.afrr_pos_e_min_bid = pyo.Constraint(model.T, rule=afrr_pos_e_min_bid_rule)
+
+        def afrr_pos_e_max_bid_rule(model, t):
+            return model.p_afrr_pos_e[t] <= model.y_afrr_pos_e[t] * model.P_max_config
+        model.afrr_pos_e_max_bid = pyo.Constraint(model.T, rule=afrr_pos_e_max_bid_rule)
+
+        def afrr_neg_e_min_bid_rule(model, t):
+            return model.p_afrr_neg_e[t] >= model.y_afrr_neg_e[t] * model.min_bid_afrr_e * 1000
+        model.afrr_neg_e_min_bid = pyo.Constraint(model.T, rule=afrr_neg_e_min_bid_rule)
+
+        def afrr_neg_e_max_bid_rule(model, t):
+            return model.p_afrr_neg_e[t] <= model.y_afrr_neg_e[t] * model.P_max_config
+        model.afrr_neg_e_max_bid = pyo.Constraint(model.T, rule=afrr_neg_e_max_bid_rule)
+
+        # PHASE II Model (i): Total Binary Linkage (NEW)
+        # y_total_ch >= y_ch and y_total_ch >= y_afrr_neg_e
+        # y_total_dis >= y_dis and y_total_dis >= y_afrr_pos_e
+        def total_ch_binary_link1_rule(model, t):
+            return model.y_total_ch[t] >= model.y_ch[t]
+        model.total_ch_binary_link1 = pyo.Constraint(model.T, rule=total_ch_binary_link1_rule)
+
+        def total_ch_binary_link2_rule(model, t):
+            return model.y_total_ch[t] >= model.y_afrr_neg_e[t]
+        model.total_ch_binary_link2 = pyo.Constraint(model.T, rule=total_ch_binary_link2_rule)
+
+        def total_dis_binary_link1_rule(model, t):
+            return model.y_total_dis[t] >= model.y_dis[t]
+        model.total_dis_binary_link1 = pyo.Constraint(model.T, rule=total_dis_binary_link1_rule)
+
+        def total_dis_binary_link2_rule(model, t):
+            return model.y_total_dis[t] >= model.y_afrr_pos_e[t]
+        model.total_dis_binary_link2 = pyo.Constraint(model.T, rule=total_dis_binary_link2_rule)
+
+        # OPTIMIZED OBJECTIVE FUNCTION - UPDATED for Model (i)
         def objective_rule(model):
-            # Day-ahead profit
-            da_profit = sum((model.P_DA[t] / 1000 * model.p_dis[t] - 
-                             model.P_DA[t] / 1000 * model.p_ch[t]) * model.dt 
+            # Day-ahead energy profit
+            da_profit = sum((model.P_DA[t] / 1000 * model.p_dis[t] -
+                             model.P_DA[t] / 1000 * model.p_ch[t]) * model.dt
                             for t in model.T)
-            
-            # Ancillary service profit (prices are per block, so no db multiplication)
+
+            # PHASE II Model (i): aFRR energy market profit (NEW)
+            afrr_energy_profit = sum((model.P_aFRR_E_pos[t] / 1000 * model.p_afrr_pos_e[t] -
+                                      model.P_aFRR_E_neg[t] / 1000 * model.p_afrr_neg_e[t]) * model.dt
+                                     for t in model.T)
+
+            # Ancillary service capacity profit (prices are per block, so no db multiplication)
             as_profit = sum(model.P_FCR[b] * model.c_fcr[b] +
                             model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
                             model.P_aFRR_neg[b] * model.c_afrr_neg[b]
                             for b in model.B)
-            
-            return da_profit + as_profit
-        
+
+            return da_profit + afrr_energy_profit + as_profit
+
         model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
         
         # OPTIONAL: End-of-horizon SOC constraint (mentioned in review)
@@ -693,21 +855,41 @@ class BESSOptimizerV2:
             }
             
             # Extract variable values efficiently
+            # Day-ahead market
             solution["p_ch"] = {t: model.p_ch[t].value for t in model.T if model.p_ch[t].value is not None}
             solution["p_dis"] = {t: model.p_dis[t].value for t in model.T if model.p_dis[t].value is not None}
             solution["e_soc"] = {t: model.e_soc[t].value for t in model.T if model.e_soc[t].value is not None}
-            
+
+            # PHASE II Model (i): aFRR energy market (NEW)
+            solution["p_afrr_pos_e"] = {t: model.p_afrr_pos_e[t].value for t in model.T if model.p_afrr_pos_e[t].value is not None}
+            solution["p_afrr_neg_e"] = {t: model.p_afrr_neg_e[t].value for t in model.T if model.p_afrr_neg_e[t].value is not None}
+
+            # PHASE II Model (i): Total power (NEW)
+            solution["p_total_ch"] = {t: model.p_total_ch[t].value for t in model.T if model.p_total_ch[t].value is not None}
+            solution["p_total_dis"] = {t: model.p_total_dis[t].value for t in model.T if model.p_total_dis[t].value is not None}
+
+            # Ancillary service capacity
             solution["c_fcr"] = {b: model.c_fcr[b].value for b in model.B if model.c_fcr[b].value is not None}
             solution["c_afrr_pos"] = {b: model.c_afrr_pos[b].value for b in model.B if model.c_afrr_pos[b].value is not None}
             solution["c_afrr_neg"] = {b: model.c_afrr_neg[b].value for b in model.B if model.c_afrr_neg[b].value is not None}
-            
+
+            # Binaries - Day-ahead
             solution["y_ch"] = {t: model.y_ch[t].value for t in model.T if model.y_ch[t].value is not None}
             solution["y_dis"] = {t: model.y_dis[t].value for t in model.T if model.y_dis[t].value is not None}
-            
+
+            # PHASE II Model (i): aFRR energy binaries (NEW)
+            solution["y_afrr_pos_e"] = {t: model.y_afrr_pos_e[t].value for t in model.T if model.y_afrr_pos_e[t].value is not None}
+            solution["y_afrr_neg_e"] = {t: model.y_afrr_neg_e[t].value for t in model.T if model.y_afrr_neg_e[t].value is not None}
+
+            # PHASE II Model (i): Total binaries (NEW)
+            solution["y_total_ch"] = {t: model.y_total_ch[t].value for t in model.T if model.y_total_ch[t].value is not None}
+            solution["y_total_dis"] = {t: model.y_total_dis[t].value for t in model.T if model.y_total_dis[t].value is not None}
+
+            # Binaries - Ancillary service capacity
             solution["y_fcr"] = {b: model.y_fcr[b].value for b in model.B if model.y_fcr[b].value is not None}
             solution["y_afrr_pos"] = {b: model.y_afrr_pos[b].value for b in model.B if model.y_afrr_pos[b].value is not None}
             solution["y_afrr_neg"] = {b: model.y_afrr_neg[b].value for b in model.B if model.y_afrr_neg[b].value is not None}
-            
+
             return solution
             
         except Exception as e:
@@ -721,12 +903,13 @@ class BESSOptimizerV2:
     def extract_country_data(self, data: pd.DataFrame, country: str) -> pd.DataFrame:
         """
         Extract and format data for a specific country with enhanced validation.
+        Enhanced for Phase II Model (i) with aFRR energy market data.
         """
         logger.info(f"Extracting data for country: {country}")
-        
+
         if country not in self.countries:
             raise ValueError(f"Country {country} not supported. Available: {self.countries}")
-        
+
         try:
             # Handle special case for DE_LU coupled market
             # Day-ahead: Use DE_LU (coupled Germany-Luxembourg market)
@@ -737,41 +920,51 @@ class BESSOptimizerV2:
             else:
                 day_ahead_country = country
                 as_country = country
-            
+
             # Extract country-specific data with market-aware mapping
             country_df = pd.DataFrame()
             country_df['price_day_ahead'] = data[(day_ahead_country, 'day_ahead', '')]
             country_df['price_fcr'] = data[(as_country, 'fcr', '')]
             country_df['price_afrr_pos'] = data[(as_country, 'afrr', 'positive')]
             country_df['price_afrr_neg'] = data[(as_country, 'afrr', 'negative')]
-            
+
+            # PHASE II Model (i): Extract aFRR energy market prices (15-min intervals)
+            try:
+                country_df['price_afrr_energy_pos'] = data[(as_country, 'afrr_energy', 'positive')]
+                country_df['price_afrr_energy_neg'] = data[(as_country, 'afrr_energy', 'negative')]
+                logger.info(f"aFRR energy market data extracted for {country}")
+            except KeyError:
+                logger.warning(f"aFRR energy market data not available for {country}. Setting to 0 (Model (i) will be limited).")
+                country_df['price_afrr_energy_pos'] = 0.0
+                country_df['price_afrr_energy_neg'] = 0.0
+
             # Create time-based identifiers
             timestamps = data.index
             country_df['hour'] = timestamps.hour
             country_df['day_of_year'] = timestamps.dayofyear
             country_df['month'] = timestamps.month
             country_df['year'] = timestamps.year
-            
+
             # Create block IDs (4-hour blocks starting at midnight)
             country_df['block_of_day'] = country_df['hour'] // 4
             country_df['block_id'] = (country_df['day_of_year'] - 1) * 6 + country_df['block_of_day']
-            
+
             # Create day IDs
             country_df['day_id'] = country_df['day_of_year']
-            
+
             # Keep timestamp as a column for filtering
             country_df['timestamp'] = timestamps
-            
+
             # Reset index to get integer-based indexing
             country_df = country_df.reset_index(drop=True)
-            
+
             # Additional validation
             if country_df.isnull().any().any():
                 logger.warning(f"Missing data found for country {country}")
-            
+
             logger.info(f"Extracted {len(country_df)} data points for {country}")
             return country_df
-            
+
         except KeyError as e:
             raise ValueError(f"Missing data for country {country}: {str(e)}")
     
@@ -883,15 +1076,24 @@ class BESSOptimizerV2:
         logger.info("Improved scenario analysis completed")
         return results_df
 
-# For backward compatibility (alias for old code that might use BESSOptimizer)
-BESSOptimizer = BESSOptimizerV2
+# ============================================================================
+# BACKWARD COMPATIBILITY ALIASES
+# ============================================================================
+# Maintain backward compatibility with existing code that uses old names
+
+# Phase II Model naming
+BESSOptimizer = BESSOptimizerModelI  # Main backward compatibility alias
+BESSOptimizerV2 = BESSOptimizerModelI  # For code that used V2 naming
+
+# Clear naming for users
+BESSOptimizer_Phase2_ModelI = BESSOptimizerModelI  # Explicit Phase II Model (i) reference
 
 if __name__ == "__main__":
-    # Example usage
-    optimizer = BESSOptimizerV2()
-    
+    # Example usage - Model (i)
+    optimizer = BESSOptimizerModelI()
+
     # Run quick test
     data_file = "../data/TechArena2025_data_tidy.jsonl"
     results = optimizer.run_scenario_analysis(data_file, num_days=3)
-    print("\nImproved Model Results:")
+    print("\nPhase II Model (i) Results:")
     print(results.to_string())

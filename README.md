@@ -4,8 +4,15 @@
 > **Phase I Archive:** See branch `r1-static-battery` for Phase I submission
 > **Active Branch:** `r2-with-bat-config`
 
-An advanced Energy Management System (EMS) that optimizes battery storage operations across multiple European electricity markets to maximize profitability while meeting operational constraints.
+An advanced Energy Management System (EMS) that optimizes battery storage operations across multiple European electricity markets to maximize profitability while meeting operational constraints. And 
 
+---
+## Important Documentation References
+
+- **Quick Start Guide:** `py_script/README.md`
+- **Model Formulation Details:** `doc\p2_model\p2_bi_model_ggdp.tex`
+- **Project Overview:** `doc/whole_project_description.md`
+- **Model Naming Scheme:** `doc/p2_model/MODEL_NAMING_SCHEME.md`
 ---
 
 ## Project Overview
@@ -116,7 +123,8 @@ The system employs **Mixed-Integer Linear Programming (MILP)** to solve a multi-
 ---
 
 ## Repository Structure
-
+<!-- 
+The Project Structure below is outdated. Please refer to the actual repository for the current structure.
 ```
 TechArena2025_EMS/
 ├── py_script/                      # Main Python package
@@ -148,14 +156,12 @@ TechArena2025_EMS/
 │   └── phase1_validation/          # Phase I validation results
 │
 └── README.md                       # This file
-```
+``` -->
 
 ### Quick Navigation
 
 - **Implementation Details:** See `py_script/README.md`
-- **Mathematical Formulation:** See `doc/mathematical_formulation.md`
-- **Phase II Model:** See `doc/Phase_II_Model.md`
-- **Phase I Archive:** Switch to branch `r1-static-battery`
+
 
 ---
 
@@ -213,13 +219,32 @@ TechArena2025_EMS/
 - ✅ Archived to branch `r1-static-battery`
 
 ### Phase II (Current Development)
+
+**Foundation Work:**
 - ✅ Repository reorganization and professional code structure
 - ✅ Enhanced constraint modeling with reserve duration parameters
 - ✅ Performance optimization (40% faster solve times)
 - ✅ Comprehensive validation framework
-- 🔄 **Battery degradation modeling integration** (Priority)
-- 🔄 **aFRR energy market implementation** (New market)
-- 🔄 Aging-aware optimization strategies
+
+**Three-Stage Model Development:**
+- ✅ **Model (i): Base + aFRR Energy Market** [IMPLEMENTED]
+  - Four-market co-optimization (DA, aFRR-E, FCR, aFRR capacity)
+  - Class: `BESSOptimizerModelI`
+  - Test: `test_model_i.py` ✓ PASSING
+  - Branch: `p2-model-stage1-afrr-energy`
+
+- 🔄 **Model (ii): Model (i) + Cyclic Aging Cost** [NEXT]
+  - Piecewise-linear cyclic degradation (Xu et al., 2017)
+  - Segment-based SOC tracking
+  - Economic cost replaces rigid cycle limits
+
+- 🔄 **Model (iii): Model (ii) + Calendar Aging Cost** [PLANNED]
+  - SOS2-based calendar aging (Collath et al., 2023)
+  - Complete Phase II degradation modeling
+  - Meta-optimization of degradation price α
+
+**Integration Tasks:**
+- 🔄 Rolling horizon (MPC) implementation for computational feasibility
 - 🔄 Multi-scenario analysis with degradation effects
 - 🔄 10-year ROI calculation with capacity fade
 - 🔄 Trade-off analysis: revenue vs. battery lifetime
@@ -251,39 +276,43 @@ TechArena2025_EMS/
 - 8GB+ RAM for full-year optimizations
 
 ### Quick Start
+
+**Installation:**
 ```bash
 # Install dependencies
 pip install -r py_script/requirements.txt
 
-# Test installation
-cd py_script
-python scripts/main.py test
-
-# Run single scenario
-python scripts/main.py single DE 0.5 1.0
+# Test Model (i) implementation
+python test_model_i.py
 ```
 
-For detailed usage instructions, see `py_script/README.md`.
+**Using the Optimizers:**
+```python
+# Model (i): Base + aFRR Energy Market (4 markets)
+from core.optimizer import BESSOptimizerModelI
+
+optimizer = BESSOptimizerModelI()
+data = optimizer.load_and_preprocess_data("data/TechArena2025_data_tidy.jsonl")
+country_data = optimizer.extract_country_data(data, 'DE_LU')
+model = optimizer.build_optimization_model(country_data, c_rate=0.5, daily_cycle_limit=1.5)
+solution = optimizer.solve_model(model)
+
+# Access new aFRR energy variables
+afrr_energy_bids = solution['p_afrr_pos_e']  # Positive (discharge)
+```
+
+**Backward Compatibility:**
+```python
+# These still work (aliases for Model (i))
+from core.optimizer import BESSOptimizer  # Main alias
+from core.optimizer import BESSOptimizerV2  # Old V2 naming
+```
+
+For detailed usage instructions, see `py_script/README.md` and `doc/p2_model/MODEL_NAMING_SCHEME.md`.
 
 ---
 
-## Documentation
 
-### For Users
-- **Quick Start Guide:** `py_script/README.md`
-- **Usage Examples:** `py_script/README.md` → Usage Examples section
-
-### For Developers
-- **Mathematical Model:** `doc/mathematical_formulation.md`
-- **Phase II Specifications:** `doc/Phase_II_Model.md`
-- **API Documentation:** Docstrings in source code
-
-### For Researchers
-- **Model Formulation:** See mathematical documentation
-- **Constraint Details:** `doc/whole_project_description.md`
-- **Validation Results:** `results/phase1_validation/`
-
----
 
 ## Competition Performance
 
@@ -299,10 +328,11 @@ For detailed usage instructions, see `py_script/README.md`.
 - **Four-Market Optimization:** Add aFRR energy market participation
 - **Trade-off Analysis:** Balance immediate profit vs. long-term battery health
 - **10-Year ROI with Aging:** DCF analysis incorporating capacity fade
-- **ORC Model Compliance:** Align with Huawei's degradation evaluation model
+<!-- - **ORC Model Compliance:** Align with Huawei's degradation evaluation model
 - **Improved Solve Times:** Target <3 minutes per scenario
 - **Comprehensive Documentation:** 20% evaluation weight on code quality
-- **Production-Ready Codebase:** Professional structure and validation
+- -->
+- **Production-Ready Codebase:** Professional structure and validation 
 
 ---
 

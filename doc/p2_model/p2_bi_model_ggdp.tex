@@ -237,7 +237,7 @@ The aFRR Energy market (15-min granularity) operates similarly to the DA market 
     \begin{equation}
     \mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t   
     \end{equation}
-    
+
 \end{itemize}
 
 This requires revising the core physical constraints to prevent conflicts. We define new \textbf{total} charge/discharge variables:
@@ -249,13 +249,22 @@ p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{
 
 These totals are then used to update the SOC, power, and mutual exclusivity constraints from Phase I.
 
-\subsection{Integrating Battery Degradation as a Linear Cost}
+And the minimum/maximum bid constraints are updated to include the new aFRR-E bids:
+\begin{align}
+    y^{\mathrm{pos}}_{aFRR,E}(t)\,\text{MinBid}_{afrr\_e} \cdot 1000 &\le p^{\mathrm{pos}}_{aFRR,E}(t) \le y^{\mathrm{pos}}_{aFRR,E}(t)\,P^{\mathrm{config}}_{\max} & \forall t \\
+    y^{\mathrm{neg}}_{aFRR,E}(t)\,\text{MinBid}_{afrr\_e} \cdot 1000 &\le p^{\mathrm{neg}}_{aFRR,E}(t) \le y^{\mathrm{neg}}_{aFRR,E}(t)\,P^{\mathrm{config}}_{\max} & \forall t \\
+    y^{\mathrm{total}}_{\mathrm{ch}}(t) \ge y^{\mathrm{neg}}_{aFRR,E}(t); \quad & \quad y^{\mathrm{total}}_{\mathrm{dis}}(t) \ge y^{\mathrm{pos}}_{aFRR,E}(t) & \forall t
+\end{align}
+
+\subsection*{Integrating Battery Degradation as a Linear Cost}
 We replace the rigid Phase I constraint (Cst-5) $\sum p_{\mathrm{dis}} \le N_{\mathrm{cycles}} E_{\mathrm{nom}}$ with a flexible and more profitable \textbf{degradation cost function}, $C^{\mathrm{Degradation}}$. This cost is subtracted from the objective function, allowing the optimizer to find the best balance between high-revenue, high-degradation actions and low-revenue, low-degradation actions.
 
 Following the literature provided (Collath et al., 2023; Xu et al., 2017), we model this cost as the sum of calendar and cyclic aging:
 $$ C^{\mathrm{Degradation}} = C^{\mathrm{cal}} + C^{\mathrm{cyc}} $$
 
-\subsubsection{Cyclic Aging Cost ($C^{\mathrm{cyc}}$)}
+
+\subsection{Model (ii): Model (i) + Cyclic Aging Cost}
+% TODO: Write additional cyclic aging cost modelling description here
 Based on the methodology from Xu et al. (2017), we model cyclic aging as a \textbf{convex piecewise-linear cost of discharge}. The battery's energy capacity $E_{\mathrm{nom}}$ is divided into $J$ segments (e.g., 10 segments of 10\% SOC). Discharging from a shallower segment (e.g., 90-100\% SOC) is "cheaper" than discharging from a deeper segment (e.g., 20-30\% SOC).
 \begin{itemize}
     \item \textbf{New Variables:} $e_{\mathrm{soc},j}(t)$ (energy in segment $j$), $p^{\mathrm{ch}}_{j}(t)$ (charge to segment $j$), and $p^{\mathrm{dis}}_{j}(t)$ (discharge from segment $j$).
@@ -263,7 +272,60 @@ Based on the methodology from Xu et al. (2017), we model cyclic aging as a \text
     \item \textbf{Logic:} The marginal cost $c^{\mathrm{cost}}_{j}$ increases as $j$ increases (deeper discharge), e.g., $c_1 < c_2 < ... < c_J$. The optimizer will naturally prefer to discharge from the "cheapest" (shallowest) available segment first, perfectly modeling the non-linear cost of deep discharges in a linear framework.
 \end{itemize}
 
-\subsubsection{Calendar Aging Cost ($C^{\mathrm{cal}}$)}
+\subsubsection{Calculation of the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
+The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the cost is distributed non-linearly based on a standard power-law model for LFP battery degradation, rather than using non-traceable coefficients from literature examples.
+
+\paragraph{Step 1: Select a Degradation Model}
+For LFP batteries, the relationship between cycle life and Depth of Discharge (DoD) is commonly described by a power-law model:
+\begin{equation*}
+    \text{CycleLife}(D) = a \cdot D^{-b}
+\end{equation*}
+Where $D$ is the DoD, and for LFP batteries, the exponent $b$ is typically in the range [1.8, 2.2]. We adopt a standard, conservative value of $b=2$. The parameter $a$ represents the cycle life at 100\% DoD ($D=1$), which we assume to be 6,000 cycles.
+
+\paragraph{Step 2: Derive Marginal Aging Weights}
+The cumulative aging stress from discharging to a depth $D$ can be modeled as being proportional to $D^b$. Therefore, the marginal stress (or aging weight) $w_j$ incurred by discharging the $j$-th segment of the battery (from DoD $D_{j-1}$ to $D_j$) is:
+\begin{equation*}
+    w_j \propto D_j^b - D_{j-1}^b
+\end{equation*}
+With $b=2$ and 10 segments ($D_j = j/10$), the weight for each segment is proportional to $w_j \propto (j/10)^2 - ((j-1)/10)^2$. These weights are calculated and normalized. The sum of these weights, $W = \sum w_j$, conveniently equals 1.0, meaning they are already self-normalized.
+
+\paragraph{Step 3: Calculate Final Marginal Costs}
+With normalized weights $w_j$, the marginal cost for discharging 1 kWh from segment $j$ is calculated by allocating the `Cost per Full Cycle` (€149.07) according to these weights.
+\begin{equation*}
+c^{\mathrm{cost}}_{j} = \frac{\text{Cost per Full Cycle} \times w_j}{E_{\mathrm{nom}} \times \text{Segment Size}}
+\end{equation*}
+For example, for the first and shallowest segment ($j=1$), the marginal cost is calculated by plugging in the corresponding weight $w_1=0.01$:
+\begin{equation*}
+c^{\mathrm{cost}}_{1} = \frac{149.07 \text{ EUR/Cycle} \times 0.01}{4472 \text{ kWh} \times 0.1} \approx 0.0033 \text{ EUR/kWh}
+\end{equation*}
+Where the segment size is 0.1 (for 10\% segments). The resulting costs are detailed in Table \ref{tab:marginal_costs}.
+
+\begin{table}[h!]
+\centering
+\caption{Calculation of Marginal Cyclic Aging Costs ($c^{\mathrm{cost}}_{j}$) based on a Power-Law Model ($b=2$)}
+\label{tab:marginal_costs}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{Segment ($j$)} & \textbf{SOC Range} & \textbf{Multiplier ($w_j$)} & \textbf{Marginal Cost ($c^{\mathrm{cost}}_{j}$) [EUR/kWh]} \\ \midrule
+1 & 90-100\% & 0.01 & 0.0033 \\
+2 & 80-90\% & 0.03 & 0.0100 \\
+3 & 70-80\% & 0.05 & 0.0167 \\
+4 & 60-70\% & 0.07 & 0.0233 \\
+5 & 50-60\% & 0.09 & 0.0300 \\
+6 & 40-50\% & 0.11 & 0.0367 \\
+7 & 30-40\% & 0.13 & 0.0433 \\
+8 & 20-30\% & 0.15 & 0.0500 \\
+9 & 10-20\% & 0.17 & 0.0567 \\
+10 & 0-10\% & 0.19 & 0.0633 \\ \bottomrule
+\end{tabular}
+\end{table}
+\textit{This approach ensures that the sum of costs incurred by discharging all 10 segments equals exactly one `Cost per Full Cycle` (€149.07), making the model economically consistent.}
+
+
+
+
+\subsection{Model (iii): Model (ii) + Calendar Aging Cost}
+% TODO: Write additional calendar aging cost modelling description here
 Based on Collath et al. (2023), calendar aging is a non-linear function of the average State of Charge (SOC). We linearize this cost using Special Ordered Sets of Type 2 (SOS2), a standard MILP technique.
 \begin{itemize}
     \item \textbf{New Variables:} $\lambda_{t,i}$ (weighting variables for linearization).
@@ -274,7 +336,26 @@ Based on Collath et al. (2023), calendar aging is a non-linear function of the a
 \end{itemize}
 This formulation directly penalizes holding the battery at high SOC, as prioritized in the project description.
 
-\section{Phase II Mathematical Formulation}
+% \subsubsection{Calculation of Calendar Aging Breakpoints}
+% The breakpoints for the SOS2 linearization are derived from the "scaled" model presented in Collath et al. (2023), specifically from Figure 3, using the curve for 5\% past calendar capacity loss. The costs are monetized using the project's BESS investment cost of 200 EUR/kWh.
+
+% \begin{table}[h!]
+% \centering
+% \caption{Calculation of Calendar Aging Breakpoints ($SOC^{\mathrm{point}}_i, Cost^{\mathrm{point}}_i$)}
+% \label{tab:calendar_costs}
+% \begin{tabular}{@{}cccc@{}}
+% \toprule
+% \textbf{Breakpoint ($i$)} & \textbf{SOC Level} & \textbf{SOC (`SOC_i^{\text{point}}`) [kWh]} & \textbf{Cost (`Cost_i^{\text{point}}`) [EUR/hr]} \\ \midrule
+% 1 & 0\% & 0 & 1.76 \\
+% 2 & 25\% & 1118 & 2.16 \\
+% 3 & 50\% & 2236 & 3.60 \\
+% 4 & 75\% & 3354 & 6.44 \\
+% 5 & 100\% & 4472 & 10.72 \\ \bottomrule
+% \end{tabular}
+% \end{table}
+% \textit{These values provide the concrete parameters for the SOS2 constraints (Eq. 44-47), ensuring the model accurately penalizes holding the battery at high states of charge.}
+
+\section{Phase II - Model (iii) Mathematical Formulation}
 
 \subsubsection{Sets and Indices}
 \begin{tabular}{@{}ll}
@@ -415,6 +496,63 @@ p^{\mathrm{total}}_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_
     \{\lambda_{t,i}\}_{i \in I} &\text{ are SOS2 variables} & \forall t
 \end{align}
 
+
+\subsection{Validation Needed: Explicit Cascading Constraints (Physical Rule)}
+To eliminate any ambiguity from the economic incentive model, we can introduce a set of explicit physical constraints to strictly enforce the 'Last-In, First-Out' (LIFO) behavior of the battery segments. While this approach increases model complexity, it ensures that the model's behavior aligns perfectly with physical reality under all conditions. This requires introducing two new sets of binary decision variables.
+
+\subsubsection{New Binary Variables for Cascading Logic}
+\begin{tabular}{@{}lll}
+\toprule
+Symbol & Description & Type \\
+\midrule
+$u^{\text{empty}}_{j}(t)$ & \textbf{(New)} 1 if segment $j$ is empty 
+   at time $t$, 0 otherwise & Binary \\
+$u^{\text{full}}_{j}(t)$  & \textbf{(New)} 1 if segment $j$ is full at
+   time $t$, 0 otherwise & Binary \\
+\bottomrule
+\end{tabular}
+
+\vspace{1em} % Add some vertical space
+We also introduce a new parameter $M$, which is a sufficiently large constant (typically set to $P^{\mathrm{config}}_{\max}$), for use in the "Big-M" constraints.
+
+\subsubsection{New Constraints}
+
+\paragraph{1. Linking Constraints for Binary Variables}
+First, we must link the new binary variables to the segment's state f
+   charge, $e_{\mathrm{soc},j}(t)$.
+
+If a segment's energy $e_{\mathrm{soc},j}(t)$ is 0, then $u^{\text{empty}}_{j}(t)$ must be 1:
+\begin{equation}
+    e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} \cdot (1 - u^{\text{empty}}_j(t)) \qquad \forall t, \forall j
+\end{equation}
+\textit{(If $u^{\text{empty}}$ is 1, the right-hand side becomes 0, forcing $e_{\mathrm{soc},j}$ to be 0.)}
+
+\vspace{1em}
+If a segment's energy $e_{\mathrm{soc},j}(t)$ reaches its capacity $E^{\mathrm{seg}}_{j}$, then $u^{\text{full}}_{j}(t)$ must be 1:
+\begin{equation}
+    e_{\mathrm{soc},j}(t) \ge E^{\mathrm{seg}}_{j} \cdot u^{\text{full}}_j(t) \qquad \forall t, \forall j
+\end{equation}
+\textit{(Only when $e_{\mathrm{soc},j}$ is full (equal to $E^{\mathrm{seg}}_{j}$) can $u^{\text{full}}_j$ be 1.)}
+
+\paragraph{2. Cascading Discharge Constraint}
+This constraint dictates that: \textit{discharging from segment $j$ is only permitted if the adjacent shallower segment $j-1$ is empty.}
+
+\begin{equation}
+p^{\mathrm{dis}}_{j}(t) \le M \cdot u^{\text{empty}}_{j-1}(t)    \qquad \forall t, \forall j > 1
+\end{equation}
+\textit{(This means: power $p^{\mathrm{dis}}_{j}$ can only be drawn  
+      from segment $j$ if segment $j-1$ is empty ($u^{\text{empty}}_{j-1}=1$).)}
+
+\paragraph{3. Cascading Charge Constraint}
+This constraint dictates that: \textit{charging into segment $j$ is only permitted if the adjacent deeper segment $j+1$ is full.}
+\begin{equation}
+p^{\mathrm{ch}}_{j}(t) \le M \cdot u^{\text{full}}_{j+1}(t) \qquad \forall t, \forall j < J
+\end{equation}
+\textit{(This means: power $p^{\mathrm{ch}}_{j}$ can only be sent to segment $j$ if segment $j+1$ is full ($u^{\text{full}}_{j+1}=1$).)}
+
+
+
+
 \section{Implementation Strategy: Meta-Optimization \& Rolling Horizon}
 The mathematical formulation above defines the "inner-loop" optimization. However, two external challenges must be solved to meet the competition's goals: \textbf{(1)} computational infeasibility of a full-year MILP solve, and \textbf{(2)} the need to select the "correct" trade-off between profit and degradation.
 
@@ -459,8 +597,12 @@ The "correct" $\alpha$ is the one that results in the highest 10-Year ROI, as re
 \end{enumerate}
 This meta-optimization strategy directly links our MILP model to the competition's final evaluation criteria (10-year ROI) and correctly implements the bi-objective optimization you identified.
 
+
 \section{Conclusion and Next Steps}
 This Phase II formulation successfully integrates the aFRR energy market and a sophisticated, linearized degradation cost model into the Phase I MILP. The implementation strategy (MPC) ensures computational feasibility, while the meta-optimization of $\alpha$ ensures we find the optimal balance between profit and degradation to maximize the 10-year ROI.
+
+
+
 
 \begin{thebibliography}{9}
 \bibitem{xu2017}

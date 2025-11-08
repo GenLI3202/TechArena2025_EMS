@@ -90,3 +90,5 @@ final_submission_csvs/
 # Script-generated progress files
 **/progress.json
 **/*_progress.json
+.gemini/
+gha-creds-*.json
