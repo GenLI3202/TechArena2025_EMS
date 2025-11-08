@@ -1484,7 +1484,7 @@ def load_phase2_market_tables(workbook_path: Path, *, prefer_csv: bool = False) 
     afrr_energy (NEW):
         Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
     """
-    from exceptions import DataLoadingError
+    from core.exceptions import DataLoadingError
     import logging
 
     logger = logging.getLogger(__name__)
@@ -1732,7 +1732,7 @@ def plot_price_time_series_mckinsey(
     >>> fig = plot_price_time_series_mckinsey(tables, country='DE', time_range='Q1')
     >>> fig.show()
     """
-    from viz_config import MCKINSEY_COLORS, get_country_color, apply_mckinsey_style
+    from visualization.config import MCKINSEY_COLORS, get_country_color, apply_mckinsey_style
 
     if markets is None:
         markets = ['day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy']
@@ -1886,7 +1886,7 @@ def plot_da_price_distribution_mckinsey(
     >>> fig = plot_da_price_distribution_mckinsey(tables['day_ahead'], country='DE')
     >>> fig.show()
     """
-    from viz_config import MCKINSEY_COLORS, apply_mckinsey_style
+    from visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
     import numpy as np
     from scipy import stats
 
@@ -2001,7 +2001,7 @@ def plot_da_price_heatmap_mckinsey(
     >>> fig = plot_da_price_heatmap_mckinsey(tables['day_ahead'], country='DE')
     >>> fig.show()
     """
-    from viz_config import MCKINSEY_COLORS, apply_mckinsey_style
+    from visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
 
     # Get data for country
     country_col = 'DE_LU' if country == 'DE' else country
@@ -2038,8 +2038,10 @@ def plot_da_price_heatmap_mckinsey(
         y=list(range(24)),
         colorscale=colorscale,
         colorbar=dict(
-            title='Avg Price<br>(EUR/MWh)',
-            titleside='right'
+            title=dict(
+                text='Avg Price<br>(EUR/MWh)',
+                side='right'
+            )
         ),
         hovertemplate='Month: %{x}<br>Hour: %{y}:00<br>Avg Price: %{z:.2f} EUR/MWh<extra></extra>'
     ))
@@ -2166,7 +2168,7 @@ def plot_price_statistics_mckinsey(
     >>> fig = plot_price_statistics_mckinsey(stats, 'DE', 'day_ahead')
     >>> fig.show()
     """
-    from viz_config import MCKINSEY_COLORS, MCKINSEY_FONTS
+    from visualization.config import MCKINSEY_COLORS, MCKINSEY_FONTS
 
     fig = go.Figure(data=[go.Table(
         header=dict(
