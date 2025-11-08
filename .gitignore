@@ -59,6 +59,10 @@ ValidationTest_*/TechArena_Phase1_Operation.xlsx
 # Local editor settings (do not track personal MCP config)
 .vscode/mcp.json
 
+# System/crash files
+nul
+*.stackdump
+
 # ============================================
 # Round 2 Specific Ignores
 # ============================================

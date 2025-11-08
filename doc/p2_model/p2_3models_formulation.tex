@@ -60,7 +60,7 @@ $I, i$ & Set and index for calendar degradation cost breakpoints $i \in \{1, ...
 \bottomrule
 \end{tabular}
 
-\subsubsection{Parameters}
+\subsubsection*{Parameters}
 \begin{tabular}{@{}lll}
 \toprule
 Symbol & Description & Unit \\
@@ -83,7 +83,7 @@ $\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
 \bottomrule
 \end{tabular}
 
-\subsubsection{Decision Variables}
+\subsubsection*{Decision Variables}
 \begin{tabular}{@{}lll}
 \toprule
 Symbol & Description & Type \\
@@ -106,7 +106,6 @@ $y^{\mathrm{pos}}_{aFRR,E}(t), ...$ & \textbf{(New)} aFRR-E bid binaries & Binar
 $y^{\mathrm{total}}_{\mathrm{ch}}(t), y^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total operation binaries & Binary \\
 \bottomrule
 \end{tabular}
-
 
 \section{Model (i): Base Model + aFRR Energy Market}
 
@@ -188,12 +187,9 @@ The objective is to maximize the total profit, defined as market revenues minus 
 \max \; Z = \mathbb{P}^{DA} + \mathbb{P}^{ANCI} + \mathbb{P}^{aFRR\_E} - \alpha \cdot C^{\mathrm{cyc}}
 \end{equation}
 Where:
-\begin{align}
-\mathbb{P}^{DA} &= \sum_{t\in T} \left( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \right)\, \Delta t \\
-\mathbb{P}^{ANCI} &= \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big) \\
-\mathbb{P}^{aFRR\_E} &= \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t \\
-C^{\mathrm{cyc}} &= \sum_{t \in T} \sum_{j \in J} \left( c^{\mathrm{cost}}_{j} \cdot \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \cdot \Delta t \right)
-\end{align}
+\begin{equation}
+C^{\mathrm{cyc}} = \sum_{t \in T} \sum_{j \in J} \left( c^{\mathrm{cost}}_{j} \cdot \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \cdot \Delta t \right)
+\end{equation}
 
 \subsection{Constraints}
 
@@ -266,13 +262,9 @@ The objective is to maximize the total profit, defined as market revenues minus 
 \max \; Z = \mathbb{P}^{DA} + \mathbb{P}^{ANCI} + \mathbb{P}^{aFRR\_E} - \alpha \cdot (C^{\mathrm{cyc}} + C^{\mathrm{cal}})
 \end{equation}
 Where:
-\begin{align}
-\mathbb{P}^{DA} &= \sum_{t\in T} \left( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \right)\, \Delta t \\
-\mathbb{P}^{ANCI} &= \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big) \\
-\mathbb{P}^{aFRR\_E} &= \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t \\
-C^{\mathrm{cyc}} &= \sum_{t \in T} \sum_{j \in J} \left( c^{\mathrm{cost}}_{j} \cdot \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \cdot \Delta t \right) \\
-C^{\mathrm{cal}} &= \sum_{t \in T} c^{\mathrm{cal}}_{\mathrm{cost}}(t) \cdot \Delta t
-\end{align}
+\begin{equation}
+C^{\mathrm{cal}} = \sum_{t \in T} c^{\mathrm{cal}}_{\mathrm{cost}}(t) \cdot \Delta t
+\end{equation}
 
 \subsection{Constraints}
 

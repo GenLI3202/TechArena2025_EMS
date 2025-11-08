@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(dir /b:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(nul)",
+      "Bash(move run_seasonal_validation.py \"py_script\\validation\"\" && move compare_validation_results.py \"py_scriptvalidation\"\")",
+      "Bash(move visualize_validation.py \"py_script\\validation\"\" && move generate_report.py \"py_scriptvalidation\"\")"
     ],
     "deny": [],
     "ask": []
