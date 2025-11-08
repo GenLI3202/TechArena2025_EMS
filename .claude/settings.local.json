@@ -6,7 +6,9 @@
       "Bash(nul)",
       "Bash(move run_seasonal_validation.py \"py_script\\validation\"\" && move compare_validation_results.py \"py_scriptvalidation\"\")",
       "Bash(move visualize_validation.py \"py_script\\validation\"\" && move generate_report.py \"py_scriptvalidation\"\")",
-      "Bash(if exist \"data\\phase2_processed\\parquet\" dir /b \"data\\phase2_processed\\parquet\")"
+      "Bash(if exist \"data\\phase2_processed\\parquet\" dir /b \"data\\phase2_processed\\parquet\")",
+      "Bash(timeout 30 python:*)",
+      "Bash(pytest:*)"
     ],
     "deny": [],
     "ask": []

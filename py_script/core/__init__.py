@@ -9,7 +9,12 @@ Main Classes:
 - DataProcessingError, DataValidationError: Custom exception classes
 """
 
-from .optimizer import BESSOptimizerV2
+from .optimizer import (
+    BESSOptimizerV2,
+    BESSOptimizerModelII,
+    BESSOptimizerV3,
+    BESSOptimizer_Phase2_ModelII,
+)
 from .exceptions import (
     DataProcessingError,
     DataLoadingError,
@@ -20,6 +25,9 @@ from .exceptions import (
 
 __all__ = [
     'BESSOptimizerV2',
+    'BESSOptimizerModelII',
+    'BESSOptimizerV3',
+    'BESSOptimizer_Phase2_ModelII',
     'DataProcessingError',
     'DataLoadingError',
     'DataValidationError',

@@ -365,6 +365,226 @@ $$
 
 ### Phase 2: Phase 1 + Battery Degradation Modeling
 
+We extend the Phase I MILP (Base Model) by incorporating the aFRR Energy Market (model (i)) and replacing the rigid daily cycle limit with a flexible degradation cost function (model (ii)). In addition, calendar aging costs are introduced in model (iii). The following subsections detail these modifications.
+
+#### Model (i): Base Model + aFRR Energy Market
+The aFRR Energy market (15-min granularity) operates similarly to the DA market as a price-taker energy market. We introduce new variables for bidding in this market and update all constraints that manage power and energy.
+
+- **New Variables:** $p^{\mathrm{pos}}_{aFRR,E}(t)$ (discharge/positive) and $p^{\mathrm{neg}}_{aFRR,E}(t)$ (charge/negative) for energy bids in the aFRR energy market.
+- **New Binaries:** $y^{\mathrm{pos}}_{aFRR,E}(t)$ and $y^{\mathrm{neg}}_{aFRR,E}(t)$ to manage minimum bids.
+- **Objective Function:** A new profit term $\mathbb{P}^{aFRR\_E}$ is added:
+$$
+\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t
+$$
+
+This requires revising the core physical constraints to prevent conflicts. We define new **total** charge/discharge variables:
+
+$$
+\begin{align}
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &= p_{\mathrm{ch}}(t) + p^{\mathrm{neg}}_{aFRR,E}(t) \quad \forall t \\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{aFRR,E}(t) \quad \forall t
+\end{align}
+$$
+
+These totals are then used to update the SOC, power, and mutual exclusivity constraints from Phase I.
+
+#### Integrating Battery Degradation as a Linear Cost
+We replace the rigid Phase I constraint (Cst-5) $\sum p_{\mathrm{dis}} \le N_{\mathrm{cycles}} E_{\mathrm{nom}}$ with a flexible and more profitable **degradation cost function**, $C^{\mathrm{Degradation}}$. This cost is subtracted from the objective function, allowing the optimizer to find the best balance between high-revenue, high-degradation actions and low-revenue, low-degradation actions.
+
+Following the literature provided (Collath et al., 2023; Xu et al., 2017), we model this cost as the sum of calendar and cyclic aging:
+$$ C^{\mathrm{Degradation}} = C^{\mathrm{cal}} + C^{\mathrm{cyc}} $$
+
+
+#### Model (ii): Model (i) + Cyclic Aging Cost
+Based on the methodology from Xu et al. (2017), we model cyclic aging as a **convex piecewise-linear cost of discharge**. The battery's energy capacity $E_{\mathrm{nom}}$ is divided into $J$ segments (e.g., 10 segments of 10% SOC). Discharging from a shallower segment (e.g., 90-100% SOC) is "cheaper" than discharging from a deeper segment (e.g., 20-30% SOC).
+
+- **New Variables:** $e_{\mathrm{soc},j}(t)$ (energy in segment $j$), $p^{\mathrm{ch}}_{j}(t)$ (charge to segment $j$), and $p^{\mathrm{dis}}_{j}(t)$ (discharge from segment $j$).
+- **Cost Function:** $C^{\mathrm{cyc}} = \sum_{t \in T} \sum_{j \in J} \left( c^{\mathrm{cost}}_{j} \cdot \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \cdot \Delta t \right)$
+- **Logic:** The marginal cost $c^{\mathrm{cost}}_{j}$ increases as $j$ increases (deeper discharge), e.g., $c_1 < c_2 < ... < c_J$. The optimizer will naturally prefer to discharge from the "cheapest" (shallowest) available segment first, perfectly modeling the non-linear cost of deep discharges in a linear framework.
+
+##### Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$
+The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
+
+**Step 1: Re-evaluating the Cycle Life Parameter ($a$)**
+The relationship between cycle life and Depth of Discharge (DoD) is described by the power-law model $\text{CycleLife}(D) = a \cdot D^{-b}$, where $b=2$ is a behaviorally superior choice for an EMS as it strongly penalizes deep discharges. The parameter $a$ (cycle life at 100% DoD) is derived from the LFP-specific commercial claim of 6,000 cycles at 80% DoD:
+$$
+a = \text{CycleLife}(0.8) \times (0.8)^{-b} = 6000 \times (0.8)^{-2} = 3840 \text{ cycles}
+$$
+This provides a traceable, LFP-specific value for the cycle life at 100% DoD.
+
+**Step 2: Recalculating the Cost per Full Cycle**
+The total BESS investment is $4472 \text{ kWh} \times 200 \text{ EUR/kWh} = 894,400 \text{ EUR}$. Amortizing this over the re-evaluated lifetime gives the new cost per full (100% DoD) cycle:
+$$
+\text{Cost per Full Cycle} = \frac{894,400 \text{ EUR}}{3840 \text{ cycles}} \approx 232.92 \text{ EUR/Cycle}
+$$
+
+**Step 3: Calculate Final Marginal Costs**
+The marginal aging weights $w_j$ for each of the 10 segments are derived from the power-law model ($w_j \propto D_j^2 - D_{j-1}^2$) and are self-normalizing. The marginal cost for discharging 1 kWh from segment $j$ is then:
+$$
+c^{\mathrm{cost}}_{j} = \frac{\text{Cost per Full Cycle} \times w_j}{E_{\mathrm{nom}} \times \text{Segment Size}}
+$$
+For example, for the first and shallowest segment ($j=1$), the marginal cost is:
+$$
+c^{\mathrm{cost}}_{1} = \frac{232.92 \text{ EUR/Cycle} \times 0.01}{4472 \text{ kWh} \times 0.1} \approx 0.0052 \text{ EUR/kWh}
+$$
+
+| **Segment ($j$)** | **SOC Range** | **Multiplier ($w_j$)** | **Marginal Cost ($c^{\mathrm{cost}}_{j}$) [EUR/kWh]** |
+|---|---|---|---|
+| 1 | 90-100% | 0.01 | 0.0052 |
+| 2 | 80-90% | 0.03 | 0.0156 |
+| 3 | 70-80% | 0.05 | 0.0260 |
+| 4 | 60-70% | 0.07 | 0.0364 |
+| 5 | 50-60% | 0.09 | 0.0469 |
+| 6 | 40-50% | 0.11 | 0.0573 |
+| 7 | 30-40% | 0.13 | 0.0677 |
+| 8 | 20-30% | 0.15 | 0.0781 |
+| 9 | 10-20% | 0.17 | 0.0885 |
+| 10 | 0-10% | 0.19 | 0.0990 |
+
+*This approach ensures that the sum of costs incurred by discharging all 10 segments equals exactly one "Cost per Full Cycle" (€232.92), making the model economically consistent and physically traceable.*
+
+#### Model (iii): Model (ii) + Calendar Aging Cost
+Based on Collath et al. (2023), calendar aging is a non-linear function of the average State of Charge (SOC). We linearize this cost using Special Ordered Sets of Type 2 (SOS2), a standard MILP technique.
+
+- **New Variables:** $\lambda_{t,i}$ (weighting variables for linearization).
+- **Cost Function:** $C^{\mathrm{cal}} = \sum_{t \in T} c^{\mathrm{cal}}_{\mathrm{cost}}(t)$
+- **Logic:** The total SOC $e_{\mathrm{soc}}(t)$ and its corresponding cost $c^{\mathrm{cal}}_{\mathrm{cost}}(t)$ are expressed as a convex combination of $I$ pre-calculated (SOC, Cost) breakpoints from the literature's non-linear curve.
+$$ e_{\mathrm{soc}}(t) = \sum_{i \in I} \lambda_{t,i} \cdot SOC^{\mathrm{point}}_i \quad | \quad c^{\mathrm{cal}}_{\mathrm{cost}}(t) = \sum_{i \in I} \lambda_{t,i} \cdot Cost^{\mathrm{point}}_i $$
+$$ \sum_{i \in I} \lambda_{t,i} = 1 \quad | \quad \{\lambda_{t,i}\} \text{ are SOS2 variables} $$
+
+This formulation directly penalizes holding the battery at high SOC, as prioritized in the project description.
+
+##### Calculation of the Calendar Aging Breakpoints
+The breakpoints for the SOS2 linearization are derived from the "scaled" model presented in Collath et al. (2023), specifically from Figure 3. This approach uses a fixed linearization point (representing a mid-life aging state) for the entire BESS lifetime to better optimize for Net Present Value (NPV). The costs are monetized using the project's BESS investment cost.
+
+**Step 1: Extract Physical Degradation Data**
+We extract data from the linearized calendar degradation model in Collath et al. (2023, Fig. 3), using the "scaled" curve for a past calendar capacity loss of $Q_{\mathrm{loss,cal}} = 5\%$. This provides the physical relationship between SOC and the rate of capacity loss. We select five key breakpoints:
+
+- SOC 0%: $\approx 0.00005\%$ capacity loss per 15 min
+- SOC 25\%: $\approx 0.00006\%$ capacity loss per 15 min
+- SOC 50\%: $\approx 0.00010\%$ capacity loss per 15 min
+- SOC 75\%: $\approx 0.00018\%$ capacity loss per 15 min
+- SOC 100\%: $\approx 0.00030\%$ capacity loss per 15 min
+
+**Step 2: Monetize the Degradation Cost**
+The physical capacity loss is converted into an hourly economic cost. The total BESS investment is $4472 \text{ kWh} \times 200 \text{ EUR/kWh} = 894,400 \text{ EUR}$. The hourly cost at each breakpoint is calculated by converting the 15-minute loss rate to an hourly rate.
+$$
+\text{Hourly Cost} = \text{Total Investment} \times (\text{15-min Loss Rate} \times 4)
+$$
+For example, for the 100% SOC breakpoint:
+$$
+\text{Cost}_{100\%} = 894,400 \text{ EUR} \times (0.00030\% \times 4) \approx 10.73 \text{ EUR/hr}
+$$
+
+**Step 3: Define Final Breakpoint Parameters**
+The calculated (SOC, Cost) pairs form the breakpoints for the SOS2 constraints. These values provide the concrete parameters for the model, ensuring it accurately penalizes holding the battery at high states of charge.
+
+| **Breakpoint ($i$)** | **SOC Level** | **SOC ($SOC_i^{\mathrm{point}}$) [kWh]** | **Cost ($Cost_i^{\mathrm{point}}$) [EUR/hr]** |
+|---|---|---|---|
+| 1 | 0% | 0 | 1.79 |
+| 2 | 25% | 1118 | 2.15 |
+| 3 | 50% | 2236 | 3.58 |
+| 4 | 75% | 3354 | 6.44 |
+| 5 | 100% | 4472 | 10.73 |
+
+*These values provide the concrete parameters for the SOS2 constraints, ensuring the model accurately penalizes holding the battery at high states of charge.*
+
+### Phase II - Model (iii) Mathematical Formulation
+
+#### Objective Function
+The objective is to maximize the total profit, defined as market revenues minus degradation costs.
+$$
+\max \; Z = \mathbb{P}^{DA} + \mathbb{P}^{ANCI} + \mathbb{P}^{aFRR\_E} - \alpha \cdot (C^{\mathrm{cyc}} + C^{\mathrm{cal}})
+$$
+
+
+#### Constraints
+
+##### Degradation-Aware SOC Dynamics (Replaces Cst-1)
+$$
+\begin{align}
+e_{\mathrm{soc},j}(t) &= e_{\mathrm{soc},j}(t-1) + \left( p^{\mathrm{ch}}_{j}(t) \eta_{\mathrm{ch}} - \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \right) \Delta t & \forall t, \forall j \\
+e_{\mathrm{soc}}(t) &= \sum_{j \in J} e_{\mathrm{soc},j}(t) & \forall t \\
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &= \sum_{j \in J} p^{\mathrm{ch}}_{j}(t) & \forall t \\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &= \sum_{j \in J} p^{\mathrm{dis}}_{j}(t) & \forall t \\
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &= p_{\mathrm{ch}}(t) + p^{\mathrm{neg}}_{aFRR,E}(t) & \forall t \\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{aFRR,E}(t) & \forall t
+\end{align}
+$$
+
+##### SOC & Segment Limits (Replaces Cst-2)
+$$
+\begin{align}
+SOC_{\min}\,E_{\mathrm{nom}} &\le e_{\mathrm{soc}}(t) \le SOC_{\max}\,E_{\mathrm{nom}} & \forall t \\
+0 &\le e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} & \forall t, \forall j
+\end{align}
+$$
+
+##### Simultaneous Operation Prevention (Replaces Cst-3)
+$$
+\begin{align}
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &\le y^{\mathrm{total}}_{\mathrm{ch}}(t) \cdot P^{\mathrm{config}}_{\max} & \forall t \\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &\le y^{\mathrm{total}}_{\mathrm{dis}}(t) \cdot P^{\mathrm{config}}_{\max} & \forall t \\
+y^{\mathrm{total}}_{\mathrm{ch}}(t) + y^{\mathrm{total}}_{\mathrm{dis}}(t) &\le 1 & \forall t
+\end{align}
+$$
+
+##### Market Co-optimization Power Limits (Replaces Cst-4)
+$$
+\begin{align}
+p^{\mathrm{total}}_{\mathrm{dis}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b) &\le P^{\mathrm{config}}_{\max} & \forall b, t \in b \\
+p^{\mathrm{total}}_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b) &\le P^{\mathrm{config}}_{\max} & \forall b, t \in b
+\end{align}
+$$
+
+##### Ancillary Service Energy Reserve (Keeps Cst-6 Logic)
+$$
+\begin{align}
+    \frac{\big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{pos}}_{aFRR}(b)\big)\,\tau}{\eta_{\mathrm{dis}}} &\leq e_{\mathrm{soc}}(t) - SOC_{\min}\,E_{\mathrm{nom}} & \forall b, t \in b \\
+    \big(1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_{aFRR}(b)\big)\,\tau\,\eta_{\mathrm{ch}} &\leq SOC_{\max}\,E_{\mathrm{nom}} - e_{\mathrm{soc}}(t) & \forall b, t \in b
+\end{align}
+$$
+*(Where $\tau$ is the reserve duration, e.g., 0.25h)*
+
+##### Ancillary Capacity Market Exclusivity (Keeps Cst-7)
+$$
+ \begin{equation}
+C^{\mathrm{cal}} = \sum_{t \in T} c^{\mathrm{cal}}_{\mathrm{cost}}(t) \cdot \Delta t
+    y_{fcr}(b) + y^{\mathrm{pos}}_{aFRR}(b) + y^{\mathrm{neg}}_{aFRR}(b) \le 1 \qquad \forall b
+ \end{equation}
+ $$
+ 
+##### Cross-Market Mutual Exclusivity (Replaces Cst-8)
+$$
+\begin{align}
+    y^{\mathrm{total}}_{\mathrm{ch}}(t) + y_{fcr}(b) + y^{\mathrm{pos}}_{aFRR}(b) &\le 1 & \forall b, t \in b \\
+    y^{\mathrm{total}}_{\mathrm{dis}}(t) + y_{fcr}(b) + y^{\mathrm{neg}}_{aFRR}(b) &\le 1 & \forall b, t \in b
+\end{align}
+$$
+ 
+##### Minimum Bids & Binary Logic (Updates Cst-9)
+$$
+\begin{align}
+    y_{\mathrm{ch}}(t)\,\text{MinBid}_{da} \cdot 1000 &\le p_{\mathrm{ch}}(t) \le y_{\mathrm{ch}}(t)\,P^{\mathrm{config}}_{\max} & \forall t \\
+    y_{\mathrm{dis}}(t)\,\text{MinBid}_{da} \cdot 1000 &\le p_{\mathrm{dis}}(t) \le y_{\mathrm{dis}}(t)\,P^{\mathrm{config}}_{\max} & \forall t \\
+    y^{\mathrm{pos}}_{aFRR,E}(t)\,\text{MinBid}_{afrr\_e} \cdot 1000 &\le p^{\mathrm{pos}}_{aFRR,E}(t) \le y^{\mathrm{pos}}_{aFRR,E}(t)\,P^{\mathrm{config}}_{\max} & \forall t \\
+    y^{\mathrm{neg}}_{aFRR,E}(t)\,\text{MinBid}_{afrr\_e} \cdot 1000 &\le p^{\mathrm{neg}}_{aFRR,E}(t) \le y^{\mathrm{neg}}_{aFRR,E}(t)\,P^{\mathrm{config}}_{\max} & \forall t \\
+    y^{\mathrm{total}}_{\mathrm{ch}}(t) &\ge y_{\mathrm{ch}}(t); \quad y^{\mathrm{total}}_{\mathrm{ch}}(t) \ge y^{\mathrm{neg}}_{aFRR,E}(t) & \forall t \\
+    y^{\mathrm{total}}_{\mathrm{dis}}(t) &\ge y_{\mathrm{dis}}(t); \quad y^{\mathrm{total}}_{\mathrm{dis}}(t) \ge y^{\mathrm{pos}}_{aFRR,E}(t) & \forall t
+\end{align}
+$$
+*(Similar min/max bid constraints for $c_{fcr}$, $c^{\mathrm{pos}}_{aFRR}$, $c^{\mathrm{neg}}_{aFRR}$ remain from Phase I)*
+
+##### Calendar Aging PWL Constraints (New)
+$$
+\begin{align}
+    e_{\mathrm{soc}}(t) &= \sum_{i \in I} \lambda_{t,i} \cdot SOC^{\mathrm{point}}_i & \forall t \\
+    c^{\mathrm{cal}}_{\mathrm{cost}}(t) &= \sum_{i \in I} \lambda_{t,i} \cdot Cost^{\mathrm{point}}_i & \forall t \\
+    \sum_{i \in I} \lambda_{t,i} &= 1 & \forall t \\
+    \{\lambda_{t,i}\}_{i \in I} &\text{ are SOS2 variables} & \forall t
+\end{align}
+$$
+
 
 ## Investment Optimization
 

@@ -280,13 +280,13 @@ Notice $p(t)$ is in kW, while $\text{MinBid}_{da}$ is in MW.
 \end{align}
 
 \section{Phase II Model Derivation}
-We extend the Phase I MILP (Base Model) by modifying the objective function and relevant constraints.
-% Set a TODO box here, say writing the cyclic and calendar aging models as model (ii) and (iii) step by step
-\begin{itemize}
-    \item[√] \textbf{Model (i):} Base Model + aFRR Energy Market
-    \item[X] \textbf{Model (ii):} Model (i) + Cyclic Aging Cost
-    \item[X] \textbf{Model (iii):} Model (ii) + Calendar Aging Cost = Full Phase II Model  
-\end{itemize}
+We extend the Phase I MILP (Base Model) by incorporating the aFRR Energy Market (model (i)) and replacing the rigid daily cycle limit with a flexible degradation cost function (model (ii)). In addition, calendar aging costs are introduced in model (iii). The following subsections detail these modifications.
+% % Set a TODO box here, say writing the cyclic and calendar aging models as model (ii) and (iii) step by step
+% \begin{itemize}
+%     \item[√] \textbf{Model (i):} Base Model + aFRR Energy Market
+%     \item[X] \textbf{Model (ii):} Model (i) + Cyclic Aging Cost
+%     \item[X] \textbf{Model (iii):} Model (ii) + Calendar Aging Cost = Full Phase II Model  
+% \end{itemize}
 
 \subsection{Model (i): Base Model + aFRR Energy Market}
 The aFRR Energy market (15-min granularity) operates similarly to the DA market as a price-taker energy market. We introduce new variables for bidding in this market and update all constraints that manage power and energy.

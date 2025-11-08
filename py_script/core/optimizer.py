@@ -417,11 +417,12 @@ class BESSOptimizerModelI:
                                  doc="Discharging efficiency")
         model.SOC_min = pyo.Param(initialize=self.battery_params['soc_min'], 
                                  doc="Minimum SOC")
-        model.SOC_max = pyo.Param(initialize=self.battery_params['soc_max'], 
+        model.SOC_max = pyo.Param(initialize=self.battery_params['soc_max'],
                                  doc="Maximum SOC")
-        model.E_soc_init = pyo.Param(initialize=self.battery_params['initial_soc'] * self.battery_params['capacity_kwh'], 
+        model.E_soc_init = pyo.Param(initialize=self.battery_params['initial_soc'] * self.battery_params['capacity_kwh'],
                                     doc="Initial SOC energy (kWh)")
-        model.N_cycles = pyo.Param(initialize=daily_cycle_limit, doc="Daily cycle limit")
+        if daily_cycle_limit is not None:
+            model.N_cycles = pyo.Param(initialize=daily_cycle_limit, doc="Daily cycle limit")
         
         # Parameters - Time intervals  
         model.dt = pyo.Param(initialize=self.market_params['time_step_hours'], 
@@ -583,12 +584,13 @@ class BESSOptimizerModelI:
             return model.p_total_ch[t] + 1000 * model.c_fcr[block] + 1000 * model.c_afrr_neg[block] <= model.P_max_config
         model.power_ch_reserve_limit = pyo.Constraint(model.T, rule=power_ch_reserve_limit_rule)
 
-        # Cst-5: Daily Cycle Limits
+        # Cst-5: Daily Cycle Limits (only if daily_cycle_limit is specified)
         # Σ_{t∈d} (p_dis(t)/η_dis * Δt) ≤ N_cycles * E_nom
-        def daily_cycle_rule(model, d):
-            # Use pre-computed day_to_times mapping
-            return sum(model.p_dis[t] / model.eta_dis * model.dt for t in self._day_to_times[d]) <= model.N_cycles * model.E_nom
-        model.daily_cycle_limit = pyo.Constraint(model.D, rule=daily_cycle_rule)
+        if daily_cycle_limit is not None:
+            def daily_cycle_rule(model, d):
+                # Use pre-computed day_to_times mapping
+                return sum(model.p_dis[t] / model.eta_dis * model.dt for t in self._day_to_times[d]) <= model.N_cycles * model.E_nom
+            model.daily_cycle_limit = pyo.Constraint(model.D, rule=daily_cycle_rule)
 
         # Cst-6: Ancillary Service Energy Reserve
         # Upward regulation: (1000*c_fcr + 1000*c_afrr_pos)*τ/η_dis ≤ e_soc(t) - SOC_min*E_nom
@@ -854,41 +856,123 @@ class BESSOptimizerModelI:
                 'termination_condition': str(results.solver.termination_condition)
             }
             
+            def _safe_value(component: Any) -> Optional[float]:
+                try:
+                    return pyo.value(component)
+                except (TypeError, ValueError):
+                    return None
+
             # Extract variable values efficiently
             # Day-ahead market
-            solution["p_ch"] = {t: model.p_ch[t].value for t in model.T if model.p_ch[t].value is not None}
-            solution["p_dis"] = {t: model.p_dis[t].value for t in model.T if model.p_dis[t].value is not None}
-            solution["e_soc"] = {t: model.e_soc[t].value for t in model.T if model.e_soc[t].value is not None}
+            solution["p_ch"] = {}
+            solution["p_dis"] = {}
+            solution["e_soc"] = {}
+            for t in model.T:
+                val_ch = _safe_value(model.p_ch[t])
+                if val_ch is not None:
+                    solution["p_ch"][t] = val_ch
+
+                val_dis = _safe_value(model.p_dis[t])
+                if val_dis is not None:
+                    solution["p_dis"][t] = val_dis
+
+                val_soc = _safe_value(model.e_soc[t])
+                if val_soc is not None:
+                    solution["e_soc"][t] = val_soc
 
             # PHASE II Model (i): aFRR energy market (NEW)
-            solution["p_afrr_pos_e"] = {t: model.p_afrr_pos_e[t].value for t in model.T if model.p_afrr_pos_e[t].value is not None}
-            solution["p_afrr_neg_e"] = {t: model.p_afrr_neg_e[t].value for t in model.T if model.p_afrr_neg_e[t].value is not None}
+            solution["p_afrr_pos_e"] = {}
+            solution["p_afrr_neg_e"] = {}
+            for t in model.T:
+                val_pos = _safe_value(model.p_afrr_pos_e[t])
+                if val_pos is not None:
+                    solution["p_afrr_pos_e"][t] = val_pos
+
+                val_neg = _safe_value(model.p_afrr_neg_e[t])
+                if val_neg is not None:
+                    solution["p_afrr_neg_e"][t] = val_neg
 
             # PHASE II Model (i): Total power (NEW)
-            solution["p_total_ch"] = {t: model.p_total_ch[t].value for t in model.T if model.p_total_ch[t].value is not None}
-            solution["p_total_dis"] = {t: model.p_total_dis[t].value for t in model.T if model.p_total_dis[t].value is not None}
+            solution["p_total_ch"] = {}
+            solution["p_total_dis"] = {}
+            for t in model.T:
+                total_ch = _safe_value(model.p_total_ch[t])
+                if total_ch is not None:
+                    solution["p_total_ch"][t] = total_ch
+
+                total_dis = _safe_value(model.p_total_dis[t])
+                if total_dis is not None:
+                    solution["p_total_dis"][t] = total_dis
 
             # Ancillary service capacity
-            solution["c_fcr"] = {b: model.c_fcr[b].value for b in model.B if model.c_fcr[b].value is not None}
-            solution["c_afrr_pos"] = {b: model.c_afrr_pos[b].value for b in model.B if model.c_afrr_pos[b].value is not None}
-            solution["c_afrr_neg"] = {b: model.c_afrr_neg[b].value for b in model.B if model.c_afrr_neg[b].value is not None}
+            solution["c_fcr"] = {}
+            solution["c_afrr_pos"] = {}
+            solution["c_afrr_neg"] = {}
+            for b in model.B:
+                val_fcr = _safe_value(model.c_fcr[b])
+                if val_fcr is not None:
+                    solution["c_fcr"][b] = val_fcr
+
+                val_afrr_pos = _safe_value(model.c_afrr_pos[b])
+                if val_afrr_pos is not None:
+                    solution["c_afrr_pos"][b] = val_afrr_pos
+
+                val_afrr_neg = _safe_value(model.c_afrr_neg[b])
+                if val_afrr_neg is not None:
+                    solution["c_afrr_neg"][b] = val_afrr_neg
 
             # Binaries - Day-ahead
-            solution["y_ch"] = {t: model.y_ch[t].value for t in model.T if model.y_ch[t].value is not None}
-            solution["y_dis"] = {t: model.y_dis[t].value for t in model.T if model.y_dis[t].value is not None}
+            solution["y_ch"] = {}
+            solution["y_dis"] = {}
+            for t in model.T:
+                val_y_ch = _safe_value(model.y_ch[t])
+                if val_y_ch is not None:
+                    solution["y_ch"][t] = val_y_ch
+
+                val_y_dis = _safe_value(model.y_dis[t])
+                if val_y_dis is not None:
+                    solution["y_dis"][t] = val_y_dis
 
             # PHASE II Model (i): aFRR energy binaries (NEW)
-            solution["y_afrr_pos_e"] = {t: model.y_afrr_pos_e[t].value for t in model.T if model.y_afrr_pos_e[t].value is not None}
-            solution["y_afrr_neg_e"] = {t: model.y_afrr_neg_e[t].value for t in model.T if model.y_afrr_neg_e[t].value is not None}
+            solution["y_afrr_pos_e"] = {}
+            solution["y_afrr_neg_e"] = {}
+            for t in model.T:
+                val_y_pos = _safe_value(model.y_afrr_pos_e[t])
+                if val_y_pos is not None:
+                    solution["y_afrr_pos_e"][t] = val_y_pos
+
+                val_y_neg = _safe_value(model.y_afrr_neg_e[t])
+                if val_y_neg is not None:
+                    solution["y_afrr_neg_e"][t] = val_y_neg
 
             # PHASE II Model (i): Total binaries (NEW)
-            solution["y_total_ch"] = {t: model.y_total_ch[t].value for t in model.T if model.y_total_ch[t].value is not None}
-            solution["y_total_dis"] = {t: model.y_total_dis[t].value for t in model.T if model.y_total_dis[t].value is not None}
+            solution["y_total_ch"] = {}
+            solution["y_total_dis"] = {}
+            for t in model.T:
+                val_y_total_ch = _safe_value(model.y_total_ch[t])
+                if val_y_total_ch is not None:
+                    solution["y_total_ch"][t] = val_y_total_ch
+
+                val_y_total_dis = _safe_value(model.y_total_dis[t])
+                if val_y_total_dis is not None:
+                    solution["y_total_dis"][t] = val_y_total_dis
 
             # Binaries - Ancillary service capacity
-            solution["y_fcr"] = {b: model.y_fcr[b].value for b in model.B if model.y_fcr[b].value is not None}
-            solution["y_afrr_pos"] = {b: model.y_afrr_pos[b].value for b in model.B if model.y_afrr_pos[b].value is not None}
-            solution["y_afrr_neg"] = {b: model.y_afrr_neg[b].value for b in model.B if model.y_afrr_neg[b].value is not None}
+            solution["y_fcr"] = {}
+            solution["y_afrr_pos"] = {}
+            solution["y_afrr_neg"] = {}
+            for b in model.B:
+                val_y_fcr = _safe_value(model.y_fcr[b])
+                if val_y_fcr is not None:
+                    solution["y_fcr"][b] = val_y_fcr
+
+                val_y_afrr_pos = _safe_value(model.y_afrr_pos[b])
+                if val_y_afrr_pos is not None:
+                    solution["y_afrr_pos"][b] = val_y_afrr_pos
+
+                val_y_afrr_neg = _safe_value(model.y_afrr_neg[b])
+                if val_y_afrr_neg is not None:
+                    solution["y_afrr_neg"][b] = val_y_afrr_neg
 
             return solution
             
@@ -1077,6 +1161,375 @@ class BESSOptimizerModelI:
         return results_df
 
 # ============================================================================
+# Phase II Model (ii): Cyclic Aging Cost Extension
+# ============================================================================
+
+
+class BESSOptimizerModelII(BESSOptimizerModelI):
+    """Battery Energy Storage System Optimizer - Phase II Model (ii).
+
+    Extends :class:`BESSOptimizerModelI` by replacing the hard daily cycle limit with
+    a convex, segment-based cyclic degradation cost. Each SOC slice carries a
+    marginal cost, enabling the optimizer to weigh revenue against battery aging.
+    """
+
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        degradation_config_path: Optional[str] = None,
+        alpha: float = 1.0,
+        enforce_segment_binary: bool = True,
+    ) -> None:
+        super().__init__()
+
+        # Optional runtime configuration overrides
+        if config:
+            self._apply_optional_config(config)
+
+        if degradation_config_path is None:
+            project_root = Path(__file__).resolve().parent.parent.parent
+            degradation_config_path = project_root / 'data' / 'phase2_aging_config' / 'aging_config.json'
+
+        self.degradation_config = self._load_degradation_config(degradation_config_path)
+
+        cyclic_config = self.degradation_config['cyclic_aging']
+        num_segments = len(cyclic_config['costs'])
+        segment_capacity = self.battery_params['capacity_kwh'] / num_segments
+
+        self.degradation_params = {
+            'enabled': True,
+            'model_type': 'cyclic_only',
+            'num_segments': num_segments,
+            'segment_capacity_kwh': segment_capacity,
+            'marginal_costs': cyclic_config['costs'],
+            'alpha': float(alpha),
+            'config_file_path': str(degradation_config_path),
+            'enforce_segment_binary': enforce_segment_binary,
+        }
+
+        self._validate_degradation_params()
+
+        logger.info("Initialized BESSOptimizerModelII:")
+        logger.info("  - Segments: %d", self.degradation_params['num_segments'])
+        logger.info(
+            "  - Segment capacity: %.2f kWh",
+            self.degradation_params['segment_capacity_kwh'],
+        )
+        logger.info("  - Alpha: %.4f", self.degradation_params['alpha'])
+        logger.info(
+            "  - Cost range: EUR %.4f - EUR %.4f per kWh",
+            min(self.degradation_params['marginal_costs']),
+            max(self.degradation_params['marginal_costs']),
+        )
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _apply_optional_config(self, config: Dict[str, Any]) -> None:
+        """Update battery/market parameters from optional configuration."""
+
+        battery_updates = config.get('battery_params') if isinstance(config, dict) else None
+        if isinstance(battery_updates, dict):
+            self.battery_params.update(battery_updates)
+
+        market_updates = config.get('market_params') if isinstance(config, dict) else None
+        if isinstance(market_updates, dict):
+            self.market_params.update(market_updates)
+
+    def _load_degradation_config(self, config_path: Any) -> Dict[str, Any]:
+        """Load cyclic aging configuration from JSON file."""
+
+        config_file = Path(config_path)
+
+        if not config_file.exists():
+            raise FileNotFoundError(
+                f"Degradation config file not found: {config_path}\n"
+                "Expected location: data/phase2_aging_config/aging_config.json"
+            )
+
+        try:
+            with open(config_file, 'r', encoding='utf-8') as handle:
+                config = json.load(handle)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in degradation config file: {exc}") from exc
+
+        if 'cyclic_aging' not in config:
+            raise KeyError("Missing 'cyclic_aging' key in degradation config")
+
+        if 'costs' not in config['cyclic_aging']:
+            raise KeyError("Missing 'costs' array in cyclic_aging config")
+
+        logger.info("Loaded degradation config from: %s", config_file)
+        return config
+
+    def _validate_degradation_params(self) -> None:
+        """Validate degradation parameters for physical and numerical consistency."""
+
+        params = self.degradation_params
+        num_seg = params['num_segments']
+        costs = params['marginal_costs']
+        seg_cap = params['segment_capacity_kwh']
+        total_cap = self.battery_params['capacity_kwh']
+        alpha = params['alpha']
+
+        if num_seg <= 0:
+            raise ValueError(f"Number of segments must be positive, got {num_seg}")
+
+        if len(costs) != num_seg:
+            raise ValueError(
+                "Marginal costs array length ({}) must equal number of segments ({})".format(
+                    len(costs), num_seg
+                )
+            )
+
+        for idx in range(1, num_seg):
+            if costs[idx] <= costs[idx - 1]:
+                logger.warning(
+                    "Marginal costs should increase with depth. Cost[%d]=%.4f is not greater than Cost[%d]=%.4f",
+                    idx,
+                    costs[idx],
+                    idx - 1,
+                    costs[idx - 1],
+                )
+
+        if any(cost < 0 for cost in costs):
+            raise ValueError(f"All marginal costs must be non-negative, got {costs}")
+
+        expected_seg_cap = total_cap / num_seg
+        if abs(seg_cap - expected_seg_cap) > 0.01:
+            raise ValueError(
+                "Segment capacity mismatch: %.2f kWh != %.2f kWh (total: %s / %s)" % (
+                    seg_cap,
+                    expected_seg_cap,
+                    total_cap,
+                    num_seg,
+                )
+            )
+
+        if alpha < 0:
+            raise ValueError(f"Alpha must be non-negative, got {alpha}")
+
+        logger.info("Degradation parameters validated successfully")
+
+    # ------------------------------------------------------------------
+    # Model construction
+    # ------------------------------------------------------------------
+
+    def build_optimization_model(
+        self,
+        country_data: pd.DataFrame,
+        c_rate: float,
+        daily_cycle_limit: Optional[float] = None,
+    ) -> pyo.ConcreteModel:
+        if daily_cycle_limit is not None:
+            logger.warning(
+                "Model (ii) ignores daily_cycle_limit parameter (%.2f). Using cost-based degradation instead.",
+                daily_cycle_limit,
+            )
+
+        # Pre-compute time sequence for use in constraint rules
+        time_indices = list(range(len(country_data)))
+        prev_time_lookup = {}
+        for idx, t in enumerate(time_indices):
+            prev_time_lookup[t] = time_indices[idx - 1] if idx > 0 else None
+
+        # Build parent model (daily cycle limit disabled)
+        model = super().build_optimization_model(country_data, c_rate, daily_cycle_limit=None)
+
+        num_segments = self.degradation_params['num_segments']
+        segment_capacity = self.degradation_params['segment_capacity_kwh']
+        marginal_costs = self.degradation_params['marginal_costs']
+        alpha = self.degradation_params['alpha']
+        P_max_config = c_rate * self.battery_params['capacity_kwh']
+
+        model.J = pyo.Set(initialize=range(1, num_segments + 1), doc="SOC segments (1=shallowest)")
+        model.E_seg = pyo.Param(model.J, initialize={j: segment_capacity for j in range(1, num_segments + 1)}, doc="Energy capacity of each segment (kWh)")
+        model.c_cost = pyo.Param(model.J, initialize={j: marginal_costs[j - 1] for j in range(1, num_segments + 1)}, doc="Marginal cyclic degradation cost (EUR/kWh)")
+        model.alpha = pyo.Param(initialize=alpha, doc="Degradation weight meta-parameter")
+
+        logger.info("Added %d SOC segments with costs: %s", num_segments, marginal_costs)
+
+        model.p_ch_j = pyo.Var(model.T, model.J, domain=pyo.NonNegativeReals, bounds=(0, P_max_config), doc="Charge power to segment j at time t (kW)")
+        model.p_dis_j = pyo.Var(model.T, model.J, domain=pyo.NonNegativeReals, bounds=(0, P_max_config), doc="Discharge power from segment j at time t (kW)")
+        model.e_soc_j = pyo.Var(model.T, model.J, domain=pyo.NonNegativeReals, bounds=(0, segment_capacity), doc="Energy stored in segment j at time t (kWh)")
+
+        logger.info("Added segment variables: %s new variables", f"{len(model.T) * len(model.J) * 3:,}")
+
+        if hasattr(model, 'soc_dynamics'):
+            model.del_component(model.soc_dynamics)
+            if hasattr(model, 'soc_dynamics_index'):
+                model.del_component(model.soc_dynamics_index)
+            logger.info("Removed parent SOC dynamics constraint (Cst-1)")
+
+        if hasattr(model, 'e_soc'):
+            model.del_component(model.e_soc)
+            if hasattr(model, 'e_soc_index'):
+                model.del_component(model.e_soc_index)
+
+        model.e_soc = pyo.Expression(model.T, rule=lambda m, t: sum(m.e_soc_j[t, j] for j in m.J), doc="Total SOC derived from segment SOCs")
+
+        def total_charge_power_rule(m, t):
+            return m.p_total_ch[t] == sum(m.p_ch_j[t, j] for j in m.J)
+
+        model.total_charge_aggregation = pyo.Constraint(model.T, rule=total_charge_power_rule, doc="Aggregate segment charge power")
+
+        def total_discharge_power_rule(m, t):
+            return m.p_total_dis[t] == sum(m.p_dis_j[t, j] for j in m.J)
+
+        model.total_discharge_aggregation = pyo.Constraint(model.T, rule=total_discharge_power_rule, doc="Aggregate segment discharge power")
+
+        def initial_segment_soc(m, j):
+            capacity_per_segment = float(pyo.value(m.E_seg[j]))
+            higher_capacity = capacity_per_segment * (int(j) - 1)
+            initial_total = float(pyo.value(m.E_soc_init))
+            remaining = max(0.0, initial_total - higher_capacity)
+            return min(capacity_per_segment, remaining)
+
+        def segment_soc_dynamics_rule(m, t, j):
+            prev_t = prev_time_lookup.get(t)
+            if prev_t is None:
+                initial_soc_j = initial_segment_soc(m, j)
+                return m.e_soc_j[t, j] == initial_soc_j + (m.p_ch_j[t, j] * m.eta_ch - m.p_dis_j[t, j] / m.eta_dis) * m.dt
+            return m.e_soc_j[t, j] == m.e_soc_j[prev_t, j] + (m.p_ch_j[t, j] * m.eta_ch - m.p_dis_j[t, j] / m.eta_dis) * m.dt
+
+        model.segment_soc_dynamics = pyo.Constraint(model.T, model.J, rule=segment_soc_dynamics_rule, doc="Segment SOC dynamics with top-down initialization")
+
+        def stacked_tank_rule(m, t, j):
+            if j == max(m.J):
+                return pyo.Constraint.Skip
+            return m.e_soc_j[t, j] >= m.e_soc_j[t, j + 1]
+
+        model.stacked_tank_ordering = pyo.Constraint(model.T, model.J, rule=stacked_tank_rule, doc="Monotonic SOC ordering across segments")
+
+        model.z_segment_active = pyo.Var(model.T, model.J, domain=pyo.Binary, doc="Segment activation binary")
+
+        def segment_activation_upper_rule(m, t, j):
+            return m.e_soc_j[t, j] <= m.E_seg[j] * m.z_segment_active[t, j]
+
+        model.segment_activation_upper = pyo.Constraint(model.T, model.J, rule=segment_activation_upper_rule)
+
+        def segment_activation_cascade_rule(m, t, j):
+            if j == 1:
+                return pyo.Constraint.Skip
+            return m.z_segment_active[t, j] <= m.z_segment_active[t, j - 1]
+
+        model.segment_activation_cascade = pyo.Constraint(model.T, model.J, rule=segment_activation_cascade_rule, doc="Ensure deeper segments only active when shallower ones are active")
+
+        if self.degradation_params.get('enforce_segment_binary', True):
+            def segment_charge_activation_rule(m, t, j):
+                return m.p_ch_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
+
+            model.segment_charge_activation = pyo.Constraint(model.T, model.J, rule=segment_charge_activation_rule)
+
+            def segment_discharge_activation_rule(m, t, j):
+                return m.p_dis_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
+
+            model.segment_discharge_activation = pyo.Constraint(model.T, model.J, rule=segment_discharge_activation_rule)
+
+        if hasattr(model, 'daily_cycle_limit'):
+            model.daily_cycle_limit.deactivate()
+            logger.info("Deactivated daily cycle limit constraint (Cst-5)")
+
+        # Capture parent objective expression before deleting
+        parent_objective_expr = model.objective.expr
+
+        # Delete parent objective
+        model.del_component(model.objective)
+
+        # Define cyclic degradation cost term
+        cost_cyclic = sum(
+            sum(model.c_cost[j] * (model.p_dis_j[t, j] / model.eta_dis) * model.dt for j in model.J)
+            for t in model.T
+        )
+
+        # Create new objective with degradation cost
+        model.objective = pyo.Objective(
+            expr=parent_objective_expr - model.alpha * cost_cyclic,
+            sense=pyo.maximize,
+            doc="Maximize profit minus weighted cyclic degradation cost"
+        )
+        logger.info("Extended parent objective with cyclic aging cost (alpha=%.4f)", alpha)
+
+        logger.info("Model (ii) build complete: %s variables, %s constraints", f"{model.nvariables():,}", f"{model.nconstraints():,}")
+        return model
+
+    # ------------------------------------------------------------------
+    # Solve & metrics
+    # ------------------------------------------------------------------
+
+    def solve_model(self, model: pyo.ConcreteModel, solver_name: Optional[str] = None) -> Dict[str, Any]:
+        results = super().solve_model(model, solver_name)
+
+        if results.get('status') not in ['optimal', 'feasible']:
+            return results
+
+        if not self.degradation_params.get('enabled', False):
+            return results
+
+        def _safe_value(component: Any) -> Optional[float]:
+            try:
+                return pyo.value(component)
+            except (TypeError, ValueError):
+                return None
+
+        p_ch_j = {}
+        p_dis_j = {}
+        e_soc_j = {}
+        for t in model.T:
+            for j in model.J:
+                val_ch = _safe_value(model.p_ch_j[t, j])
+                if val_ch is not None:
+                    p_ch_j[(t, j)] = val_ch
+
+                val_dis = _safe_value(model.p_dis_j[t, j])
+                if val_dis is not None:
+                    p_dis_j[(t, j)] = val_dis
+
+                val_soc = _safe_value(model.e_soc_j[t, j])
+                if val_soc is not None:
+                    e_soc_j[(t, j)] = val_soc
+
+        results['p_ch_j'] = p_ch_j
+        results['p_dis_j'] = p_dis_j
+        results['e_soc_j'] = e_soc_j
+        results['degradation_metrics'] = self._calculate_degradation_metrics(model, p_dis_j)
+
+        return results
+
+    def _calculate_degradation_metrics(self, model: pyo.ConcreteModel, p_dis_j: Dict[Tuple[int, int], float]) -> Dict[str, Any]:
+        eta_dis = pyo.value(model.eta_dis)
+        dt = pyo.value(model.dt)
+        E_nom = pyo.value(model.E_nom)
+
+        total_cyclic_cost = 0.0
+        throughput_per_segment = {j: 0.0 for j in model.J}
+
+        for (t, j), discharge_power in p_dis_j.items():
+            energy = (discharge_power / eta_dis) * dt
+            throughput_per_segment[j] += energy
+            total_cyclic_cost += pyo.value(model.c_cost[j]) * energy
+
+        total_throughput = sum(throughput_per_segment.values())
+        efc = total_throughput / E_nom if E_nom else 0.0
+        avg_dod = efc / len(model.D) if len(model.D) > 0 else 0.0
+
+        cost_per_segment = {
+            j: pyo.value(model.c_cost[j]) * throughput_per_segment[j]
+            for j in model.J
+        }
+
+        return {
+            'total_cyclic_cost_eur': total_cyclic_cost,
+            'equivalent_full_cycles': efc,
+            'total_throughput_kwh': total_throughput,
+            'throughput_per_segment_kwh': throughput_per_segment,
+            'cost_per_segment_eur': cost_per_segment,
+            'average_dod': avg_dod,
+            'alpha': pyo.value(model.alpha) if hasattr(model, 'alpha') else self.degradation_params.get('alpha'),
+        }
+
+# ============================================================================
 # BACKWARD COMPATIBILITY ALIASES
 # ============================================================================
 # Maintain backward compatibility with existing code that uses old names
@@ -1084,9 +1537,11 @@ class BESSOptimizerModelI:
 # Phase II Model naming
 BESSOptimizer = BESSOptimizerModelI  # Main backward compatibility alias
 BESSOptimizerV2 = BESSOptimizerModelI  # For code that used V2 naming
+BESSOptimizerV3 = BESSOptimizerModelII  # Version-based alias for cyclic aging model
 
 # Clear naming for users
 BESSOptimizer_Phase2_ModelI = BESSOptimizerModelI  # Explicit Phase II Model (i) reference
+BESSOptimizer_Phase2_ModelII = BESSOptimizerModelII  # Explicit Phase II Model (ii) reference
 
 if __name__ == "__main__":
     # Example usage - Model (i)
