@@ -716,10 +716,10 @@ class BESSOptimizerModelI:
                                       model.P_aFRR_E_neg[t] / 1000 * model.p_afrr_neg_e[t]) * model.dt
                                      for t in model.T)
 
-            # Ancillary service capacity profit (prices are per block, so no db multiplication)
-            as_profit = sum(model.P_FCR[b] * model.c_fcr[b] +
-                            model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
-                            model.P_aFRR_neg[b] * model.c_afrr_neg[b]
+            # Ancillary service capacity profit (prices in EUR/MW/h, multiply by block duration)
+            as_profit = sum((model.P_FCR[b] * model.c_fcr[b] +
+                             model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
+                             model.P_aFRR_neg[b] * model.c_afrr_neg[b]) * model.db
                             for b in model.B)
 
             return da_profit + afrr_energy_profit + as_profit

@@ -66,9 +66,9 @@ $I, i$ & Set and index for calendar degradation cost breakpoints $i \in \{1, ...
 Symbol & Description & Unit \\
 \midrule
 $P_{DA}(t)$ & Day-ahead electricity price & EUR/MWh \\
-$P_{FCR}(b)$ & FCR capacity price & EUR/MW \\
-$P^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity price & EUR/MW \\
-$P^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity price & EUR/MW \\
+$P_{FCR}(b)$ & FCR capacity price & EUR/MW/h \\
+$P^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity price & EUR/MW/h \\
+$P^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity price & EUR/MW/h \\
 $P^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} Positive aFRR energy price & EUR/MWh \\
 $P^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} Negative aFRR energy price & EUR/MWh \\
 $E_{\mathrm{nom}}$ & Nominal energy capacity & kWh \\
@@ -118,7 +118,7 @@ The objective is to maximize the total profit from market participation.
 Where:
 \begin{align}
 \mathbb{P}^{DA} &= \sum_{t\in T} \left( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \right)\, \Delta t \\
-\mathbb{P}^{ANCI} &= \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big) \\
+\mathbb{P}^{ANCI} &= \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, \Delta b \\
 \mathbb{P}^{aFRR\_E} &= \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t
 \end{align}
 

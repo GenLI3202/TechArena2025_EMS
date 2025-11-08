@@ -10,6 +10,16 @@
 ### Summary
 Extended the Phase I MILP to include the aFRR Energy Market, enabling real-time balancing revenue optimization alongside day-ahead arbitrage and ancillary service capacity payments.
 
+### Recent Fixes
+
+**Capacity Market Revenue Calculation (2025-11-08)**
+- **Issue:** Objective function underestimated capacity revenue by 4×
+- **Root Cause:** Capacity prices are in EUR/MW/h (hourly rates) but were treated as EUR/MW (per-block rates). Missing multiplication by block duration (`model.db = 4.0 hours`)
+- **Fix:** Added `* model.db` to capacity profit calculation in objective function (optimizer.py:720-723)
+- **Impact:** Capacity markets (FCR, aFRR capacity) now economically viable, expected to contribute 10-30% of revenue vs. previous ~0%
+- **Status:** ✅ Code updated, ⏳ Validation pending
+- **Related:** See `.github/ISSUE_capacity_market_revenue_bug.md`
+
 ### Implementation Details
 
 **Class Name:** `BESSOptimizerModelI`

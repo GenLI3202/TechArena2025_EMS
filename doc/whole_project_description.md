@@ -206,7 +206,7 @@ $$
 
 $$
 \begin{equation}
-\mathbb{P}^{ANCI} = \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)
+\mathbb{P}^{ANCI} = \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\Delta b 
 \end{equation}
 $$
 * Where $T$ is the set of 15-minute intervals in 2024 (35,040 intervals); $B$ is the set of 4-hour blocks (6 blocks/day × 365 days = 2,190 blocks), and $t \in b$ denotes the set of 16 consecutive 15-minute intervals within block $b$.
@@ -215,7 +215,7 @@ $$
   * $P_{DA}(t)$ is the day-ahead market price at time $t$ (EUR/MWh). 
   * $\Delta t$ is the time step duration (hours).
 * The second term $\mathbb{P}^{ANCI}$ is ancillary service capacity profit.
-  * Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW for each 4-hour block $b$.
+  * Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW/h (hourly rates). Multiplying by $\Delta b = 4$ hours yields EUR per block.
     > - [x] When the capacity is reserved but not fully, can one still bid in the DA market with the remaining capacity? $\leftarrow$ if FCR is reserved, as its bi-directional, then both DA charge and discharge bids are forbidden. If aFRR is reserved, then only one direction (charge or discharge) is allowed.
 
 
@@ -405,9 +405,9 @@ $$
 | $D$ | Set of 24-hour days, $d \in D = \{1, ..., 365\}$ | - | Set |
 | **Parameters** | | | |
 | $P_{DA}(t)$ | Day-ahead electricity price in interval $t$ | EUR/MWh | Input |
-| $P_{FCR}(b)$ | FCR capacity price in block $b$ | EUR/MW | Input |
-| $P^{\mathrm{pos}}_{aFRR}(b)$ | Positive aFRR capacity price in block $b$ | EUR/MW | Input |
-| $P^{\mathrm{neg}}_{aFRR}(b)$ | Negative aFRR capacity price in block $b$ | EUR/MW | Input |
+| $P_{FCR}(b)$ | FCR capacity price in block $b$ | EUR/MW/h | Input |
+| $P^{\mathrm{pos}}_{aFRR}(b)$ | Positive aFRR capacity price in block $b$ | EUR/MW/h | Input |
+| $P^{\mathrm{neg}}_{aFRR}(b)$ | Negative aFRR capacity price in block $b$ | EUR/MW/h | Input |
 | $E_{\mathrm{nom}}$ | Nominal energy capacity of the BESS | kWh | Input |
 | $P^{\mathrm{config}}_{\max}$ | Maximum charge/discharge power for the selected configuration | kW | Input |
 | $\eta_{\mathrm{ch}}, \eta_{\mathrm{dis}}$ | Charging and discharging efficiencies | - | Input |
