@@ -1,0 +1,8 @@
+{
+  "iterations": 2,
+  "total_revenue": 11436.586310173028,
+  "total_degradation": 753.4755198747595,
+  "net_profit": 10683.11079029827,
+  "final_soc": 631.0815789473675,
+  "violations": 142
+}

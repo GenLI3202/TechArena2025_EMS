@@ -96,3 +96,9 @@ final_submission_csvs/
 **/*_progress.json
 .gemini/
 gha-creds-*.json
+
+# ============================================
+# Archived Code and Scripts
+# ============================================
+py_script/test_scripts/archive/
+py_script/visualization/archive/

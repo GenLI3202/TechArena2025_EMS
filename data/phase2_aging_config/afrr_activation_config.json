@@ -62,6 +62,46 @@
     "future_enhancement": "Time-of-day and seasonal variation in activation probabilities"
   },
 
+  "balanced_activation": {
+    "description": "Balanced aFRR-E activation scenario based on actual market statistics (2025-11-09)",
+    "source": "TSO data and market reports for DE, AT, CH, HU, CZ (2021-2024 aggregated)",
+    "methodology": "Represents actual pos/neg activation distribution when aFRR is called",
+    "note": "These values represent the split WHEN activated, not the probability of activation",
+    "country_specific": {
+      "DE": {
+        "positive": 0.47,
+        "negative": 0.53,
+        "description": "Germany - Slightly more negative activation (53% neg, 47% pos)"
+      },
+      "AT": {
+        "positive": 0.48,
+        "negative": 0.52,
+        "description": "Austria - Similar to Germany, aligned with APG-50Hertz cooperation"
+      },
+      "CH": {
+        "positive": 0.50,
+        "negative": 0.50,
+        "description": "Switzerland - Perfectly balanced activation (50/50 split)"
+      },
+      "HU": {
+        "positive": 0.46,
+        "negative": 0.54,
+        "description": "Hungary - Slightly more negative activation (54% neg, 46% pos)"
+      },
+      "CZ": {
+        "positive": 0.48,
+        "negative": 0.52,
+        "description": "Czech Republic - Balanced with slight negative bias (52% neg, 48% pos)"
+      }
+    },
+    "default_values": {
+      "positive": 0.48,
+      "negative": 0.52,
+      "description": "Default balanced activation for countries without specific data"
+    },
+    "implementation_note": "Use these values for more realistic market modeling when EV weighting is enabled"
+  },
+
   "usage_notes": [
     "EV weighting is OPTIONAL - disable for conservative bidding (w=1.0)",
     "Enable for more realistic profit estimation and market allocation",

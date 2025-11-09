@@ -1,0 +1,30 @@
+{
+  "config": {
+    "country": "CH",
+    "date": "2024-07-22",
+    "horizon_hours": 24,
+    "alpha": 1.5,
+    "intervals": 96
+  },
+  "model_info": {
+    "num_variables": 4260,
+    "num_constraints": 3402,
+    "num_time_steps": 96,
+    "num_blocks": 6
+  },
+  "solution_status": {
+    "status": "optimal",
+    "objective_value": 6026.063280455214,
+    "solve_time": 0.339487
+  },
+  "decision_var_summary": {
+    "c_fcr_unique_values": 2,
+    "c_afrr_pos_unique_values": 1,
+    "c_afrr_neg_unique_values": 1,
+    "fcr_active_blocks": 4,
+    "afrr_pos_active_blocks": 0,
+    "afrr_neg_active_blocks": 0,
+    "charging_intervals": 0,
+    "discharging_intervals": 0
+  }
+}

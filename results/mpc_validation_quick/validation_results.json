@@ -1,0 +1,60 @@
+{
+  "test_id": "MPC_QUICK_VALIDATION",
+  "timestamp": "2025-11-09T19:50:09.996085",
+  "config": {
+    "country": "CH",
+    "num_days": 5,
+    "horizon_hours": 32,
+    "execution_hours": 24,
+    "alpha": 1.0,
+    "c_rate": 0.5,
+    "initial_soc_fraction": 0.5
+  },
+  "performance": {
+    "total_simulation_time_sec": 2.7703168392181396,
+    "iterations_completed": 5,
+    "iterations_expected": 5,
+    "mean_solve_time_sec": 0.0,
+    "max_solve_time_sec": 0,
+    "solve_times_per_iteration": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "correctness": {
+    "soc_continuity": {
+      "soc_trajectory": [
+        2236.0,
+        2235.999999999999,
+        2235.9999999999986,
+        2235.9999999999986,
+        2235.9999999999986,
+        2235.9999999999986
+      ],
+      "soc_changes_at_boundaries": [
+        9.094947017729282e-13,
+        4.547473508864641e-13,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max_soc_change_kwh": 9.094947017729282e-13,
+      "initial_soc": 2236.0,
+      "final_soc": 2235.9999999999986
+    },
+    "constraints": {
+      "total_violations": 0,
+      "violations": []
+    }
+  },
+  "overall_status": "PASS",
+  "economic": {
+    "total_revenue": NaN,
+    "degradation_cost": 429.5999999999997,
+    "net_profit": NaN,
+    "daily_avg_profit": NaN
+  }
+}

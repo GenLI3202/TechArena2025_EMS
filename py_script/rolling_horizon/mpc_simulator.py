@@ -306,6 +306,10 @@ class MPCSimulator:
         total_cyclic_cost = 0.0
         total_calendar_cost = 0.0
 
+        # CRITICAL: Bid aggregation for annual DataFrame (for submission)
+        all_bids_list = []  # List of dicts for each timestep
+        all_soc_15min = []  # SOC at every 15-min interval
+
         # MPC loop
         iteration = 0
         for t_start in range(0, self.total_steps, self.execution_steps):
@@ -345,15 +349,20 @@ class MPCSimulator:
 
             # 3. Build and solve model for this horizon
             try:
-                # Build model (pass initial_segment_soc if Model II/III)
-                # Note: This requires modification to ModelII/III build_optimization_model
+                # CRITICAL FIX: Set initial SOC in battery_params BEFORE building model
+                # This ensures E_soc_init reads the updated value
+                self.optimizer.battery_params['initial_soc_kwh'] = current_total_soc
+                logger.info("  Set battery_params['initial_soc_kwh'] = %.2f kWh for this iteration",
+                           current_total_soc)
+
+                # Build model
                 model = self.optimizer.build_optimization_model(
                     data_window,
                     self.c_rate,
                     daily_cycle_limit=None
                 )
 
-                # Set initial segment SOC values
+                # Set initial segment SOC values (Model II/III only)
                 if hasattr(model, 'e_soc_j'):
                     for j in model.J:
                         # Fix initial value for each segment
@@ -430,7 +439,40 @@ class MPCSimulator:
                 'window_results': window_results,
                 'solve_time': solution['solve_time'],
                 'validation': validation_report,
+                'solution': solution,  # Store full solution for bid extraction
             })
+
+            # CRITICAL: Extract bids from execution window for annual aggregation
+            for t_exec in range(actual_execution_length):
+                bid_row = {
+                    'timestep': t_start + t_exec,
+                    # Day-ahead bids (MW)
+                    'p_ch': solution['p_ch'].get(t_exec, 0.0),
+                    'p_dis': solution['p_dis'].get(t_exec, 0.0),
+                    # aFRR energy bids (MW)
+                    'p_afrr_pos_e': solution.get('p_afrr_pos_e', {}).get(t_exec, 0.0),
+                    'p_afrr_neg_e': solution.get('p_afrr_neg_e', {}).get(t_exec, 0.0),
+                    # SOC (kWh)
+                    'e_soc': solution['e_soc'].get(t_exec, 0.0) if 'e_soc' in solution else None,
+                }
+                all_bids_list.append(bid_row)
+
+                # Extract SOC for 15-min trajectory
+                if 'e_soc' in solution:
+                    all_soc_15min.append(solution['e_soc'].get(t_exec, current_total_soc))
+                elif hasattr(model, 'e_soc_j'):
+                    # Model II/III: sum segments
+                    soc_sum = sum(solution.get(f'e_soc_j[{t_exec},{j}]', 0.0) for j in range(1, 11))
+                    all_soc_15min.append(soc_sum)
+
+            # Extract capacity bids (block-level, need to map to timesteps)
+            # For AS capacity markets, bids are per 4-hour block
+            # CRITICAL FIX: Use actual block_id from data, not local index
+            for t_exec in range(actual_execution_length):
+                block_id = int(data_window['block_id'].iloc[t_exec])
+                all_bids_list[-actual_execution_length + t_exec]['c_fcr'] = solution['c_fcr'].get(block_id, 0.0)
+                all_bids_list[-actual_execution_length + t_exec]['c_afrr_pos'] = solution['c_afrr_pos'].get(block_id, 0.0)
+                all_bids_list[-actual_execution_length + t_exec]['c_afrr_neg'] = solution['c_afrr_neg'].get(block_id, 0.0)
 
             # 5. Update state for next iteration
             # Get final SOC from the last executed timestep
@@ -457,6 +499,10 @@ class MPCSimulator:
         total_degradation_cost = total_cyclic_cost + total_calendar_cost
         net_profit = total_revenue - total_degradation_cost
 
+        # CRITICAL: Create annual bid DataFrame for submission
+        import pandas as pd
+        annual_bids_df = pd.DataFrame(all_bids_list)
+
         logger.info("")
         logger.info("=" * 80)
         logger.info("MPC SIMULATION COMPLETE")
@@ -473,9 +519,12 @@ class MPCSimulator:
         logger.info("  Final SOC: %.2f kWh (%.1f%%)",
                    current_total_soc,
                    100 * current_total_soc / self.battery_params['capacity_kwh'])
+        logger.info("  Annual bids DataFrame: %d rows x %d columns",
+                   len(annual_bids_df), len(annual_bids_df.columns))
         logger.info("=" * 80)
 
         return {
+            # Financial totals (for ROI calculation)
             'total_revenue': total_revenue,
             'da_revenue': total_da_revenue,
             'afrr_e_revenue': total_afrr_e_revenue,
@@ -484,8 +533,16 @@ class MPCSimulator:
             'cyclic_cost': total_cyclic_cost,
             'calendar_cost': total_calendar_cost,
             'net_profit': net_profit,
+
+            # State trajectory
             'final_soc': current_total_soc,
-            'soc_trajectory': all_soc_trajectory,
+            'soc_trajectory': all_soc_trajectory,  # Iteration boundaries
+            'soc_15min': all_soc_15min,  # Every 15-min interval
+
+            # CRITICAL: Annual bid DataFrame for submission
+            'annual_bids_df': annual_bids_df,
+
+            # Detailed results
             'iteration_results': iteration_results,
             'validation_reports': validation_reports if self.validate_constraints else None,
             'summary': {
@@ -494,5 +551,6 @@ class MPCSimulator:
                 'c_rate': self.c_rate,
                 'horizon_hours': self.horizon_hours,
                 'execution_hours': self.execution_hours,
+                'total_timesteps': len(annual_bids_df),
             },
         }

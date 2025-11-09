@@ -1,0 +1,354 @@
+2025-11-09 20:57:24,280 - INFO - BESS Optimizer - Phase II Model (i): Base + aFRR Energy Market initialized (without EV weighting)
+2025-11-09 20:57:24,308 - INFO - Loaded degradation config from: \\nas.ads.mwn.de\ge75pax\TUM-PC\TUM_CEM_PhD\a_tech_arena_hw\TechArena2025_EMS\data\phase2_aging_config\aging_config.json
+2025-11-09 20:57:24,309 - INFO - Degradation parameters validated successfully
+2025-11-09 20:57:24,309 - INFO - Initialized BESSOptimizerModelII:
+2025-11-09 20:57:24,309 - INFO -   - Segments: 10
+2025-11-09 20:57:24,309 - INFO -   - Segment capacity: 447.20 kWh
+2025-11-09 20:57:24,309 - INFO -   - Alpha: 1.0000
+2025-11-09 20:57:24,309 - INFO -   - Cost range: EUR 0.0052 - EUR 0.0990 per kWh
+2025-11-09 20:57:24,309 - INFO - Calendar aging parameters validated successfully
+2025-11-09 20:57:24,309 - INFO - Initialized BESSOptimizerModelIII:
+2025-11-09 20:57:24,309 - INFO -   - Calendar aging enabled with 5 breakpoints
+2025-11-09 20:57:24,309 - INFO -   - SOC range: 0 - 4472 kWh
+2025-11-09 20:57:24,309 - INFO -   - Cost range: 1.79 - 10.73 EUR/hr
+2025-11-09 20:57:24,309 - INFO -   - Alpha (degradation weight): 1.0000
+2025-11-09 20:57:24,309 - INFO - Loading data from data/archive/phase_1_data_TechArena2025_data_tidy.jsonl
+2025-11-09 20:57:25,207 - INFO - Loaded 208629 data points from JSONL
+2025-11-09 20:57:25,392 - WARNING - aFRR energy file not found at data\archive\phase2_processed\parquet\afrr_energy.parquet. Model (i) requires this data!
+2025-11-09 20:57:25,406 - INFO - Time range: 2024-01-01 00:00:00 to 2025-01-01 00:00:00
+2025-11-09 20:57:25,406 - INFO - Index frequency: 15min
+2025-11-09 20:57:25,408 - INFO - Data preprocessed. Shape: (35137, 20)
+2025-11-09 20:57:25,408 - INFO - Date range: 2024-01-01 00:00:00 to 2025-01-01 00:00:00
+2025-11-09 20:57:25,440 - INFO - Extracting data for country: CH
+2025-11-09 20:57:25,442 - WARNING - aFRR energy market data not available for CH. Setting to 0 (Model (i) will be limited).
+2025-11-09 20:57:25,443 - INFO - EV weighting disabled for CH: using w=1.0 (deterministic)
+2025-11-09 20:57:25,453 - INFO - Applied aFRR energy market preprocessing (0 prices -> NaN)
+2025-11-09 20:57:25,454 - INFO - Extracted 35137 data points for CH
+2025-11-09 20:57:25,454 - INFO - ================================================================================
+2025-11-09 20:57:25,454 - INFO - MPC SIMULATOR INITIALIZED
+2025-11-09 20:57:25,454 - INFO - ================================================================================
+2025-11-09 20:57:25,454 - INFO -   Optimizer: BESSOptimizerModelIII
+2025-11-09 20:57:25,454 - INFO -   Total data: 480 intervals (5.0 days)
+2025-11-09 20:57:25,454 - INFO -   Horizon: 32 hours (128 intervals)
+2025-11-09 20:57:25,454 - INFO -   Execution window: 24 hours (96 intervals)
+2025-11-09 20:57:25,454 - INFO -   Expected iterations: ~5
+2025-11-09 20:57:25,454 - INFO -   C-rate: 0.50
+2025-11-09 20:57:25,455 - INFO -   Validation: Disabled
+2025-11-09 20:57:25,455 - INFO - ================================================================================
+2025-11-09 20:57:25,455 - INFO - ================================================================================
+2025-11-09 20:57:25,455 - INFO - STARTING FULL-YEAR MPC SIMULATION
+2025-11-09 20:57:25,455 - INFO - ================================================================================
+2025-11-09 20:57:25,455 - INFO - Initial SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:25,455 - INFO - 
+2025-11-09 20:57:25,455 - INFO - \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+2025-11-09 20:57:25,455 - INFO - MPC Iteration 1 | Progress: 0.0% | Time step: 0 / 480
+2025-11-09 20:57:25,455 - INFO -   Horizon: [0, 128) | Execution: [0, 96)
+2025-11-09 20:57:25,455 - INFO -   Initial SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:25,455 - INFO -   Set battery_params['initial_soc_kwh'] = 2236.00 kWh for this iteration
+2025-11-09 20:57:25,455 - INFO - Building improved optimization model for C-rate=0.5, cycles=None
+2025-11-09 20:57:25,455 - INFO - Time horizon: 128 periods (32.0 hours)
+2025-11-09 20:57:25,455 - INFO - Blocks: 8 blocks
+2025-11-09 20:57:25,455 - INFO - Days: 2 days
+2025-11-09 20:57:25,455 - INFO - Validating input data...
+2025-11-09 20:57:25,456 - WARNING - Null values found: {'price_afrr_energy_pos': 128, 'price_afrr_energy_neg': 128}
+2025-11-09 20:57:25,456 - INFO - Input validation completed
+2025-11-09 20:57:25,471 - INFO - Enabled (Cst-11) Max Total AS Reservation Limit at 80%
+2025-11-09 20:57:25,473 - INFO - Improved optimization model built successfully
+2025-11-09 20:57:25,473 - INFO - Variables: 1200
+2025-11-09 20:57:25,473 - INFO - Constraints: 1856
+2025-11-09 20:57:25,474 - INFO - Added 10 SOC segments with costs: [0.0052, 0.0156, 0.026, 0.0364, 0.0469, 0.0573, 0.0677, 0.0781, 0.0885, 0.099]
+2025-11-09 20:57:25,475 - INFO - Added segment variables: 3,840 new variables
+2025-11-09 20:57:25,476 - INFO - Removed parent SOC dynamics constraint (Cst-1)
+2025-11-09 20:57:25,477 - INFO - Overriding (Cst-6) Energy Reserve constraints to link to segmented SOC Expression...
+2025-11-09 20:57:25,516 - INFO - Extended parent objective with cyclic aging cost (alpha=1.0000)
+2025-11-09 20:57:25,516 - INFO - Model (ii) build complete: 4,912 variables, 4,416 constraints
+2025-11-09 20:57:25,517 - INFO - Extending Model (ii) to Model (iii) with calendar aging...
+2025-11-09 20:57:25,517 - INFO - Added 768 calendar aging variables (5 SOS2 per timestep)
+2025-11-09 20:57:25,521 - INFO - Added 384 calendar aging constraints
+2025-11-09 20:57:25,521 - INFO - Extended objective function with calendar aging cost (alpha=1.0000)
+2025-11-09 20:57:25,521 - INFO - Model (iii) build complete:
+2025-11-09 20:57:25,521 - INFO -   - Variables: 5,680
+2025-11-09 20:57:25,521 - INFO -   - Constraints: 4,800
+2025-11-09 20:57:25,521 - INFO -   - Degradation: Cyclic (10 segments) + Calendar (5 breakpoints)
+2025-11-09 20:57:25,521 - INFO - \U0001f50d Detecting available optimization solver...
+2025-11-09 20:57:25,528 - INFO - \u2705 Using solver: CPLEX (commercial)
+================================================================================
+MPC 5-DAY TEST WITH VISUALIZATIONS
+================================================================================
+Start time: 2025-11-09 20:57:24
+
+Configuration:
+  country: CH
+  num_days: 5
+  horizon_hours: 32
+  execution_hours: 24
+  alpha: 1.0
+  c_rate: 0.5
+  initial_soc_fraction: 0.5
+
+Output directory: results/mpc_5day_test
+
+[1/5] Initializing Model III optimizer...
+[2/5] Loading Phase 1 data (CH)...
+  Data loaded: 480 timesteps (5.0 days)
+  Date range: 2024-01-01 00:00:00 to 2024-01-05 23:45:00
+
+[3/5] Running MPC simulation...
+2025-11-09 20:57:25,909 - INFO - Optimal solution found in 0.38 seconds
+2025-11-09 20:57:25,920 - INFO - Degradation cost breakdown:
+2025-11-09 20:57:25,920 - INFO -   - Cyclic aging: -0.00 EUR
+2025-11-09 20:57:25,920 - INFO -   - Calendar aging: 114.56 EUR
+2025-11-09 20:57:25,920 - INFO -   - Total degradation: 114.56 EUR
+2025-11-09 20:57:25,920 - INFO -   Solve status: optimal (0.38 seconds)
+2025-11-09 20:57:25,922 - INFO -   Window revenue: nan EUR (DA: 0.00, aFRR-E: nan, AS: 3706.11)
+2025-11-09 20:57:25,922 - INFO -   Window degradation: 85.92 EUR (Cyclic: -0.00, Calendar: 85.92)
+2025-11-09 20:57:25,922 - INFO - DEBUG: iter=1, t_exec=0, block_id=0, c_fcr=1.7888, c_afrr_pos=0.0000, c_afrr_neg=0.0000
+2025-11-09 20:57:25,922 - INFO - DEBUG: bid_row BEFORE update: {'timestep': 0, 'p_ch': 0.0, 'p_dis': 4.3200998334214094e-13, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2236.0}
+2025-11-09 20:57:25,922 - INFO - DEBUG: bid_row AFTER update: {'timestep': 0, 'p_ch': 0.0, 'p_dis': 4.3200998334214094e-13, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2236.0, 'c_fcr': 1.7888000000000002, 'c_afrr_pos': 0.0, 'c_afrr_neg': 0.0}
+2025-11-09 20:57:25,922 - INFO - 
+2025-11-09 20:57:25,922 - INFO - DEBUG: iter=1, t_exec=1, block_id=0, c_fcr=1.7888, c_afrr_pos=0.0000, c_afrr_neg=0.0000
+2025-11-09 20:57:25,922 - INFO - DEBUG: bid_row BEFORE update: {'timestep': 1, 'p_ch': 0.0, 'p_dis': 0.0, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2235.999999999999}
+2025-11-09 20:57:25,922 - INFO - DEBUG: bid_row AFTER update: {'timestep': 1, 'p_ch': 0.0, 'p_dis': 0.0, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2235.999999999999, 'c_fcr': 1.7888000000000002, 'c_afrr_pos': 0.0, 'c_afrr_neg': 0.0}
+2025-11-09 20:57:25,922 - INFO - 
+2025-11-09 20:57:25,922 - INFO - DEBUG: iter=1, t_exec=2, block_id=0, c_fcr=1.7888, c_afrr_pos=0.0000, c_afrr_neg=0.0000
+2025-11-09 20:57:25,922 - INFO - DEBUG: bid_row BEFORE update: {'timestep': 2, 'p_ch': 0.0, 'p_dis': 0.0, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2235.999999999999}
+2025-11-09 20:57:25,922 - INFO - DEBUG: bid_row AFTER update: {'timestep': 2, 'p_ch': 0.0, 'p_dis': 0.0, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2235.999999999999, 'c_fcr': 1.7888000000000002, 'c_afrr_pos': 0.0, 'c_afrr_neg': 0.0}
+2025-11-09 20:57:25,922 - INFO - 
+2025-11-09 20:57:25,923 - INFO -   Final SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:25,923 - INFO - 
+2025-11-09 20:57:25,923 - INFO - \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+2025-11-09 20:57:25,923 - INFO - MPC Iteration 2 | Progress: 20.0% | Time step: 96 / 480
+2025-11-09 20:57:25,923 - INFO -   Horizon: [96, 224) | Execution: [96, 192)
+2025-11-09 20:57:25,923 - INFO -   Initial SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:25,923 - INFO -   Set battery_params['initial_soc_kwh'] = 2236.00 kWh for this iteration
+2025-11-09 20:57:25,923 - INFO - Building improved optimization model for C-rate=0.5, cycles=None
+2025-11-09 20:57:25,923 - INFO - Time horizon: 128 periods (32.0 hours)
+2025-11-09 20:57:25,923 - INFO - Blocks: 8 blocks
+2025-11-09 20:57:25,923 - INFO - Days: 2 days
+2025-11-09 20:57:25,923 - INFO - Validating input data...
+2025-11-09 20:57:25,924 - WARNING - Null values found: {'price_afrr_energy_pos': 128, 'price_afrr_energy_neg': 128}
+2025-11-09 20:57:25,925 - INFO - Input validation completed
+2025-11-09 20:57:25,938 - INFO - Enabled (Cst-11) Max Total AS Reservation Limit at 80%
+2025-11-09 20:57:25,941 - INFO - Improved optimization model built successfully
+2025-11-09 20:57:25,941 - INFO - Variables: 1200
+2025-11-09 20:57:25,941 - INFO - Constraints: 1856
+2025-11-09 20:57:25,941 - INFO - Added 10 SOC segments with costs: [0.0052, 0.0156, 0.026, 0.0364, 0.0469, 0.0573, 0.0677, 0.0781, 0.0885, 0.099]
+2025-11-09 20:57:25,943 - INFO - Added segment variables: 3,840 new variables
+2025-11-09 20:57:25,943 - INFO - Removed parent SOC dynamics constraint (Cst-1)
+2025-11-09 20:57:25,944 - INFO - Overriding (Cst-6) Energy Reserve constraints to link to segmented SOC Expression...
+2025-11-09 20:57:25,961 - INFO - Extended parent objective with cyclic aging cost (alpha=1.0000)
+2025-11-09 20:57:25,962 - INFO - Model (ii) build complete: 4,912 variables, 4,416 constraints
+2025-11-09 20:57:25,962 - INFO - Extending Model (ii) to Model (iii) with calendar aging...
+2025-11-09 20:57:25,962 - INFO - Added 768 calendar aging variables (5 SOS2 per timestep)
+2025-11-09 20:57:25,993 - INFO - Added 384 calendar aging constraints
+2025-11-09 20:57:25,994 - INFO - Extended objective function with calendar aging cost (alpha=1.0000)
+2025-11-09 20:57:25,994 - INFO - Model (iii) build complete:
+2025-11-09 20:57:25,994 - INFO -   - Variables: 5,680
+2025-11-09 20:57:25,994 - INFO -   - Constraints: 4,800
+2025-11-09 20:57:25,994 - INFO -   - Degradation: Cyclic (10 segments) + Calendar (5 breakpoints)
+2025-11-09 20:57:25,994 - INFO - \U0001f50d Detecting available optimization solver...
+2025-11-09 20:57:25,994 - INFO - \u2705 Using solver: CPLEX (commercial)
+2025-11-09 20:57:26,361 - INFO - Optimal solution found in 0.37 seconds
+2025-11-09 20:57:26,371 - INFO - Degradation cost breakdown:
+2025-11-09 20:57:26,371 - INFO -   - Cyclic aging: -0.00 EUR
+2025-11-09 20:57:26,371 - INFO -   - Calendar aging: 114.56 EUR
+2025-11-09 20:57:26,371 - INFO -   - Total degradation: 114.56 EUR
+2025-11-09 20:57:26,371 - INFO -   Solve status: optimal (0.37 seconds)
+2025-11-09 20:57:26,373 - INFO -   Window revenue: nan EUR (DA: 0.00, aFRR-E: nan, AS: 3114.52)
+2025-11-09 20:57:26,373 - INFO -   Window degradation: 85.92 EUR (Cyclic: -0.00, Calendar: 85.92)
+2025-11-09 20:57:26,374 - INFO -   Final SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:26,374 - INFO - 
+2025-11-09 20:57:26,374 - INFO - \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+2025-11-09 20:57:26,374 - INFO - MPC Iteration 3 | Progress: 40.0% | Time step: 192 / 480
+2025-11-09 20:57:26,374 - INFO -   Horizon: [192, 320) | Execution: [192, 288)
+2025-11-09 20:57:26,374 - INFO -   Initial SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:26,374 - INFO -   Set battery_params['initial_soc_kwh'] = 2236.00 kWh for this iteration
+2025-11-09 20:57:26,374 - INFO - Building improved optimization model for C-rate=0.5, cycles=None
+2025-11-09 20:57:26,374 - INFO - Time horizon: 128 periods (32.0 hours)
+2025-11-09 20:57:26,374 - INFO - Blocks: 8 blocks
+2025-11-09 20:57:26,374 - INFO - Days: 2 days
+2025-11-09 20:57:26,374 - INFO - Validating input data...
+2025-11-09 20:57:26,375 - WARNING - Null values found: {'price_afrr_energy_pos': 128, 'price_afrr_energy_neg': 128}
+2025-11-09 20:57:26,375 - INFO - Input validation completed
+2025-11-09 20:57:26,389 - INFO - Enabled (Cst-11) Max Total AS Reservation Limit at 80%
+2025-11-09 20:57:26,391 - INFO - Improved optimization model built successfully
+2025-11-09 20:57:26,391 - INFO - Variables: 1200
+2025-11-09 20:57:26,391 - INFO - Constraints: 1856
+2025-11-09 20:57:26,391 - INFO - Added 10 SOC segments with costs: [0.0052, 0.0156, 0.026, 0.0364, 0.0469, 0.0573, 0.0677, 0.0781, 0.0885, 0.099]
+2025-11-09 20:57:26,393 - INFO - Added segment variables: 3,840 new variables
+2025-11-09 20:57:26,393 - INFO - Removed parent SOC dynamics constraint (Cst-1)
+2025-11-09 20:57:26,394 - INFO - Overriding (Cst-6) Energy Reserve constraints to link to segmented SOC Expression...
+2025-11-09 20:57:26,411 - INFO - Extended parent objective with cyclic aging cost (alpha=1.0000)
+2025-11-09 20:57:26,411 - INFO - Model (ii) build complete: 4,912 variables, 4,416 constraints
+2025-11-09 20:57:26,411 - INFO - Extending Model (ii) to Model (iii) with calendar aging...
+2025-11-09 20:57:26,412 - INFO - Added 768 calendar aging variables (5 SOS2 per timestep)
+2025-11-09 20:57:26,415 - INFO - Added 384 calendar aging constraints
+2025-11-09 20:57:26,415 - INFO - Extended objective function with calendar aging cost (alpha=1.0000)
+2025-11-09 20:57:26,415 - INFO - Model (iii) build complete:
+2025-11-09 20:57:26,415 - INFO -   - Variables: 5,680
+2025-11-09 20:57:26,415 - INFO -   - Constraints: 4,800
+2025-11-09 20:57:26,415 - INFO -   - Degradation: Cyclic (10 segments) + Calendar (5 breakpoints)
+2025-11-09 20:57:26,415 - INFO - \U0001f50d Detecting available optimization solver...
+2025-11-09 20:57:26,416 - INFO - \u2705 Using solver: CPLEX (commercial)
+2025-11-09 20:57:26,788 - INFO - Optimal solution found in 0.37 seconds
+2025-11-09 20:57:26,798 - INFO - Degradation cost breakdown:
+2025-11-09 20:57:26,798 - INFO -   - Cyclic aging: -0.00 EUR
+2025-11-09 20:57:26,798 - INFO -   - Calendar aging: 114.56 EUR
+2025-11-09 20:57:26,798 - INFO -   - Total degradation: 114.56 EUR
+2025-11-09 20:57:26,798 - INFO -   Solve status: optimal (0.37 seconds)
+2025-11-09 20:57:26,800 - INFO -   Window revenue: nan EUR (DA: 0.00, aFRR-E: nan, AS: 3015.92)
+2025-11-09 20:57:26,800 - INFO -   Window degradation: 85.92 EUR (Cyclic: -0.00, Calendar: 85.92)
+2025-11-09 20:57:26,800 - INFO -   Final SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:26,800 - INFO - 
+2025-11-09 20:57:26,800 - INFO - \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+2025-11-09 20:57:26,800 - INFO - MPC Iteration 4 | Progress: 60.0% | Time step: 288 / 480
+2025-11-09 20:57:26,800 - INFO -   Horizon: [288, 416) | Execution: [288, 384)
+2025-11-09 20:57:26,801 - INFO -   Initial SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:26,801 - INFO -   Set battery_params['initial_soc_kwh'] = 2236.00 kWh for this iteration
+2025-11-09 20:57:26,801 - INFO - Building improved optimization model for C-rate=0.5, cycles=None
+2025-11-09 20:57:26,801 - INFO - Time horizon: 128 periods (32.0 hours)
+2025-11-09 20:57:26,801 - INFO - Blocks: 8 blocks
+2025-11-09 20:57:26,801 - INFO - Days: 2 days
+2025-11-09 20:57:26,801 - INFO - Validating input data...
+2025-11-09 20:57:26,802 - WARNING - Null values found: {'price_afrr_energy_pos': 128, 'price_afrr_energy_neg': 128}
+2025-11-09 20:57:26,802 - INFO - Input validation completed
+2025-11-09 20:57:26,850 - INFO - Enabled (Cst-11) Max Total AS Reservation Limit at 80%
+2025-11-09 20:57:26,853 - INFO - Improved optimization model built successfully
+2025-11-09 20:57:26,853 - INFO - Variables: 1200
+2025-11-09 20:57:26,853 - INFO - Constraints: 1856
+2025-11-09 20:57:26,853 - INFO - Added 10 SOC segments with costs: [0.0052, 0.0156, 0.026, 0.0364, 0.0469, 0.0573, 0.0677, 0.0781, 0.0885, 0.099]
+2025-11-09 20:57:26,855 - INFO - Added segment variables: 3,840 new variables
+2025-11-09 20:57:26,855 - INFO - Removed parent SOC dynamics constraint (Cst-1)
+2025-11-09 20:57:26,856 - INFO - Overriding (Cst-6) Energy Reserve constraints to link to segmented SOC Expression...
+2025-11-09 20:57:26,873 - INFO - Extended parent objective with cyclic aging cost (alpha=1.0000)
+2025-11-09 20:57:26,873 - INFO - Model (ii) build complete: 4,912 variables, 4,416 constraints
+2025-11-09 20:57:26,873 - INFO - Extending Model (ii) to Model (iii) with calendar aging...
+2025-11-09 20:57:26,874 - INFO - Added 768 calendar aging variables (5 SOS2 per timestep)
+2025-11-09 20:57:26,877 - INFO - Added 384 calendar aging constraints
+2025-11-09 20:57:26,877 - INFO - Extended objective function with calendar aging cost (alpha=1.0000)
+2025-11-09 20:57:26,877 - INFO - Model (iii) build complete:
+2025-11-09 20:57:26,877 - INFO -   - Variables: 5,680
+2025-11-09 20:57:26,877 - INFO -   - Constraints: 4,800
+2025-11-09 20:57:26,878 - INFO -   - Degradation: Cyclic (10 segments) + Calendar (5 breakpoints)
+2025-11-09 20:57:26,878 - INFO - \U0001f50d Detecting available optimization solver...
+2025-11-09 20:57:26,878 - INFO - \u2705 Using solver: CPLEX (commercial)
+2025-11-09 20:57:27,418 - INFO - Optimal solution found in 0.54 seconds
+2025-11-09 20:57:27,429 - INFO - Degradation cost breakdown:
+2025-11-09 20:57:27,429 - INFO -   - Cyclic aging: -0.00 EUR
+2025-11-09 20:57:27,429 - INFO -   - Calendar aging: 114.56 EUR
+2025-11-09 20:57:27,429 - INFO -   - Total degradation: 114.56 EUR
+2025-11-09 20:57:27,429 - INFO -   Solve status: optimal (0.54 seconds)
+2025-11-09 20:57:27,431 - INFO -   Window revenue: nan EUR (DA: 0.00, aFRR-E: nan, AS: 3284.02)
+2025-11-09 20:57:27,431 - INFO -   Window degradation: 85.92 EUR (Cyclic: -0.00, Calendar: 85.92)
+2025-11-09 20:57:27,431 - INFO -   Final SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:27,431 - INFO - 
+2025-11-09 20:57:27,431 - INFO - \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+2025-11-09 20:57:27,431 - INFO - MPC Iteration 5 | Progress: 80.0% | Time step: 384 / 480
+2025-11-09 20:57:27,431 - INFO -   Horizon: [384, 480) | Execution: [384, 480)
+2025-11-09 20:57:27,432 - INFO -   Initial SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:27,432 - INFO -   Set battery_params['initial_soc_kwh'] = 2236.00 kWh for this iteration
+2025-11-09 20:57:27,432 - INFO - Building improved optimization model for C-rate=0.5, cycles=None
+2025-11-09 20:57:27,432 - INFO - Time horizon: 96 periods (24.0 hours)
+2025-11-09 20:57:27,432 - INFO - Blocks: 6 blocks
+2025-11-09 20:57:27,432 - INFO - Days: 1 days
+2025-11-09 20:57:27,432 - INFO - Validating input data...
+2025-11-09 20:57:27,433 - WARNING - Null values found: {'price_afrr_energy_pos': 96, 'price_afrr_energy_neg': 96}
+2025-11-09 20:57:27,433 - INFO - Input validation completed
+2025-11-09 20:57:27,444 - INFO - Enabled (Cst-11) Max Total AS Reservation Limit at 80%
+2025-11-09 20:57:27,446 - INFO - Improved optimization model built successfully
+2025-11-09 20:57:27,446 - INFO - Variables: 900
+2025-11-09 20:57:27,446 - INFO - Constraints: 1392
+2025-11-09 20:57:27,446 - INFO - Added 10 SOC segments with costs: [0.0052, 0.0156, 0.026, 0.0364, 0.0469, 0.0573, 0.0677, 0.0781, 0.0885, 0.099]
+2025-11-09 20:57:27,448 - INFO - Added segment variables: 2,880 new variables
+2025-11-09 20:57:27,448 - INFO - Removed parent SOC dynamics constraint (Cst-1)
+2025-11-09 20:57:27,448 - INFO - Overriding (Cst-6) Energy Reserve constraints to link to segmented SOC Expression...
+2025-11-09 20:57:27,498 - INFO - Extended parent objective with cyclic aging cost (alpha=1.0000)
+2025-11-09 20:57:27,498 - INFO - Model (ii) build complete: 3,684 variables, 3,312 constraints
+2025-11-09 20:57:27,498 - INFO - Extending Model (ii) to Model (iii) with calendar aging...
+2025-11-09 20:57:27,499 - INFO - Added 576 calendar aging variables (5 SOS2 per timestep)
+2025-11-09 20:57:27,501 - INFO - Added 288 calendar aging constraints
+2025-11-09 20:57:27,501 - INFO - Extended objective function with calendar aging cost (alpha=1.0000)
+2025-11-09 20:57:27,501 - INFO - Model (iii) build complete:
+2025-11-09 20:57:27,502 - INFO -   - Variables: 4,260
+2025-11-09 20:57:27,502 - INFO -   - Constraints: 3,600
+2025-11-09 20:57:27,502 - INFO -   - Degradation: Cyclic (10 segments) + Calendar (5 breakpoints)
+2025-11-09 20:57:27,502 - INFO - \U0001f50d Detecting available optimization solver...
+2025-11-09 20:57:27,502 - INFO - \u2705 Using solver: CPLEX (commercial)
+2025-11-09 20:57:28,022 - INFO - Optimal solution found in 0.52 seconds
+2025-11-09 20:57:28,030 - INFO - Degradation cost breakdown:
+2025-11-09 20:57:28,030 - INFO -   - Cyclic aging: -0.00 EUR
+2025-11-09 20:57:28,030 - INFO -   - Calendar aging: 85.92 EUR
+2025-11-09 20:57:28,030 - INFO -   - Total degradation: 85.92 EUR
+2025-11-09 20:57:28,030 - INFO -   Solve status: optimal (0.52 seconds)
+2025-11-09 20:57:28,033 - INFO -   Window revenue: nan EUR (DA: 0.00, aFRR-E: nan, AS: 2391.55)
+2025-11-09 20:57:28,033 - INFO -   Window degradation: 85.92 EUR (Cyclic: -0.00, Calendar: 85.92)
+2025-11-09 20:57:28,033 - INFO -   Final SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:28,033 - INFO - DEBUG: all_bids_list first 3 rows before DataFrame creation:
+2025-11-09 20:57:28,033 - INFO -   Row 0: {'timestep': 0, 'p_ch': 0.0, 'p_dis': 4.3200998334214094e-13, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2236.0, 'c_fcr': 1.7888000000000002, 'c_afrr_pos': 0.0, 'c_afrr_neg': 0.0}
+2025-11-09 20:57:28,033 - INFO -   Row 1: {'timestep': 1, 'p_ch': 0.0, 'p_dis': 0.0, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2235.999999999999, 'c_fcr': 1.7888000000000002, 'c_afrr_pos': 0.0, 'c_afrr_neg': 0.0}
+2025-11-09 20:57:28,033 - INFO -   Row 2: {'timestep': 2, 'p_ch': 0.0, 'p_dis': 0.0, 'p_afrr_pos_e': 0.0, 'p_afrr_neg_e': 0.0, 'e_soc': 2235.999999999999, 'c_fcr': 1.7888000000000002, 'c_afrr_pos': 0.0, 'c_afrr_neg': 0.0}
+2025-11-09 20:57:28,034 - INFO - DEBUG: DataFrame columns: ['timestep', 'p_ch', 'p_dis', 'p_afrr_pos_e', 'p_afrr_neg_e', 'e_soc', 'c_fcr', 'c_afrr_pos', 'c_afrr_neg']
+2025-11-09 20:57:28,034 - INFO - DEBUG: DataFrame first 3 rows c_fcr values: [1.7888000000000002, 1.7888000000000002, 1.7888000000000002]
+2025-11-09 20:57:28,034 - INFO - 
+2025-11-09 20:57:28,034 - INFO - ================================================================================
+2025-11-09 20:57:28,034 - INFO - MPC SIMULATION COMPLETE
+2025-11-09 20:57:28,034 - INFO - ================================================================================
+2025-11-09 20:57:28,034 - INFO -   Iterations completed: 5
+2025-11-09 20:57:28,034 - INFO -   Total revenue: nan EUR
+2025-11-09 20:57:28,034 - INFO -     - DA energy: 0.00 EUR
+2025-11-09 20:57:28,034 - INFO -     - aFRR energy: nan EUR
+2025-11-09 20:57:28,034 - INFO -     - AS capacity: 15512.12 EUR
+2025-11-09 20:57:28,034 - INFO -   Total degradation: 429.60 EUR
+2025-11-09 20:57:28,034 - INFO -     - Cyclic aging: -0.00 EUR
+2025-11-09 20:57:28,034 - INFO -     - Calendar aging: 429.60 EUR
+2025-11-09 20:57:28,034 - INFO -   Net profit: nan EUR
+2025-11-09 20:57:28,034 - INFO -   Final SOC: 2236.00 kWh (50.0%)
+2025-11-09 20:57:28,034 - INFO -   Annual bids DataFrame: 480 rows x 9 columns
+2025-11-09 20:57:28,034 - INFO - ================================================================================
+
+  Simulation completed in 2.58 seconds (0.04 minutes)
+
+[4/5] Extracting decision variables...
+  Saved decision variables: results/mpc_5day_test/decision_variables_5day.csv
+  Shape: (480, 16)
+  Columns: ['timestep', 'p_ch', 'p_dis', 'p_afrr_pos_e', 'p_afrr_neg_e', 'e_soc', 'c_fcr', 'c_afrr_pos', 'c_afrr_neg', 'timestamp', 'price_day_ahead', 'price_fcr', 'price_afrr_pos', 'price_afrr_neg', 'price_afrr_energy_pos', 'price_afrr_energy_neg']
+  Saved financial summary: results/mpc_5day_test/financial_summary.json
+
+[5/5] Creating visualizations...
+  [5.1] Day-Ahead Market plot...
+  [5.2] aFRR Energy Market plot...
+  [5.3] Capacity Markets plot...
+  [5.4] SOC and Power Bids plot...
+
+================================================================================
+TEST COMPLETE
+================================================================================
+
+Financial Summary:
+  Total Revenue:      nan EUR
+    - DA Energy:      0.00 EUR
+    - aFRR Energy:    nan EUR
+    - AS Capacity:    15512.12 EUR
+  Total Degradation:  429.60 EUR
+    - Cyclic:         -0.00 EUR
+    - Calendar:       429.60 EUR
+  Net Profit:         nan EUR
+
+SOC Trajectory:
+  Initial SOC:        2236.00 kWh (50.0%)
+  Final SOC:          2236.00 kWh (50.0%)
+  Iterations:         5
+
+Output Files:
+  Decision Variables: results/mpc_5day_test/decision_variables_5day.csv
+  Financial Summary:  results/mpc_5day_test/financial_summary.json
+
+Visualization Plots:
+  Day-Ahead Market: results/mpc_5day_test/da_market_price_bid.html
+  aFRR Energy Market: results/mpc_5day_test/afrr_energy_market_price_bid.html
+  Capacity Markets: results/mpc_5day_test/capacity_markets_price_bid.html
+  SOC and Power Bids: results/mpc_5day_test/soc_and_power_bids.html
+
+Runtime: 2.58 seconds (0.04 minutes)
+End time: 2025-11-09 20:57:29
+================================================================================

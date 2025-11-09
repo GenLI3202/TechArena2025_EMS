@@ -25,7 +25,15 @@
       "Bash(timeout 180 python:*)",
       "Bash(timeout 1200 python:*)",
       "Bash(timeout 2400 python week14_5day_test.py)",
-      "Bash(timeout 60 python:*)"
+      "Bash(timeout 60 python:*)",
+      "Bash(timeout 1800 python:*)",
+      "Bash(tee:*)",
+      "Bash(timeout 600 python:*)",
+      "Bash(timeout 300 python:*)",
+      "Bash(start resultsmodel_iii_validationhu_winter_48h_plotsafrr_energy_market_price_bid.html)",
+      "Bash(start \"results\\model_iii_validation\\hu_winter_36h_plots\\afrr_energy_market_price_bid.html\")",
+      "Bash(start \"results\\model_iii_validation\\hu_winter_36h_plots\\soc_and_power_bids.html\")",
+      "Bash(start resultsmpc_5day_testsoc_and_power_bids.html)"
     ],
     "deny": [],
     "ask": []

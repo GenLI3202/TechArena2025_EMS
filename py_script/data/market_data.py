@@ -1973,6 +1973,286 @@ def plot_da_price_distribution_mckinsey(
     return fig
 
 
+def plot_da_price_distribution_multi_country_mckinsey(
+    day_ahead_df: pd.DataFrame,
+    countries: list = None,
+    bins: int = 50
+) -> go.Figure:
+    """Plot day-ahead price distribution comparison across multiple countries.
+
+    Module B: Multi-Country Price Distribution (DA)
+
+    Creates overlaid histograms with KDE curves for comparing price distributions
+    across countries, using McKinsey styling.
+
+    Parameters
+    ----------
+    day_ahead_df : pd.DataFrame
+        Wide-format day-ahead data
+    countries : list, optional
+        List of country codes to compare (default: ['DE', 'AT', 'CH', 'HU', 'CZ'])
+    bins : int, optional
+        Number of histogram bins (default: 50)
+
+    Returns
+    -------
+    go.Figure
+        Overlaid histograms with KDE curves
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_da_price_distribution_multi_country_mckinsey(tables['day_ahead'])
+    >>> fig.show()
+    """
+    from visualization.config import COUNTRY_COLORS, apply_mckinsey_style, get_country_color
+    import numpy as np
+    from scipy import stats
+
+    if countries is None:
+        countries = ['DE', 'AT', 'CH', 'HU', 'CZ']
+
+    fig = go.Figure()
+
+    # Add histogram and KDE for each country
+    for country in countries:
+        country_col = 'DE_LU' if country == 'DE' else country
+
+        if country_col not in day_ahead_df.columns:
+            print(f"Warning: Country {country} not found, skipping")
+            continue
+
+        prices = day_ahead_df[country_col].dropna()
+        color = get_country_color(country)
+
+        # Histogram (semi-transparent)
+        fig.add_trace(go.Histogram(
+            x=prices,
+            nbinsx=bins,
+            name=f'{country} (Histogram)',
+            marker_color=color,
+            opacity=0.3,
+            showlegend=False,
+            hovertemplate=f'{country}<br>Price: %{{x:.2f}} EUR/MWh<br>Count: %{{y}}<extra></extra>'
+        ))
+
+        # KDE overlay (prominent line)
+        try:
+            kde = stats.gaussian_kde(prices)
+            x_range = np.linspace(prices.min(), prices.max(), 200)
+            kde_values = kde(x_range)
+
+            # Scale KDE to match histogram height approximately
+            kde_scaled = kde_values * len(prices) * (prices.max() - prices.min()) / bins
+
+            fig.add_trace(go.Scatter(
+                x=x_range,
+                y=kde_scaled,
+                mode='lines',
+                name=f'{country}',
+                line=dict(color=color, width=2.5),
+                hovertemplate=f'{country}<br>Price: %{{x:.2f}} EUR/MWh<extra></extra>'
+            ))
+        except Exception as e:
+            print(f"Warning: Could not compute KDE for {country}: {e}")
+
+    # Apply McKinsey styling
+    fig = apply_mckinsey_style(
+        fig,
+        title='Day-Ahead Price Distribution - Multi-Country Comparison'
+    )
+
+    fig.update_layout(
+        xaxis_title='Price (EUR/MWh)',
+        yaxis_title='Frequency',
+        barmode='overlay',  # Overlay histograms
+        height=500,
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99
+        )
+    )
+
+    return fig
+
+
+def plot_da_price_ridgeline_mckinsey(
+    day_ahead_df: pd.DataFrame,
+    countries: list = None,
+    bins: int = 100
+):
+    """Plot day-ahead price distribution as ridgeline plot (joy plot) with McKinsey styling.
+
+    Module B: Multi-Country Price Distribution (Ridgeline)
+
+    Creates a ridgeline (joy plot) visualization using matplotlib showing 
+    overlapping KDE curves for comparing price distributions across countries. 
+    This format provides better visual separation than overlaid histograms.
+
+    Parameters
+    ----------
+    day_ahead_df : pd.DataFrame
+        Wide-format day-ahead data
+    countries : list, optional
+        List of country codes to compare (default: ['DE', 'AT', 'CH', 'HU', 'CZ'])
+    bins : int, optional
+        Number of points for KDE calculation (default: 100)
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Ridgeline plot with vertically offset KDE curves
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_da_price_ridgeline_mckinsey(tables['day_ahead'])
+    >>> fig.show()  # or plt.show()
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as mcolors
+    from visualization.config import COUNTRY_COLORS, get_country_color
+    import numpy as np
+    from scipy import stats
+
+    if countries is None:
+        countries = ['DE', 'AT', 'CH', 'HU', 'CZ']
+
+    # Prepare data
+    all_prices = []
+    kde_data = []
+    
+    for country in countries:
+        country_col = 'DE_LU' if country == 'DE' else country
+        
+        if country_col not in day_ahead_df.columns:
+            print(f"Warning: Country {country} not found, skipping")
+            continue
+            
+        prices = day_ahead_df[country_col].dropna()
+        
+        if len(prices) < 10:
+            print(f"Warning: Insufficient data for {country}, skipping")
+            continue
+            
+        all_prices.extend(prices.values)
+        kde_data.append({
+            'country': country,
+            'prices': prices.values,
+            'mean': prices.mean(),
+            'color': get_country_color(country)
+        })
+    
+    if not kde_data:
+        raise ValueError("No valid data found for specified countries")
+    
+    # Calculate global x range
+    x_min, x_max = np.percentile(all_prices, [1, 99])
+    x = np.linspace(x_min, x_max, bins)
+    
+    # Create figure with McKinsey styling
+    fig, ax = plt.subplots(figsize=(14, 8))
+    
+    # McKinsey color palette - convert hex to RGB
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16)/255 for i in (0, 2, 4))
+    
+    # Plot each country's distribution
+    vertical_spacing = 0.05  # Spacing as fraction of max density
+    
+    for idx, data in enumerate(kde_data):
+        # Calculate KDE
+        kde = stats.gaussian_kde(data['prices'])
+        density = kde(x)
+        
+        # Normalize to 0-1 range for consistent height
+        density_norm = density / density.max()
+        
+        # Vertical offset
+        y_offset = idx * vertical_spacing
+        y = density_norm + y_offset
+        
+        # Get color
+        color_hex = data['color']
+        color_rgb = hex_to_rgb(color_hex)
+        
+        # Plot filled curve
+        ax.fill_between(x, y_offset, y, 
+                        alpha=0.7, 
+                        color=color_rgb,
+                        linewidth=0)
+        
+        # Plot outline
+        ax.plot(x, y, 
+               color=color_rgb, 
+               linewidth=2.5,
+               solid_capstyle='round')
+        
+        # Plot baseline
+        ax.plot(x, np.full_like(x, y_offset), 
+               color=color_rgb, 
+               linewidth=1.5, 
+               alpha=0.5)
+        
+        # Add mean line
+        mean_val = data['mean']
+        density_at_mean = kde(mean_val)[0] / kde(x).max()
+        ax.plot([mean_val, mean_val], 
+               [y_offset, y_offset + density_at_mean * 0.7],
+               color=color_rgb,
+               linewidth=2.5,
+               linestyle='--',
+               alpha=0.8)
+        
+        # Add country label
+        ax.text(x_min - (x_max - x_min) * 0.02, 
+               y_offset + 0.4,
+               data['country'],
+               fontsize=14,
+               fontweight='bold',
+               color=color_rgb,
+               ha='right',
+               va='center',
+               family='sans-serif')
+    
+    # Styling
+    ax.set_xlim(x_min - (x_max - x_min) * 0.05, x_max + (x_max - x_min) * 0.02)
+    ax.set_ylim(-0.01, len(kde_data) * vertical_spacing + 1.1)
+    
+    # Remove y-axis
+    ax.set_yticks([])
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    
+    # X-axis styling
+    ax.set_xlabel('Price (EUR/MWh)', fontsize=12, fontweight='bold', family='sans-serif')
+    ax.spines['bottom'].set_linewidth(1.5)
+    ax.tick_params(axis='x', labelsize=11, length=6, width=1.5)
+    
+    # Title
+    ax.set_title('Day-Ahead Price Distribution - Multi-Country Comparison',
+                fontsize=16, fontweight='bold', pad=20, family='sans-serif')
+    
+    # Grid
+    ax.grid(axis='x', alpha=0.3, linewidth=0.8, linestyle='-')
+    ax.set_axisbelow(True)
+    
+    # Background
+    ax.set_facecolor('white')
+    fig.patch.set_facecolor('white')
+    
+    # Tight layout
+    plt.tight_layout()
+    
+    return fig
+
+
 def plot_da_price_heatmap_mckinsey(
     day_ahead_df: pd.DataFrame,
     country: str

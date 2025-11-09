@@ -1,0 +1,27 @@
+{
+  "country": "HU",
+  "horizon_hours": 36,
+  "horizon_steps": 144,
+  "start_step": 0,
+  "end_step": 144,
+  "alpha": 0.5,
+  "max_as_ratio": 0.8,
+  "optimization": {
+    "status": "optimal",
+    "objective_value": 1037.1317139757723,
+    "build_time_seconds": 0.07903337478637695,
+    "solve_time_seconds": 1.4583790302276611,
+    "total_time_seconds": 1.537412405014038,
+    "n_variables": 6390,
+    "n_constraints": 5370
+  },
+  "bess_config": {
+    "capacity_kwh": 4472,
+    "efficiency": 0.95,
+    "soc_min": 0,
+    "soc_max": 1,
+    "initial_soc": 0.5,
+    "daily_cycle_limit": null
+  },
+  "timestamp": "2025-11-09T18:20:44.402966"
+}

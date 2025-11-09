@@ -1,0 +1,76 @@
+{
+  "horizon_hours": 24,
+  "country": "CH",
+  "alpha": 0.5,
+  "max_fcr_ratio": 1.0,
+  "max_as_ratio": 0.8,
+  "configuration": [
+    "Cst-6 bug fixed (energy reserve)",
+    "Cst-10 REMOVED (no FCR capacity limit)",
+    "Cst-11 Max total AS capacity (80%)",
+    "Alpha = 0.5 (reduced degradation)",
+    "Balanced aFRR activation scenario"
+  ],
+  "solve_time_seconds": 0.4561126232147217,
+  "status": "optimal",
+  "objective_value": 5864.997102676008,
+  "da_intervals": {
+    "charge": 0,
+    "discharge": 0,
+    "total": 0,
+    "percentage": 0.0
+  },
+  "as_intervals": {
+    "fcr": 32,
+    "afrr_pos": 0,
+    "afrr_neg": 0
+  },
+  "max_capacities": {
+    "fcr_mw": 1.7888000000000002,
+    "total_as_mw": 1.7888000000000002
+  },
+  "revenue": {
+    "da": 0.0,
+    "afrr_energy": 4496.219183832914,
+    "as_capacity": 1568.41984,
+    "total": 6064.639023832913
+  },
+  "degradation": {
+    "total_cyclic_cost_eur": 327.4200931646221,
+    "equivalent_full_cycles": 3.555921052631579,
+    "total_throughput_kwh": 15902.078947368422,
+    "throughput_per_segment_kwh": {
+      "1": 5361.450774304181,
+      "2": 4414.962975860705,
+      "3": 2645.4284194037728,
+      "4": 1417.5739694631318,
+      "5": 1051.715990634481,
+      "6": 719.2580958976389,
+      "7": 291.68872180451115,
+      "8": 0.0,
+      "9": 0.0,
+      "10": 0.0
+    },
+    "cost_per_segment_eur": {
+      "1": 27.87954402638174,
+      "2": 68.873422423427,
+      "3": 68.78113890449809,
+      "4": 51.599692488458,
+      "5": 49.32547996075715,
+      "6": 41.213488894934706,
+      "7": 19.747326466165404,
+      "8": 0.0,
+      "9": 0.0,
+      "10": 0.0
+    },
+    "average_dod": 3.555921052631579,
+    "alpha": 0.5,
+    "total_calendar_cost_eur": 71.86374914918875,
+    "total_degradation_cost_eur": 399.28384231381085,
+    "cost_breakdown": {
+      "cyclic_eur": 327.4200931646221,
+      "calendar_eur": 71.86374914918875,
+      "total_eur": 399.28384231381085
+    }
+  }
+}

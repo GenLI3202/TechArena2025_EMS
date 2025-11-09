@@ -145,7 +145,7 @@ Where:
 \end{equation}
 
 \begin{equation}
-\mathbb{P}^{ANCI} = \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, \Delta b
+\mathbb{P}^{ANCI} = \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, 
 \end{equation}
 
 \begin{itemize}
@@ -158,7 +158,7 @@ Where:
   \end{itemize}
   \item The second term $\mathbb{P}^{ANCI}$ is ancillary service capacity profit.
   \begin{itemize}
-    \item Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW/h (hourly rates). Multiplying by $\Delta b = 4$ hours yields EUR per block.
+    % \item Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW/h (hourly rates). Multiplying by $\Delta b = 4$ hours yields EUR per block.
   \end{itemize}
 \end{itemize}
 
@@ -333,6 +333,10 @@ Based on the methodology from Xu et al. (2017), we model cyclic aging as a \text
     \item \textbf{Logic:} The marginal cost $c^{\mathrm{cost}}_{j}$ increases as $j$ increases (deeper discharge), e.g., $c_1 < c_2 < ... < c_J$. The optimizer will naturally prefer to discharge from the "cheapest" (shallowest) available segment first, perfectly modeling the non-linear cost of deep discharges in a linear framework.
 \end{itemize}
 
+Additionally, to enforce the physical stack-like behavior of the segments, a simple monotonic ordering constraint is added. This ensures that a deeper segment (e.g., $j+1$) can only hold energy if the shallower segment above it ($j$) is full. This is a linear, non-binary alternative to the complex cascading constraints discussed in Section 4.8.
+\begin{align}
+    e_{\mathrm{soc},j}(t) &\ge e_{\mathrm{soc},j+1}(t) & \forall t, \forall j \in \{1, ..., J-1\}
+\end{align}
 
 \subsubsection{Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
 The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
@@ -402,7 +406,7 @@ The EV model introduces a set of time-dependent parameters, denoted as $w^{\math
 \end{align}
 By weighting the aFRR energy market bids with these probabilities, the model can make a more rational economic decision. For example, a high-priced aFRR bid with a low activation probability may be correctly evaluated as less profitable than a lower-priced but certain DA market bid. This modification is implemented through a minor adjustments to the objective function. The power bid variables, $p^{\mathrm{pos}}_{aFRR,E}(t)$ and $p^{\mathrm{neg}}_{aFRR,E}(t)$, are multiplied by their respective activation probabilities, $w^{\mathrm{pos}}_t$ and $w^{\mathrm{neg}}_t$:
 \begin{equation}
-\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{pos}}_{aFRR, E}(t) \cdot w_t^{\mathrm{pos}}) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{neg}}_{aFRR, E}(t) \cdot w_t^{\mathrm{neg}}) \right)\, \Delta t
+\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{pos}}_{aFRR, E}(t) \cdot w_t^{\mathrm{pos}}) + \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{neg}}_{aFRR, E}(t) \cdot w_t^{\mathrm{neg}}) \right)\, \Delta t
 \end{equation}
 
 
@@ -416,7 +420,8 @@ Based on Collath et al. (2023), calendar aging is a non-linear function of the a
     $$ e_{\mathrm{soc}}(t) = \sum_{i \in I} \lambda_{t,i} \cdot SOC^{\mathrm{point}}_i \quad | \quad c^{\mathrm{cal}}_{\mathrm{cost}}(t) = \sum_{i \in I} \lambda_{t,i} \cdot Cost^{\mathrm{point}}_i $$
     $$ \sum_{i \in I} \lambda_{t,i} = 1 \quad | \quad \{\lambda_{t,i}\} \text{ are SOS2 variables} $$
 \end{itemize}
-This formulation directly penalizes holding the battery at high SOC, as prioritized in the project description.
+This formulation directly penalizes holding the battery at high SOC, as prioritized in the project description. 
+
 
 \subsubsection{Calculation of the Calendar Aging Breakpoints}
 The breakpoints for the SOS2 linearization are derived from the "scaled" model presented in Collath et al. (2023), specifically from Figure 3. This approach uses a fixed linearization point (representing a mid-life aging state) for the entire BESS lifetime to better optimize for Net Present Value (NPV). The costs are monetized using the project's BESS investment cost.
@@ -472,8 +477,8 @@ The objective is to maximize the total profit, defined as market revenues minus 
 Where:
 \begin{align}
 \mathbb{P}^{DA} &= \sum_{t\in T} \left( \frac{P_{DA}(t)}{1000}\, p_{\mathrm{dis}}(t) - \frac{P_{DA}(t)}{1000}\, p_{\mathrm{ch}}(t) \right)\, \Delta t \\
-\mathbb{P}^{ANCI} &= \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, \Delta b \\
-\mathbb{P}^{aFRR\_E} &= \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t \\
+\mathbb{P}^{ANCI} &= \sum_{b\in B} \Big( P_{FCR}(b)\, c_{fcr}(b) + P^{\mathrm{pos}}_{aFRR}(b)\, c^{\mathrm{pos}}_{aFRR}(b) + P^{\mathrm{neg}}_{aFRR}(b)\, c^{\mathrm{neg}}_{aFRR}(b) \Big)\, \\
+\mathbb{P}^{aFRR\_E} &= \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{pos}}_{aFRR, E}(t) \cdot w_t^{\mathrm{pos}}) + \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{neg}}_{aFRR, E}(t) \cdot w_t^{\mathrm{neg}}) \right)\, \Delta t \\
 C^{\mathrm{cyc}} &= \sum_{t \in T} \sum_{j \in J} \left( c^{\mathrm{cost}}_{j} \cdot \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \cdot \Delta t \right) \\
 C^{\mathrm{cal}} &= \sum_{t \in T} c^{\mathrm{cal}}_{\mathrm{cost}}(t) \cdot \Delta t
 \end{align}
@@ -493,7 +498,8 @@ p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{
 \subsubsection{SOC \& Segment Limits (Replaces Cst-2)}
 \begin{align}
 SOC_{\min}\,E_{\mathrm{nom}} &\le e_{\mathrm{soc}}(t) \le SOC_{\max}\,E_{\mathrm{nom}} & \forall t \\
-0 &\le e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} & \forall t, \forall j
+0 &\le e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} & \forall t, \forall j \\
+e_{\mathrm{soc},j}(t) &\ge e_{\mathrm{soc},j+1}(t) & \forall t, \forall j \in \{1, ..., J-1\}
 \end{align}
 
 \subsubsection{Simultaneous Operation Prevention (Replaces Cst-3)}
@@ -538,12 +544,19 @@ p^{\mathrm{total}}_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_
 \end{align}
 \textit{(Similar min/max bid constraints for $c_{fcr}$, $c^{\mathrm{pos}}_{aFRR}$, $c^{\mathrm{neg}}_{aFRR}$ remain from Phase I)}
 
-\subsubsection{Calendar Aging PWL Constraints (New)}
+\subsubsection{Calendar Aging PWL Constraints (New, Cst-10)}
 \begin{align}
     e_{\mathrm{soc}}(t) &= \sum_{i \in I} \lambda_{t,i} \cdot SOC^{\mathrm{point}}_i & \forall t \\
     c^{\mathrm{cal}}_{\mathrm{cost}}(t) &= \sum_{i \in I} \lambda_{t,i} \cdot Cost^{\mathrm{point}}_i & \forall t \\
     \sum_{i \in I} \lambda_{t,i} &= 1 & \forall t \\
     \{\lambda_{t,i}\}_{i \in I} &\text{ are SOS2 variables} & \forall t
+\end{align}
+
+\subsubsection{Total Ancillary Service Capacity Limit (New)}
+\textit{(New constraint based on optimizer.py Cst-11)}
+To prevent the model from reserving 100\% of its power rating for ancillary services (which would block all energy market arbitrage), a cap is introduced. This constraint ensures that the total reserved capacity in any block $b$ does not exceed a ratio $\rho_{as\_max}$ (e.g., 0.8 for 80\%) of the BESS's power rating.
+\begin{align}
+    c_{fcr}(b) + c^{\mathrm{pos}}_{aFRR}(b) + c^{\mathrm{neg}}_{aFRR}(b) \le \rho_{as\_max} \cdot \frac{P^{\mathrm{config}}_{\max}}{1000} \qquad \forall b \in B
 \end{align}
 
 

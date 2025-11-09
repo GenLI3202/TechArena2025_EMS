@@ -1,0 +1,36 @@
+{
+  "horizon_hours": 24,
+  "country": "CH",
+  "alpha": 1.5,
+  "min_da_participation_ratio": 0.1,
+  "max_as_capacity_ratio": 0.8,
+  "fixes_applied": [
+    "Cst-6 bug fixed",
+    "Cst-10 Min DA participation",
+    "Cst-11 Max AS capacity"
+  ],
+  "solve_time_seconds": 0.5263528823852539,
+  "status": "optimal",
+  "objective_value": 5542.534201277727,
+  "da_intervals": {
+    "charge": 0,
+    "discharge": 1,
+    "total": 1,
+    "percentage": 1.0416666666666665
+  },
+  "as_intervals": {
+    "fcr": 48,
+    "afrr_pos": 0,
+    "afrr_neg": 0
+  },
+  "max_capacities": {
+    "fcr_mw": 1.7888000000000006,
+    "total_as_mw": 1.7888000000000006
+  },
+  "revenue": {
+    "da": 2.5704000000000007,
+    "afrr_energy": 3877.9413053566745,
+    "as_capacity": 2086.4563200000002,
+    "total": 5966.968025356675
+  }
+}

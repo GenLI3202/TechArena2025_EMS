@@ -518,8 +518,8 @@ class BESSOptimizerModelI:
                               doc="Day-ahead price (EUR/MWh)")
 
         # PHASE II Model (i): aFRR energy prices indexed by time (vary every 15 min)
-        afrr_energy_pos_prices = {t: float(country_data['price_afrr_energy_pos'].iloc[t]) for t in T_data}
-        afrr_energy_neg_prices = {t: float(country_data['price_afrr_energy_neg'].iloc[t]) for t in T_data}
+        afrr_energy_pos_prices = {t: float(country_data['price_afrr_energy_pos'].iloc[t]) if not pd.isna(country_data['price_afrr_energy_pos'].iloc[t]) else 0 for t in T_data}
+        afrr_energy_neg_prices = {t: float(country_data['price_afrr_energy_neg'].iloc[t]) if not pd.isna(country_data['price_afrr_energy_neg'].iloc[t]) else 0 for t in T_data}
         model.P_aFRR_E_pos = pyo.Param(model.T, initialize=afrr_energy_pos_prices,
                                       doc="aFRR energy positive price (EUR/MWh) - Phase II Model (i)")
         model.P_aFRR_E_neg = pyo.Param(model.T, initialize=afrr_energy_neg_prices,
@@ -612,6 +612,22 @@ class BESSOptimizerModelI:
         # CONSTRAINTS (Ordered to match documentation structure)
         # ============================================================================
 
+        # Cst-0: Prevent bidding in non-activated aFRR energy markets
+        ## REMARK: the aFRR-E neg data is expected to be preprocessed such that all 0 `aFRR-E pos` prices are set as `NA` . 
+        def no_bid_if_no_afrr_pos_activation_rule(model, t):
+            if pd.isna(country_data['price_afrr_energy_pos'].iloc[t]):
+                return model.p_afrr_pos_e[t] == 0
+            return pyo.Constraint.Skip
+        model.no_bid_if_no_afrr_pos_activation = pyo.Constraint(model.T, rule=no_bid_if_no_afrr_pos_activation_rule,
+                                                                doc="Force no aFRR+ energy bid if market not activated")
+
+        def no_bid_if_no_afrr_neg_activation_rule(model, t):
+            if pd.isna(country_data['price_afrr_energy_neg'].iloc[t]):
+                return model.p_afrr_neg_e[t] == 0
+            return pyo.Constraint.Skip
+        model.no_bid_if_no_afrr_neg_activation = pyo.Constraint(model.T, rule=no_bid_if_no_afrr_neg_activation_rule,
+                                                                doc="Force no aFRR- energy bid if market not activated")
+
         # PHASE II Model (i): Total Power Definition Constraints (NEW)
         # Define total charge/discharge power as sum of DA and aFRR energy markets
         def total_ch_def_rule(model, t):
@@ -703,35 +719,64 @@ class BESSOptimizerModelI:
             return model.y_fcr[b] + model.y_afrr_pos[b] + model.y_afrr_neg[b] <= 1
         model.as_market_exclusivity = pyo.Constraint(model.B, rule=as_market_exclusivity_rule)
 
-        # --- COMMENTED OUT Cst-8: Cross-Market Mutual Exclusivity (Surgical Optimization V4) ---
-        # REASON: These 2 constraints depend on y_total_ch and y_total_dis binaries (commented above).
-        # REDUNDANCY: Cross-market conflicts are already handled by:
-        # - Cst-4 power limits prevent over-commitment (p_total + reserves ≤ P_max)
-        # - Cst-7 AS market exclusivity (can't bid FCR + aFRR simultaneously)
-        # - Objective function ensures economically optimal market selection
-        # Removing these saves 2T constraints, further reducing MILP complexity.
+        # ============================================================================
+        # NEW CONSTRAINTS: Market Participation Limits (Added 2025-11-09)
+        # These constraints prevent unrealistic over-reliance on single markets
+        # ============================================================================
+
+        # --- (Cst-10): DELETED per user request (2025-11-09) ---
+        # User feedback: "Delete cst-10, the cap on FCR, this does not match the real world case"
+        # Original constraint limited FCR capacity to 50% of total power
+        # Removal allows model to freely optimize FCR allocation based on economics
+        # --- END DELETED CONSTRAINT ---
+
+        # (Cst-11): Total AS Capacity Upper Limit
+        # Enforces maximum capacity reservation across all AS markets (FCR + aFRR)
+        # This ensures some power remains available for energy market arbitrage
+        model.max_as_ratio = pyo.Param(initialize=getattr(self, 'max_as_ratio', 0.8),
+                                       doc="Maximum total AS reservation as fraction of power (default 80%)")
+
+        if pyo.value(model.max_as_ratio) < 1.0:
+            def max_as_reservation_rule(model, b):
+                # Total AS capacity (FCR + aFRR+ + aFRR-) must be less than Y% of total power
+                total_reserved_capacity_mw = model.c_fcr[b] + model.c_afrr_pos[b] + model.c_afrr_neg[b]
+                max_allowed_capacity_mw = model.max_as_ratio * (model.P_max_config / 1000.0)
+                return total_reserved_capacity_mw <= max_allowed_capacity_mw
+
+            model.max_as_reservation = pyo.Constraint(
+                model.B, rule=max_as_reservation_rule,
+                doc=f"(Cst-11) Enforce max total AS reservation at {pyo.value(model.max_as_ratio)*100:.0f}%"
+            )
+            logger.info("Enabled (Cst-11) Max Total AS Reservation Limit at %.0f%%",
+                       pyo.value(model.max_as_ratio) * 100)
+        # ============================================================================
+
+        # --- RE-ENABLED Cst-8: Cross-Market Mutual Exclusivity (Fix for Validation Violations) ---
+        # REASON: Validation showed 142 violations when commented out. Cst-4 and Cst-7 are NOT sufficient.
+        # CRITICAL: These constraints prevent physical impossibility - can't discharge AND hold reserves.
+        # Binary variables must enforce: y_total_dis + y_fcr + y_afrr_neg ≤ 1 (only one action at a time)
+        # Cost: Adds 2T constraints but ensures solution feasibility.
         # --- END COMMENT ---
-        # # Cst-8: Cross-Market Mutual Exclusivity - UPDATED for Model (i)
-        # # y_total_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no total discharge with charging AS)
-        # # y_total_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no total charge with discharging AS)
-        # def cross_market_exclusivity_rule_1(model, t):
-        #     block = model.block_map[t]
-        #     return model.y_total_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
-        # model.cross_market_exclusivity1 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_1)
 
-        # def cross_market_exclusivity_rule_2(model, t):
-        #     block = model.block_map[t]
-        #     return model.y_total_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
-        # model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2)
+        # Cst-8: Cross-Market Mutual Exclusivity - UPDATED for Model (i)
+        # y_total_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no discharge with charging AS reserves)
+        # y_total_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no charge with discharging AS reserves)
+        def cross_market_exclusivity_rule_1(model, t):
+            block = model.block_map[t]
+            return model.y_total_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
+        model.cross_market_exclusivity1 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_1,
+                                                         doc="Cst-8a: Prevent discharge + charging AS reserves")
 
-        # --- COMMENTED OUT Cst-9: DA Energy MinBid Constraints (Surgical Optimization V4) ---
-        # REASON: These 4 constraints enforce 0.1 MW minimum bid for DA energy market using y_ch/y_dis binaries.
-        # NON-CRITICAL: The 0.1 MW (100 kW) MinBid is very small compared to:
-        # - Battery capacity: 4,472 kWh
-        # - Typical C-rate power: 2,236 kW (C=0.5) to 1,491 kW (C=0.33)
-        # - Capacity market MinBids: 1.0 MW (10x larger, enforced with B-indexed binaries below)
-        # COST-BENEFIT: Removing 4T constraints is more valuable than enforcing this minor rule.
-        # The optimizer naturally avoids tiny bids due to transaction costs implicit in market behavior.
+        def cross_market_exclusivity_rule_2(model, t):
+            block = model.block_map[t]
+            return model.y_total_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
+        model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2,
+                                                         doc="Cst-8b: Prevent charge + discharging AS reserves")
+
+        # --- COMMENTED OUT Cst-9: DA Energy MinBid Constraints (REQUIRES y_ch/y_dis binaries) ---
+        # REASON: These 4 constraints require y_ch/y_dis binaries which are commented out (lines 586-588).
+        # DEPENDENCY ISSUE: Cannot enforce MinBid for DA energy without separate DA binaries.
+        # RESOLUTION: Keep commented unless y_ch/y_dis binaries are re-enabled.
         # --- END COMMENT ---
         # # Cst-9: Minimum and Maximum Bid Size Constraints
         # # DA Energy Bids: y(t)*MinBid*1000 ≤ p(t) ≤ y(t)*P_max_config
@@ -752,39 +797,42 @@ class BESSOptimizerModelI:
         # model.da_dis_max_bid = pyo.Constraint(model.T, rule=da_dis_max_bid_rule)
 
         # FCR Capacity Bids: y(b)*MinBid ≤ c(b) ≤ y(b)*P_max_config/1000
+        # NOTE: These are ACTIVE - AS capacity MinBid constraints use block-indexed binaries which DO exist
         def fcr_min_bid_rule(model, b):
             return model.c_fcr[b] >= model.y_fcr[b] * model.min_bid_fcr
-        model.fcr_min_bid = pyo.Constraint(model.B, rule=fcr_min_bid_rule)
+        model.fcr_min_bid = pyo.Constraint(model.B, rule=fcr_min_bid_rule,
+                                          doc="Cst-9i: FCR minimum bid size (1.0 MW)")
 
         def fcr_max_bid_rule(model, b):
             return model.c_fcr[b] <= model.y_fcr[b] * (model.P_max_config / 1000)
-        model.fcr_max_bid = pyo.Constraint(model.B, rule=fcr_max_bid_rule)
+        model.fcr_max_bid = pyo.Constraint(model.B, rule=fcr_max_bid_rule,
+                                          doc="Cst-9j: FCR maximum bid size")
 
         # aFRR Capacity Bids: y(b)*MinBid ≤ c(b) ≤ y(b)*P_max_config/1000
         def afrr_pos_min_bid_rule(model, b):
             return model.c_afrr_pos[b] >= model.y_afrr_pos[b] * model.min_bid_afrr
-        model.afrr_pos_min_bid = pyo.Constraint(model.B, rule=afrr_pos_min_bid_rule)
+        model.afrr_pos_min_bid = pyo.Constraint(model.B, rule=afrr_pos_min_bid_rule,
+                                                doc="Cst-9k: aFRR+ capacity minimum bid size (1.0 MW)")
 
         def afrr_pos_max_bid_rule(model, b):
             return model.c_afrr_pos[b] <= model.y_afrr_pos[b] * (model.P_max_config / 1000)
-        model.afrr_pos_max_bid = pyo.Constraint(model.B, rule=afrr_pos_max_bid_rule)
+        model.afrr_pos_max_bid = pyo.Constraint(model.B, rule=afrr_pos_max_bid_rule,
+                                                doc="Cst-9l: aFRR+ capacity maximum bid size")
 
         def afrr_neg_min_bid_rule(model, b):
             return model.c_afrr_neg[b] >= model.y_afrr_neg[b] * model.min_bid_afrr
-        model.afrr_neg_min_bid = pyo.Constraint(model.B, rule=afrr_neg_min_bid_rule)
+        model.afrr_neg_min_bid = pyo.Constraint(model.B, rule=afrr_neg_min_bid_rule,
+                                                doc="Cst-9m: aFRR- capacity minimum bid size (1.0 MW)")
 
         def afrr_neg_max_bid_rule(model, b):
             return model.c_afrr_neg[b] <= model.y_afrr_neg[b] * (model.P_max_config / 1000)
-        model.afrr_neg_max_bid = pyo.Constraint(model.B, rule=afrr_neg_max_bid_rule)
+        model.afrr_neg_max_bid = pyo.Constraint(model.B, rule=afrr_neg_max_bid_rule,
+                                                doc="Cst-9n: aFRR- capacity maximum bid size")
 
-        # --- COMMENTED OUT Cst-9: aFRR Energy MinBid + Total Binary Linkage (Surgical Optimization V4) ---
-        # REASON: These 8 constraints enforce 0.1 MW MinBid for aFRR energy market and link binaries.
-        # Same rationale as DA energy MinBid above:
-        # - aFRR energy MinBid is 0.1 MW (same small threshold)
-        # - Total binary linkage constraints depend on all T-indexed binaries (commented above)
-        # - Removing 8T constraints significantly improves scalability
-        # CRITICAL MINBIDS RETAINED: Capacity market MinBids (1.0 MW) are still enforced below
-        # using B-indexed binaries (6 blocks × 3 markets = ~18 binaries for 7-day vs ~4.2k T-indexed).
+        # --- COMMENTED OUT Cst-9: aFRR Energy MinBid Constraints (REQUIRES y_afrr_pos_e/y_afrr_neg_e binaries) ---
+        # REASON: These 4 constraints require y_afrr_pos_e/y_afrr_neg_e binaries which are commented out (lines 592-594).
+        # DEPENDENCY ISSUE: Cannot enforce MinBid for aFRR energy without separate aFRR energy binaries.
+        # RESOLUTION: Keep commented unless those binaries are re-enabled.
         # --- END COMMENT ---
         # # PHASE II Model (i): aFRR Energy Market Bid Constraints (NEW)
         # def afrr_pos_e_min_bid_rule(model, t):
@@ -844,11 +892,13 @@ class BESSOptimizerModelI:
 
         def as_capacity_profit_rule(model):
             """Ancillary service capacity profit (EUR)
-            Prices in EUR/MW/h, multiply by block duration
+
+            IMPORTANT: Prices are in EUR/MW per 4-hour block (NOT EUR/MW/h).
+            Do NOT multiply by model.db - the price already includes block duration.
             """
-            return sum((model.P_FCR[b] * model.c_fcr[b] +
-                        model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
-                        model.P_aFRR_neg[b] * model.c_afrr_neg[b]) * model.db
+            return sum(model.P_FCR[b] * model.c_fcr[b] +
+                       model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
+                       model.P_aFRR_neg[b] * model.c_afrr_neg[b]
                        for b in model.B)
         model.profit_as_capacity = pyo.Expression(rule=as_capacity_profit_rule)
 
@@ -1118,6 +1168,12 @@ class BESSOptimizerModelI:
                 val_y_afrr_neg = _safe_value(model.y_afrr_neg[b])
                 if val_y_afrr_neg is not None:
                     solution["y_afrr_neg"][b] = val_y_afrr_neg
+
+            # Extract block mapping (time → block) for visualization
+            # This maps each time step to its corresponding AS capacity block
+            solution["block_map"] = {}
+            for t in model.T:
+                solution["block_map"][t] = int(_safe_value(model.block_map[t]) or 0)
 
             return solution
             
@@ -1548,6 +1604,47 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
                 model.del_component(model.e_soc_index)
 
         model.e_soc = pyo.Expression(model.T, rule=lambda m, t: sum(m.e_soc_j[t, j] for j in m.J), doc="Total SOC derived from segment SOCs")
+
+        # ============================================================================
+        # CRITICAL FIX: Re-define Cst-6 to override parent and link to new e_soc Expression
+        # ============================================================================
+        # The parent class (Model I) defined Cst-6 constraints that reference e_soc as a Variable.
+        # However, in Model II, we deleted that Variable and replaced it with an Expression.
+        # The inherited constraints still reference the deleted Variable (causing them to fail).
+        # We must re-define these constraints here to properly reference the new Expression.
+        logger.info("Overriding (Cst-6) Energy Reserve constraints to link to segmented SOC Expression...")
+
+        # First, remove the inherited (broken) constraints from parent
+        if hasattr(model, 'energy_reserve_pos'):
+            model.del_component(model.energy_reserve_pos)
+        if hasattr(model, 'energy_reserve_neg'):
+            model.del_component(model.energy_reserve_neg)
+
+        # Cst-6: Ancillary Service Energy Reserve (REDEFINED for Model II)
+        # Upward regulation: (1000*c_fcr + 1000*c_afrr_pos)*τ/η_dis ≤ e_soc(t) - SOC_min*E_nom
+        def energy_reserve_pos_rule_v2(m, t):
+            block = m.block_map[t]
+            required_energy = (1000 * m.c_fcr[block] + 1000 * m.c_afrr_pos[block]) * m.tau / m.eta_dis
+            # Now m.e_soc[t] correctly references the Expression (sum of segments)
+            return required_energy <= m.e_soc[t] - m.SOC_min * m.E_nom
+
+        model.energy_reserve_pos = pyo.Constraint(
+            model.T, rule=energy_reserve_pos_rule_v2,
+            doc="(Cst-6a REDEFINED) Energy reserve for upward regulation"
+        )
+
+        # Downward regulation: (1000*c_fcr + 1000*c_afrr_neg)*τ*η_ch ≤ SOC_max*E_nom - e_soc(t)
+        def energy_reserve_neg_rule_v2(m, t):
+            block = m.block_map[t]
+            required_storage = (1000 * m.c_fcr[block] + 1000 * m.c_afrr_neg[block]) * m.tau * m.eta_ch
+            # Now m.e_soc[t] correctly references the Expression (sum of segments)
+            return required_storage <= m.SOC_max * m.E_nom - m.e_soc[t]
+
+        model.energy_reserve_neg = pyo.Constraint(
+            model.T, rule=energy_reserve_neg_rule_v2,
+            doc="(Cst-6b REDEFINED) Energy reserve for downward regulation"
+        )
+        # ============================================================================
 
         def total_charge_power_rule(m, t):
             return m.p_total_ch[t] == sum(m.p_ch_j[t, j] for j in m.J)
