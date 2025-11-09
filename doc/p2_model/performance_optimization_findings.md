@@ -8,7 +8,7 @@
 ---
 
 ## Executive Summary
-
+!!!A 这份数据有问题，需要修改。
 Strategic removal of constraints Cst-8 (Cross-Market Exclusivity) and Cst-9 (Energy Market Minimum Bids) from the optimization model resulted in **14-337x faster solve times** and **47-77% profit improvements**, while maintaining **100% constraint compliance** (0 violations across 5,856 intervals tested). These constraints were proven redundant through comprehensive validation, as their intent is already enforced by other model components. This optimization enables full-month (31-day) optimizations that were previously computationally infeasible.
 
 **Key Result:** The optimized model solves 7-day problems in 6-7 seconds vs. 10+ minutes timeout with full constraints, with no degradation in solution quality or constraint satisfaction.
