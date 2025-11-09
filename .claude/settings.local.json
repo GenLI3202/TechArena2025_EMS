@@ -24,7 +24,8 @@
       "Bash(timeout 120 python:*)",
       "Bash(timeout 180 python:*)",
       "Bash(timeout 1200 python:*)",
-      "Bash(timeout 2400 python week14_5day_test.py)"
+      "Bash(timeout 2400 python week14_5day_test.py)",
+      "Bash(timeout 60 python:*)"
     ],
     "deny": [],
     "ask": []

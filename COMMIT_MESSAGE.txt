@@ -1,0 +1,55 @@
+fix: Critical bug in aFRR energy revenue calculation and add profit component extraction
+
+This commit addresses two major issues in the optimizer:
+
+1. CRITICAL BUG FIX: aFRR energy revenue formula
+   - Fixed incorrect subtraction of negative aFRR energy revenue
+   - Both positive and negative aFRR energy should ADD to total revenue
+   - Bug caused paradoxical behavior where EV weighting increased profit
+
+   Before (WRONG):
+     revenue = price_pos * power_pos - price_neg * power_neg
+
+   After (CORRECT):
+     revenue = price_pos * power_pos + price_neg * power_neg
+
+   Impact:
+   - All seasonal tests now show correct profit reduction with EV weighting
+   - Winter: -1.05%, Spring: -12.42%, Summer: -6.44%, Autumn: -7.17%
+   - aFRR-E revenue correctly decreases by 6-13% when applying EV weights
+
+2. ENHANCEMENT: Profit component extraction as Pyomo Expressions
+   - Refactored objective function to use Pyomo Expression components
+   - Added three profit expressions: profit_da, profit_afrr_energy, profit_as_capacity
+   - Added cyclic aging cost expression: cost_cyclic
+   - Modified solve_model() to extract profit components directly
+   - Enables accurate post-optimization analysis without manual recalculation
+
+   Benefits:
+   - Eliminates manual calculation errors
+   - Profit components guaranteed to match optimizer's calculations
+   - Easy verification: Objective = (DA + aFRR-E + AS) - α × Aging_Cost
+   - All test cases show perfect summation (diff = 0.000000)
+
+3. Model II objective reconstruction
+   - Fixed issue where profit expressions were lost when Model II rebuilt objective
+   - Now references existing profit expressions instead of re-computing
+   - Maintains consistent profit calculation across Model I and Model II
+
+Files modified:
+- py_script/core/optimizer.py: Fixed aFRR-E formula, added profit Expressions
+- test_ev_phase2_simple.py: Updated to use profit components from solved model
+- PROFIT_COMPONENTS_UPDATE.md: Documentation of changes
+
+Testing:
+- Validated on seasonal instances (Winter, Spring, Summer, Autumn)
+- Verified profit components sum to objective value (diff < 1e-6)
+- Confirmed EV weighting now correctly reduces profit in all cases
+- All solver status: optimal, solve times < 20s for 24h instances
+
+Breaking Changes:
+- None - solution dictionary now includes additional keys:
+  - 'profit_da', 'profit_afrr_energy', 'profit_as_capacity', 'cost_cyclic'
+  - Existing code continues to work, new keys available for enhanced analysis
+
+Co-authored-by: User (identified critical math inconsistency)

@@ -374,7 +374,7 @@ The aFRR Energy market (15-min granularity) operates similarly to the DA market 
 - **New Binaries:** $y^{\mathrm{pos}}_{aFRR,E}(t)$ and $y^{\mathrm{neg}}_{aFRR,E}(t)$ to manage minimum bids.
 - **Objective Function:** A new profit term $\mathbb{P}^{aFRR\_E}$ is added:
 $$
-\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t
+\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{pos}}_{aFRR, E}(t) + \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, p^{\mathrm{neg}}_{aFRR, E}(t) \right)\, \Delta t
 $$
 
 This requires revising the core physical constraints to prevent conflicts. We define new **total** charge/discharge variables:

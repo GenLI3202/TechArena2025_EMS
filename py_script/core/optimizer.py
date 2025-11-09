@@ -98,8 +98,13 @@ class BESSOptimizerModelI:
         See doc/p2_model/p2_3models_formulation.tex Section "Model (i)"
     """
 
-    def __init__(self):
-        """Initialize Phase II Model (i) optimizer with aFRR energy market integration."""
+    def __init__(self, use_afrr_ev_weighting: bool = False):
+        """Initialize Phase II Model (i) optimizer with aFRR energy market integration.
+
+        Args:
+            use_afrr_ev_weighting: Enable Expected Value weighting for aFRR energy bids
+                                   to account for activation probability (default: False)
+        """
         # Battery specifications
         self.battery_params = {
             'capacity_kwh': 4472,
@@ -109,7 +114,7 @@ class BESSOptimizerModelI:
             'initial_soc': 0.5,
             'daily_cycle_limit': 1.0  # Default, will be overridden
         }
-        
+
         # Market parameters
         self.market_params = {
             'min_bid_da': 0.1,    # MW
@@ -121,20 +126,81 @@ class BESSOptimizerModelI:
             'reserve_duration_hours': 0.25, # Assumed activation duration for reserve calculation
             'solver_time_limit': 600  # seconds - consistent across all solvers
         }
-        
+
         # Configuration scenarios
         # Include DE_LU for coupled Germany-Luxembourg day-ahead market
         self.countries = ['DE', 'DE_LU', 'AT', 'CH', 'HU', 'CZ']
         self.c_rates = [0.25, 0.33, 0.5]
         self.daily_cycles = [1.0, 1.5, 2.0]
-        
+
         # Pre-computed mappings for efficiency
         self._block_to_times = {}
         self._time_to_block = {}
         self._day_to_times = {}
 
-        logger.info("BESS Optimizer - Phase II Model (i): Base + aFRR Energy Market initialized")
-    
+        # EV weighting configuration
+        self.use_afrr_ev_weighting = use_afrr_ev_weighting
+        self._activation_config = None  # Lazy loaded when needed
+
+        mode_str = "with EV weighting" if use_afrr_ev_weighting else "without EV weighting"
+        logger.info(f"BESS Optimizer - Phase II Model (i): Base + aFRR Energy Market initialized ({mode_str})")
+
+    def _load_activation_config(self) -> Dict[str, Any]:
+        """
+        Load aFRR activation probability configuration for Expected Value weighting.
+
+        Returns:
+            Dictionary with activation probabilities by country
+
+        Raises:
+            FileNotFoundError: If config file doesn't exist
+            ValueError: If config format is invalid
+        """
+        if self._activation_config is not None:
+            return self._activation_config
+
+        config_path = Path(__file__).parent.parent.parent / 'data' / 'phase2_aging_config' / 'afrr_activation_config.json'
+
+        if not config_path.exists():
+            logger.warning(f"Activation config not found at {config_path}. Using default probabilities.")
+            # Fallback to defaults
+            self._activation_config = {
+                'default_probabilities': {'positive': 0.30, 'negative': 0.30},
+                'country_specific': {}
+            }
+            return self._activation_config
+
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+
+            # Validate config structure
+            if 'default_probabilities' not in config:
+                raise ValueError("Missing 'default_probabilities' in activation config")
+
+            if 'positive' not in config['default_probabilities'] or 'negative' not in config['default_probabilities']:
+                raise ValueError("Missing 'positive' or 'negative' in default_probabilities")
+
+            self._activation_config = config
+            logger.info(f"Loaded activation config from {config_path}")
+
+            # Log default values
+            default_pos = config['default_probabilities']['positive']
+            default_neg = config['default_probabilities']['negative']
+            logger.info(f"Default activation rates: pos={default_pos:.2f}, neg={default_neg:.2f}")
+
+            # Log country-specific values if available
+            if 'country_specific' in config and config['country_specific']:
+                countries_with_custom = list(config['country_specific'].keys())
+                logger.info(f"Custom activation rates available for: {', '.join(countries_with_custom)}")
+
+            return self._activation_config
+
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in activation config: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Error loading activation config: {str(e)}")
+
     def _validate_input_data(self, country_data: pd.DataFrame, blocks: List[int], 
                            days: List[int], T_data: List[int]) -> None:
         """
@@ -459,6 +525,17 @@ class BESSOptimizerModelI:
         model.P_aFRR_E_neg = pyo.Param(model.T, initialize=afrr_energy_neg_prices,
                                       doc="aFRR energy negative price (EUR/MWh) - Phase II Model (i)")
 
+        # PHASE II Model (i): aFRR activation probabilities for Expected Value weighting
+        # These weights account for the probability that aFRR energy bids will be activated
+        # w = 1.0 → deterministic (assumes 100% activation, original formulation)
+        # w < 1.0 → probabilistic (accounts for non-activation, more realistic)
+        afrr_weights_pos = {t: float(country_data['w_afrr_pos'].iloc[t]) for t in T_data}
+        afrr_weights_neg = {t: float(country_data['w_afrr_neg'].iloc[t]) for t in T_data}
+        model.w_aFRR_pos = pyo.Param(model.T, initialize=afrr_weights_pos,
+                                     doc="aFRR positive activation probability (0-1) - EV weighting")
+        model.w_aFRR_neg = pyo.Param(model.T, initialize=afrr_weights_neg,
+                                     doc="aFRR negative activation probability (0-1) - EV weighting")
+
         # AS capacity prices indexed by block (constant within 4h blocks) - MEMORY OPTIMIZED
         model.P_FCR = pyo.Param(model.B, initialize=fcr_prices_by_block,
                                doc="FCR capacity price (EUR/MW/h)")
@@ -745,25 +822,39 @@ class BESSOptimizerModelI:
         #     return model.y_total_dis[t] >= model.y_afrr_pos_e[t]
         # model.total_dis_binary_link2 = pyo.Constraint(model.T, rule=total_dis_binary_link2_rule)
 
-        # OPTIMIZED OBJECTIVE FUNCTION - UPDATED for Model (i)
+        # OPTIMIZED OBJECTIVE FUNCTION - UPDATED for Model (i) with Profit Component Expressions
+        # Define profit components as Pyomo Expressions for easy post-solve retrieval
+
+        def da_profit_rule(model):
+            """Day-ahead energy profit (EUR)"""
+            return sum((model.P_DA[t] / 1000 * model.p_dis[t] -
+                        model.P_DA[t] / 1000 * model.p_ch[t]) * model.dt
+                       for t in model.T)
+        model.profit_da = pyo.Expression(rule=da_profit_rule)
+
+        def afrr_energy_profit_rule(model):
+            """aFRR energy market profit with Expected Value weighting (EUR)
+            Multiply power by activation weight: w=1.0 (deterministic), w<1.0 (probabilistic)
+            BOTH positive and negative aFRR energy generate POSITIVE revenue (addition, not subtraction)
+            """
+            return sum((model.P_aFRR_E_pos[t] / 1000 * model.p_afrr_pos_e[t] * model.w_aFRR_pos[t] +
+                        model.P_aFRR_E_neg[t] / 1000 * model.p_afrr_neg_e[t] * model.w_aFRR_neg[t]) * model.dt
+                       for t in model.T)
+        model.profit_afrr_energy = pyo.Expression(rule=afrr_energy_profit_rule)
+
+        def as_capacity_profit_rule(model):
+            """Ancillary service capacity profit (EUR)
+            Prices in EUR/MW/h, multiply by block duration
+            """
+            return sum((model.P_FCR[b] * model.c_fcr[b] +
+                        model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
+                        model.P_aFRR_neg[b] * model.c_afrr_neg[b]) * model.db
+                       for b in model.B)
+        model.profit_as_capacity = pyo.Expression(rule=as_capacity_profit_rule)
+
         def objective_rule(model):
-            # Day-ahead energy profit
-            da_profit = sum((model.P_DA[t] / 1000 * model.p_dis[t] -
-                             model.P_DA[t] / 1000 * model.p_ch[t]) * model.dt
-                            for t in model.T)
-
-            # PHASE II Model (i): aFRR energy market profit (NEW)
-            afrr_energy_profit = sum((model.P_aFRR_E_pos[t] / 1000 * model.p_afrr_pos_e[t] -
-                                      model.P_aFRR_E_neg[t] / 1000 * model.p_afrr_neg_e[t]) * model.dt
-                                     for t in model.T)
-
-            # Ancillary service capacity profit (prices in EUR/MW/h, multiply by block duration)
-            as_profit = sum((model.P_FCR[b] * model.c_fcr[b] +
-                             model.P_aFRR_pos[b] * model.c_afrr_pos[b] +
-                             model.P_aFRR_neg[b] * model.c_afrr_neg[b]) * model.db
-                            for b in model.B)
-
-            return da_profit + afrr_energy_profit + as_profit
+            """Total profit = DA + aFRR Energy + AS Capacity"""
+            return model.profit_da + model.profit_afrr_energy + model.profit_as_capacity
 
         model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
         
@@ -894,12 +985,24 @@ class BESSOptimizerModelI:
                 'solver': solver_name,
                 'termination_condition': str(results.solver.termination_condition)
             }
-            
+
             def _safe_value(component: Any) -> Optional[float]:
                 try:
                     return pyo.value(component)
                 except (TypeError, ValueError):
                     return None
+
+            # Extract profit components from Pyomo Expressions
+            if hasattr(model, 'profit_da'):
+                solution['profit_da'] = _safe_value(model.profit_da)
+            if hasattr(model, 'profit_afrr_energy'):
+                solution['profit_afrr_energy'] = _safe_value(model.profit_afrr_energy)
+            if hasattr(model, 'profit_as_capacity'):
+                solution['profit_as_capacity'] = _safe_value(model.profit_as_capacity)
+
+            # Extract aging cost (Model II and III)
+            if hasattr(model, 'cost_cyclic'):
+                solution['cost_cyclic'] = _safe_value(model.cost_cyclic)
 
             # Extract variable values efficiently
             # Day-ahead market
@@ -1064,6 +1167,31 @@ class BESSOptimizerModelI:
                 country_df['price_afrr_energy_pos'] = 0.0
                 country_df['price_afrr_energy_neg'] = 0.0
 
+            # Add aFRR activation probabilities for Expected Value weighting
+            if self.use_afrr_ev_weighting:
+                # Load activation config
+                activation_config = self._load_activation_config()
+
+                # Check for country-specific values (use as_country for activation rates)
+                if 'country_specific' in activation_config and as_country in activation_config['country_specific']:
+                    w_pos = activation_config['country_specific'][as_country]['positive']
+                    w_neg = activation_config['country_specific'][as_country]['negative']
+                    logger.info(f"Using country-specific activation rates for {as_country}: pos={w_pos:.2f}, neg={w_neg:.2f}")
+                else:
+                    # Use default values
+                    w_pos = activation_config['default_probabilities']['positive']
+                    w_neg = activation_config['default_probabilities']['negative']
+                    logger.info(f"Using default activation rates for {as_country}: pos={w_pos:.2f}, neg={w_neg:.2f}")
+
+                # Add as constant columns (could be time-varying in future)
+                country_df['w_afrr_pos'] = w_pos
+                country_df['w_afrr_neg'] = w_neg
+            else:
+                # No EV weighting: set weights to 1.0 (100% activation assumption)
+                country_df['w_afrr_pos'] = 1.0
+                country_df['w_afrr_neg'] = 1.0
+                logger.info(f"EV weighting disabled for {country}: using w=1.0 (deterministic)")
+
             # Create time-based identifiers
             timestamps = data.index
             country_df['hour'] = timestamps.hour
@@ -1221,8 +1349,18 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
         degradation_config_path: Optional[str] = None,
         alpha: float = 1.0,
         enforce_segment_binary: bool = True,
+        use_afrr_ev_weighting: bool = False,
     ) -> None:
-        super().__init__()
+        """Initialize Phase II Model (ii) with cyclic aging cost.
+
+        Args:
+            config: Optional runtime configuration overrides
+            degradation_config_path: Path to aging_config.json (defaults to standard location)
+            alpha: Degradation price weight parameter (default 1.0)
+            enforce_segment_binary: Whether to enforce segment ordering binaries (default True)
+            use_afrr_ev_weighting: Enable Expected Value weighting for aFRR energy bids (default False)
+        """
+        super().__init__(use_afrr_ev_weighting=use_afrr_ev_weighting)
 
         # Optional runtime configuration overrides
         if config:
@@ -1477,21 +1615,25 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             model.daily_cycle_limit.deactivate()
             logger.info("Deactivated daily cycle limit constraint (Cst-5)")
 
-        # Capture parent objective expression before deleting
-        parent_objective_expr = model.objective.expr
+        # Define cyclic degradation cost term as Expression (for easy extraction)
+        def cost_cyclic_rule(m):
+            return sum(
+                sum(m.c_cost[j] * (m.p_dis_j[t, j] / m.eta_dis) * m.dt for j in m.J)
+                for t in m.T
+            )
+        model.cost_cyclic = pyo.Expression(rule=cost_cyclic_rule)
 
-        # Delete parent objective
+        # Capture parent profit expressions before modifying objective
+        # Note: model.profit_da, model.profit_afrr_energy, model.profit_as_capacity
+        # were already defined in the parent class and will remain available
+
+        # Delete parent objective to replace with aging-aware objective
         model.del_component(model.objective)
 
-        # Define cyclic degradation cost term
-        cost_cyclic = sum(
-            sum(model.c_cost[j] * (model.p_dis_j[t, j] / model.eta_dis) * model.dt for j in model.J)
-            for t in model.T
-        )
-
         # Create new objective with degradation cost
+        # Objective = Profit - α × Aging_Cost
         model.objective = pyo.Objective(
-            expr=parent_objective_expr - model.alpha * cost_cyclic,
+            expr=model.profit_da + model.profit_afrr_energy + model.profit_as_capacity - model.alpha * model.cost_cyclic,
             sense=pyo.maximize,
             doc="Maximize profit minus weighted cyclic degradation cost"
         )
@@ -1576,6 +1718,441 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
         }
 
 # ============================================================================
+# Phase II Model (iii): Calendar Aging Cost Extension
+# ============================================================================
+
+
+class BESSOptimizerModelIII(BESSOptimizerModelII):
+    """Battery Energy Storage System Optimizer - Phase II Model (iii).
+
+    Extends :class:`BESSOptimizerModelII` by adding calendar aging cost on top of
+    cyclic aging cost. Calendar aging is modeled using Special Ordered Sets of Type 2 (SOS2)
+    piecewise-linear approximation based on Collath et al. (2023).
+
+    Model Progression:
+    ------------------
+    ✓ Model (i): Base + aFRR Energy Market
+    ✓ Model (ii): Model (i) + Cyclic Aging Cost
+    ✓ Model (iii): Model (ii) + Calendar Aging Cost (THIS MODEL)
+
+    Calendar Aging Model:
+    ---------------------
+    - Uses SOS2 variables to approximate non-linear SOC-dependent aging
+    - 5 breakpoints from Collath et al. (2023): 0%, 25%, 50%, 75%, 100% SOC
+    - Higher SOC → Higher calendar aging cost (encourages lower SOC storage)
+    - Cost function: c_cal_cost(t) = Σᵢ λ[t,i] * Cost_point[i]
+    - SOC constraint: e_soc(t) = Σᵢ λ[t,i] * SOC_point[i]
+    - SOS2 constraint: At most 2 adjacent λ variables non-zero
+
+    Mathematical Formulation:
+    -------------------------
+    Objective: max(Revenue - α * (C_cyclic + C_calendar))
+
+    Where:
+    - C_cyclic: Segment-based cyclic aging cost (from Model II)
+    - C_calendar: SOS2-based calendar aging cost (NEW)
+    - α: Meta-parameter for degradation price
+
+    References:
+        See doc/p2_model/p2_bi_model_ggdp.tex Section \"Model (iii)\"
+        Collath et al. (2023), Applied Energy, 348, 121531
+    """
+
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        degradation_config_path: Optional[str] = None,
+        alpha: float = 1.0,
+        enforce_segment_binary: bool = True,
+        use_afrr_ev_weighting: bool = False,
+    ) -> None:
+        """Initialize Phase II Model (iii) with cyclic and calendar aging.
+
+        Args:
+            config: Optional runtime configuration overrides
+            degradation_config_path: Path to aging_config.json (defaults to standard location)
+            alpha: Degradation price weight parameter (default 1.0)
+            enforce_segment_binary: Whether to enforce segment ordering binaries (default True)
+            use_afrr_ev_weighting: Enable Expected Value weighting for aFRR energy bids (default False)
+        """
+        # Initialize parent (Model II with cyclic aging)
+        super().__init__(
+            config=config,
+            degradation_config_path=degradation_config_path,
+            alpha=alpha,
+            enforce_segment_binary=enforce_segment_binary,
+            use_afrr_ev_weighting=use_afrr_ev_weighting,
+        )
+
+        # Load calendar aging configuration
+        if 'calendar_aging' not in self.degradation_config:
+            raise KeyError(
+                "Missing 'calendar_aging' key in degradation config.\n"
+                f"Config file: {self.degradation_params.get('config_file_path', 'unknown')}"
+            )
+
+        calendar_config = self.degradation_config['calendar_aging']
+
+        # Validate calendar aging data structure (NEW FORMAT)
+        if 'breakpoints' not in calendar_config:
+            raise KeyError(
+                "Missing 'breakpoints' key in calendar_aging config.\n"
+                "Expected format: 'breakpoints': [{'soc_kwh': X, 'cost_eur_hr': Y}, ...]"
+            )
+
+        # Extract breakpoint data from new combined format
+        breakpoints = calendar_config['breakpoints']
+
+        if not isinstance(breakpoints, list) or len(breakpoints) == 0:
+            raise ValueError("Calendar aging 'breakpoints' must be a non-empty list")
+
+        # Parse SOC and cost arrays from combined breakpoints
+        soc_breakpoints = []
+        cost_breakpoints = []
+
+        for i, bp in enumerate(breakpoints):
+            if not isinstance(bp, dict):
+                raise ValueError(f"Breakpoint {i} must be a dictionary")
+
+            if 'soc_kwh' not in bp or 'cost_eur_hr' not in bp:
+                raise KeyError(
+                    f"Breakpoint {i} missing required keys 'soc_kwh' or 'cost_eur_hr'.\n"
+                    f"Found keys: {list(bp.keys())}"
+                )
+
+            soc_breakpoints.append(bp['soc_kwh'])
+            cost_breakpoints.append(bp['cost_eur_hr'])
+
+        # Validate breakpoint consistency
+        if len(soc_breakpoints) < 2:
+            raise ValueError(f"Need at least 2 breakpoints, got {len(soc_breakpoints)}")
+
+        # Extract unit information from new format
+        unit_info = calendar_config.get('unit', {})
+        soc_unit = unit_info.get('soc_kwh', 'kWh')
+        cost_unit = unit_info.get('cost_eur_hr', 'EUR/hr')
+
+        # Store calendar aging parameters
+        self.calendar_params = {
+            'num_breakpoints': len(soc_breakpoints),
+            'soc_breakpoints_kwh': soc_breakpoints,
+            'cost_breakpoints_eur_hr': cost_breakpoints,
+            'soc_unit': soc_unit,
+            'cost_unit': cost_unit,
+        }
+
+        # Update degradation params to indicate calendar aging is enabled
+        self.degradation_params['model_type'] = 'cyclic_and_calendar'
+        self.degradation_params['calendar_enabled'] = True
+
+        # Validate calendar aging parameters
+        self._validate_calendar_params()
+
+        logger.info("Initialized BESSOptimizerModelIII:")
+        logger.info("  - Calendar aging enabled with %d breakpoints",
+                   self.calendar_params['num_breakpoints'])
+        logger.info("  - SOC range: %.0f - %.0f kWh",
+                   min(soc_breakpoints), max(soc_breakpoints))
+        logger.info("  - Cost range: %.2f - %.2f EUR/hr",
+                   min(cost_breakpoints), max(cost_breakpoints))
+        logger.info("  - Alpha (degradation weight): %.4f", alpha)
+
+    def _validate_calendar_params(self) -> None:
+        """Validate calendar aging parameters for consistency."""
+        soc_points = self.calendar_params['soc_breakpoints_kwh']
+        cost_points = self.calendar_params['cost_breakpoints_eur_hr']
+        battery_capacity = self.battery_params['capacity_kwh']
+
+        # Check SOC breakpoints are monotonically increasing
+        for i in range(1, len(soc_points)):
+            if soc_points[i] <= soc_points[i-1]:
+                raise ValueError(
+                    f"SOC breakpoints must be strictly increasing. "
+                    f"SOC[{i}]={soc_points[i]} <= SOC[{i-1}]={soc_points[i-1]}"
+                )
+
+        # Check SOC range matches battery capacity
+        if abs(soc_points[0]) > 1e-6:  # Should start near 0
+            logger.warning(
+                "First SOC breakpoint (%.2f kWh) is not 0. "
+                "This may cause issues at low SOC.", soc_points[0]
+            )
+
+        if abs(soc_points[-1] - battery_capacity) > 1e-6:  # Should end at capacity
+            logger.warning(
+                "Last SOC breakpoint (%.2f kWh) does not match battery capacity (%.2f kWh). "
+                "This may cause issues at high SOC.",
+                soc_points[-1], battery_capacity
+            )
+
+        # Check cost breakpoints are non-negative and generally increasing
+        # (Calendar aging typically increases with SOC)
+        if any(cost < 0 for cost in cost_points):
+            raise ValueError(f"All cost breakpoints must be non-negative, got {cost_points}")
+
+        for i in range(1, len(cost_points)):
+            if cost_points[i] < cost_points[i-1]:
+                logger.warning(
+                    "Calendar cost typically increases with SOC. "
+                    f"Cost[{i}]={cost_points[i]:.2f} < Cost[{i-1}]={cost_points[i-1]:.2f}"
+                )
+
+        logger.info("Calendar aging parameters validated successfully")
+
+    def build_optimization_model(
+        self,
+        country_data: pd.DataFrame,
+        c_rate: float,
+        daily_cycle_limit: Optional[float] = None,
+    ) -> pyo.ConcreteModel:
+        """Build Model (iii) with cyclic and calendar aging costs.
+
+        Extends Model (ii) by adding SOS2-based calendar aging constraints.
+
+        Args:
+            country_data: Market price data
+            c_rate: C-rate configuration
+            daily_cycle_limit: Ignored in Model (iii), kept for API compatibility
+
+        Returns:
+            Pyomo ConcreteModel with full Phase II Model (iii) formulation
+        """
+        if daily_cycle_limit is not None:
+            logger.warning(
+                "Model (iii) ignores daily_cycle_limit parameter (%.2f). "
+                "Using cost-based degradation (cyclic + calendar) instead.",
+                daily_cycle_limit,
+            )
+
+        # Build parent model (Model II with cyclic aging)
+        model = super().build_optimization_model(country_data, c_rate, daily_cycle_limit=None)
+
+        # Extract calendar aging parameters
+        num_breakpoints = self.calendar_params['num_breakpoints']
+        soc_breakpoints = self.calendar_params['soc_breakpoints_kwh']
+        cost_breakpoints = self.calendar_params['cost_breakpoints_eur_hr']
+
+        logger.info("Extending Model (ii) to Model (iii) with calendar aging...")
+
+        # ============================================================================
+        # Add Calendar Aging Components (SOS2 Piecewise-Linear Approximation)
+        # ============================================================================
+
+        # New Set: Calendar aging breakpoints
+        model.I = pyo.Set(
+            initialize=range(1, num_breakpoints + 1),
+            doc="Calendar aging breakpoint indices (1=0% SOC, ..., I=100% SOC)"
+        )
+
+        # New Parameters: Breakpoint values
+        model.SOC_point = pyo.Param(
+            model.I,
+            initialize={i: soc_breakpoints[i-1] for i in range(1, num_breakpoints + 1)},
+            doc="SOC breakpoint values (kWh)"
+        )
+
+        model.Cost_point = pyo.Param(
+            model.I,
+            initialize={i: cost_breakpoints[i-1] for i in range(1, num_breakpoints + 1)},
+            doc="Calendar cost breakpoint values (EUR/hr)"
+        )
+
+        # New Variables: SOS2 weighting variables and calendar cost
+        model.lambda_cal = pyo.Var(
+            model.T, model.I,
+            domain=pyo.NonNegativeReals,
+            bounds=(0, 1),
+            doc="SOS2 variables for calendar aging piecewise-linear approximation"
+        )
+
+        model.c_cal_cost = pyo.Var(
+            model.T,
+            domain=pyo.NonNegativeReals,
+            doc="Calendar aging cost at time t (EUR/hr)"
+        )
+
+        logger.info(
+            "Added %d calendar aging variables (%d SOS2 per timestep)",
+            len(model.T) * (num_breakpoints + 1),  # lambda_cal + c_cal_cost
+            num_breakpoints
+        )
+
+        # ============================================================================
+        # Calendar Aging Constraints (Section 4.7 of p2_bi_model_ggdp.tex)
+        # ============================================================================
+
+        # Constraint: SOC must be expressed as convex combination of breakpoints
+        # e_soc(t) = Σᵢ λ_cal[t,i] * SOC_point[i]
+        def calendar_soc_rule(m, t):
+            # Note: m.e_soc[t] is an Expression (sum of segment SOCs from Model II)
+            # We need to create an equality constraint here
+            return (
+                sum(m.lambda_cal[t, i] * m.SOC_point[i] for i in m.I) ==
+                sum(m.e_soc_j[t, j] for j in m.J)  # Use explicit sum instead of Expression
+            )
+
+        model.calendar_soc_con = pyo.Constraint(
+            model.T,
+            rule=calendar_soc_rule,
+            doc="Link total SOC to SOS2 variables for calendar aging"
+        )
+
+        # Constraint: Calendar cost must be expressed as same convex combination
+        # c_cal_cost(t) = Σᵢ λ_cal[t,i] * Cost_point[i]
+        def calendar_cost_rule(m, t):
+            return m.c_cal_cost[t] == sum(
+                m.lambda_cal[t, i] * m.Cost_point[i] for i in m.I
+            )
+
+        model.calendar_cost_con = pyo.Constraint(
+            model.T,
+            rule=calendar_cost_rule,
+            doc="Calculate calendar cost from SOS2 variables"
+        )
+
+        # Constraint: SOS2 weights must sum to 1
+        # Σᵢ λ_cal[t,i] = 1
+        def calendar_sos2_sum_rule(m, t):
+            return sum(m.lambda_cal[t, i] for i in m.I) == 1
+
+        model.calendar_sos2_sum_con = pyo.Constraint(
+            model.T,
+            rule=calendar_sos2_sum_rule,
+            doc="SOS2 weights must sum to 1"
+        )
+
+        # SOS2 Constraint: At most 2 adjacent λ variables can be non-zero
+        # This is the key constraint that enforces piecewise-linearity
+        def calendar_sos2_rule(m, t):
+            # Return list of variables that form the SOS2 set for time t
+            return [m.lambda_cal[t, i] for i in m.I]
+
+        model.calendar_sos2_set = pyo.SOSConstraint(
+            model.T,
+            var=calendar_sos2_rule,
+            sos=2,  # Type 2: At most 2 adjacent variables non-zero
+            doc="SOS2 constraint ensuring at most 2 adjacent lambda variables are non-zero"
+        )
+
+        logger.info("Added %d calendar aging constraints", len(model.T) * 3)  # 3 constraints per t
+
+        # ============================================================================
+        # Update Objective Function to Include Calendar Aging Cost
+        # ============================================================================
+
+        # Capture current objective (already has Revenue - α*C_cyclic from Model II)
+        parent_objective_expr = model.objective.expr
+
+        # Calculate total calendar aging cost
+        # C_calendar = Σₜ c_cal_cost[t] * Δt
+        cost_calendar = sum(model.c_cal_cost[t] * model.dt for t in model.T)
+
+        # Delete old objective
+        model.del_component(model.objective)
+
+        # Create new objective: Revenue - α*(C_cyclic + C_calendar)
+        # Note: parent_objective_expr already contains "- alpha * C_cyclic"
+        model.objective = pyo.Objective(
+            expr=parent_objective_expr - model.alpha * cost_calendar,
+            sense=pyo.maximize,
+            doc="Maximize profit minus weighted degradation cost (cyclic + calendar)"
+        )
+
+        logger.info(
+            "Extended objective function with calendar aging cost (alpha=%.4f)",
+            pyo.value(model.alpha)
+        )
+
+        # ============================================================================
+        # Model Summary
+        # ============================================================================
+
+        logger.info("Model (iii) build complete:")
+        logger.info("  - Variables: %s", f"{model.nvariables():,}")
+        logger.info("  - Constraints: %s", f"{model.nconstraints():,}")
+        logger.info("  - Degradation: Cyclic (%d segments) + Calendar (%d breakpoints)",
+                   self.degradation_params['num_segments'],
+                   num_breakpoints)
+
+        return model
+
+    def solve_model(
+        self,
+        model: pyo.ConcreteModel,
+        solver_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Solve Model (iii) and extract calendar aging results.
+
+        Extends parent solve_model() to extract calendar aging metrics.
+
+        Args:
+            model: Model (iii) Pyomo model
+            solver_name: Solver to use (auto-detect if None)
+
+        Returns:
+            Dictionary with solution and degradation metrics (cyclic + calendar)
+        """
+        # Call parent solver
+        results = super().solve_model(model, solver_name)
+
+        # If solve failed, return early
+        if results.get('status') not in ['optimal', 'feasible']:
+            return results
+
+        # Extract calendar aging results
+        def _safe_value(component: Any) -> Optional[float]:
+            try:
+                return pyo.value(component)
+            except (TypeError, ValueError):
+                return None
+
+        # Extract SOS2 variables (for validation)
+        lambda_cal = {}
+        for t in model.T:
+            for i in model.I:
+                val = _safe_value(model.lambda_cal[t, i])
+                if val is not None and val > 1e-6:  # Only store non-zero values
+                    lambda_cal[(t, i)] = val
+
+        # Extract calendar costs
+        c_cal_cost = {}
+        total_calendar_cost = 0.0
+        for t in model.T:
+            val = _safe_value(model.c_cal_cost[t])
+            if val is not None:
+                c_cal_cost[t] = val
+                total_calendar_cost += val * pyo.value(model.dt)
+
+        # Add calendar aging results to solution
+        results['lambda_cal'] = lambda_cal
+        results['c_cal_cost'] = c_cal_cost
+
+        # Update degradation metrics
+        if 'degradation_metrics' in results:
+            results['degradation_metrics']['total_calendar_cost_eur'] = total_calendar_cost
+
+            # Calculate combined degradation cost
+            cyclic_cost = results['degradation_metrics'].get('total_cyclic_cost_eur', 0.0)
+            results['degradation_metrics']['total_degradation_cost_eur'] = (
+                cyclic_cost + total_calendar_cost
+            )
+
+            # Add breakdown
+            results['degradation_metrics']['cost_breakdown'] = {
+                'cyclic_eur': cyclic_cost,
+                'calendar_eur': total_calendar_cost,
+                'total_eur': cyclic_cost + total_calendar_cost,
+            }
+
+            logger.info("Degradation cost breakdown:")
+            logger.info("  - Cyclic aging: %.2f EUR", cyclic_cost)
+            logger.info("  - Calendar aging: %.2f EUR", total_calendar_cost)
+            logger.info("  - Total degradation: %.2f EUR", cyclic_cost + total_calendar_cost)
+
+        return results
+
+
+# ============================================================================
 # BACKWARD COMPATIBILITY ALIASES
 # ============================================================================
 # Maintain backward compatibility with existing code that uses old names
@@ -1584,10 +2161,12 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
 BESSOptimizer = BESSOptimizerModelI  # Main backward compatibility alias
 BESSOptimizerV2 = BESSOptimizerModelI  # For code that used V2 naming
 BESSOptimizerV3 = BESSOptimizerModelII  # Version-based alias for cyclic aging model
+BESSOptimizerV4 = BESSOptimizerModelIII  # Version-based alias for full model (cyclic + calendar)
 
 # Clear naming for users
 BESSOptimizer_Phase2_ModelI = BESSOptimizerModelI  # Explicit Phase II Model (i) reference
 BESSOptimizer_Phase2_ModelII = BESSOptimizerModelII  # Explicit Phase II Model (ii) reference
+BESSOptimizer_Phase2_ModelIII = BESSOptimizerModelIII  # Explicit Phase II Model (iii) reference
 
 if __name__ == "__main__":
     # Example usage - Model (i)

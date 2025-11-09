@@ -17,25 +17,16 @@
   },
   "calendar_aging": {
     "description": "Breakpoints for the piecewise-linear calendar aging cost function (SOS2), derived from Collath et al. (2023).",
-    "soc_breakpoints": {
-      "unit": "kWh",
-      "values": [
-        0,
-        1118,
-        2236,
-        3354,
-        4472
-      ]
+    "unit": {
+      "soc_kwh": "kWh",
+      "cost_eur_hr": "EUR/hr"
     },
-    "cost_breakpoints": {
-      "unit": "EUR/hr",
-      "values": [
-        1.79,
-        2.15,
-        3.58,
-        6.44,
-        10.73
-      ]
-    }
+    "breakpoints": [
+      { "soc_kwh": 0,    "cost_eur_hr": 1.79 },
+      { "soc_kwh": 1118, "cost_eur_hr": 2.15 },
+      { "soc_kwh": 2236, "cost_eur_hr": 3.58 },
+      { "soc_kwh": 3354, "cost_eur_hr": 6.44 },
+      { "soc_kwh": 4472, "cost_eur_hr": 10.73 }
+    ]
   }
 }

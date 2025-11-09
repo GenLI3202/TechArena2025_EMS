@@ -1,0 +1,91 @@
+{
+  "description": "aFRR energy activation probabilities for Expected Value (EV) weighting",
+  "version": "2.0",
+  "reference": "Derived from data/phase2_processed/metadata.json (zero_pct statistics)",
+  "data_source": "TechArena2025 Phase 2 aFRR energy price data (2024 full year)",
+
+  "methodology": {
+    "description": "Activation probability w = 1 - (zero_price_pct / 100)",
+    "formula": "w^pos_t = 1 - π^pos_t, w^neg_t = 1 - π^neg_t",
+    "rationale": "Zero prices indicate non-activation periods (no energy dispatch)",
+    "purpose": "Weight aFRR energy bids by activation likelihood to avoid profit overestimation"
+  },
+
+  "default_probabilities": {
+    "positive": 0.80,
+    "negative": 0.60,
+    "description": "Average activation rates across all markets",
+    "rationale": "Fallback for countries without specific data"
+  },
+
+  "country_specific": {
+    "DE": {
+      "positive": 0.9419,
+      "negative": 0.7734,
+      "zero_pct_pos": 5.806010928961749,
+      "zero_pct_neg": 22.663365209471767,
+      "description": "Germany - High positive activation (94%), moderate negative (77%)"
+    },
+    "AT": {
+      "positive": 0.9121,
+      "negative": 0.6648,
+      "zero_pct_pos": 8.785860655737705,
+      "zero_pct_neg": 33.51832877959927,
+      "description": "Austria - High positive activation (91%), moderate negative (66%)"
+    },
+    "CH": {
+      "positive": 0.9926,
+      "negative": 0.6120,
+      "zero_pct_pos": 0.7371357012750456,
+      "zero_pct_neg": 38.80066029143898,
+      "description": "Switzerland - Very high positive activation (99%), moderate negative (61%)"
+    },
+    "HU": {
+      "positive": 0.4070,
+      "negative": 0.1941,
+      "zero_pct_pos": 59.295309653916206,
+      "zero_pct_neg": 80.59255464480874,
+      "description": "Hungary - Low activation for both directions (41% pos, 19% neg)"
+    },
+    "CZ": {
+      "positive": 0.9676,
+      "negative": 0.7623,
+      "zero_pct_pos": 3.2388433515482693,
+      "zero_pct_neg": 23.767645719489984,
+      "description": "Czech Republic - High activation (97% pos, 76% neg)"
+    }
+  },
+
+  "time_varying": {
+    "enabled": false,
+    "description": "Set to true when hourly/seasonal activation data becomes available",
+    "future_enhancement": "Time-of-day and seasonal variation in activation probabilities"
+  },
+
+  "usage_notes": [
+    "EV weighting is OPTIONAL - disable for conservative bidding (w=1.0)",
+    "Enable for more realistic profit estimation and market allocation",
+    "Lower w values → model bids more aggressively to aFRR-E (compensates for low activation)",
+    "Compare results with/without EV weighting using compare_ev_weighting.py"
+  ],
+
+  "impact_analysis": {
+    "without_ev_weighting": {
+      "behavior": "Model assumes 100% activation of aFRR bids",
+      "consequence": "May over-allocate to aFRR-E market",
+      "objective": "Overestimates revenue (optimistic)"
+    },
+    "with_ev_weighting": {
+      "behavior": "Model accounts for actual activation probability from historical data",
+      "consequence": "More realistic allocation between DA, FCR, aFRR-C, and aFRR-E",
+      "objective": "Realistic expected revenue based on market statistics"
+    }
+  },
+
+  "notes": {
+    "interpretation": "Zero price percentage = non-activation rate (no energy dispatched)",
+    "activation_rate": "Calculated as: w = 1 - (zero_pct / 100)",
+    "data_period": "2024-01-01 to 2024-12-31 (full year)",
+    "observation": "Positive aFRR-E generally has higher activation than negative across most markets"
+  }
+}
