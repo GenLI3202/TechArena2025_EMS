@@ -498,24 +498,16 @@ class BESSOptimizerModelI:
                                   doc="aFRR negative capacity bid (MW)")
 
         # Binary variables for operational states - Day-ahead market
-        # --- COMMENTED OUT T-INDEXED BINARIES FOR PERFORMANCE (Surgical Optimization V4) ---
-        # REASON: These 6 groups of T-indexed binaries (T=672 for 7-day → ~4.2k binaries) cause
-        # exponential complexity growth. 3-day solves in 27s, but 7-day times out at 10+ minutes.
-        # The constraints they support (Cst-3, Cst-8, Cst-9 energy) are either:
-        # - Redundant (already enforced by objective or Cst-4 power limits)
-        # - Non-critical (0.1 MW MinBid is minor rule vs 1.0 MW for capacity markets)
-        # Keeping only B-indexed binaries (blocks) for critical 1.0 MW MinBids.
-        # --- END COMMENT ---
-        # model.y_ch = pyo.Var(model.T, domain=pyo.Binary,
-        #                     doc="DA charging state binary")
-        # model.y_dis = pyo.Var(model.T, domain=pyo.Binary,
-        #                      doc="DA discharging state binary")
+        model.y_ch = pyo.Var(model.T, domain=pyo.Binary,
+                            doc="DA charging state binary")
+        model.y_dis = pyo.Var(model.T, domain=pyo.Binary,
+                             doc="DA discharging state binary")
 
         # PHASE II Model (i): aFRR energy market binaries
-        # model.y_afrr_pos_e = pyo.Var(model.T, domain=pyo.Binary,
-        #                             doc="aFRR energy positive bid binary - Model (i)")
-        # model.y_afrr_neg_e = pyo.Var(model.T, domain=pyo.Binary,
-        #                             doc="aFRR energy negative bid binary - Model (i)")
+        model.y_afrr_pos_e = pyo.Var(model.T, domain=pyo.Binary,
+                                    doc="aFRR energy positive bid binary - Model (i)")
+        model.y_afrr_neg_e = pyo.Var(model.T, domain=pyo.Binary,
+                                    doc="aFRR energy negative bid binary - Model (i)")
 
         # PHASE II Model (i): Total operation binaries
         model.y_total_ch = pyo.Var(model.T, domain=pyo.Binary,
@@ -561,12 +553,6 @@ class BESSOptimizerModelI:
         # Note: Already enforced via variable bounds (lines 375-377)
         # No explicit constraint needed - included in model.e_soc variable definition
 
-        # --- RE-ENABLED Cst-3: Simultaneous Operation Prevention (Partial Optimization V5) ---
-        # ANALYSIS: Validation showed Cst-3 violations (2,700+ instances) when fully commented out.
-        # These constraints are ESSENTIAL for preventing simultaneous charge/discharge.
-        # Cst-8 and Cst-9 remain commented out (0 violations observed).
-        # --- END COMMENT ---
-        
         # Cst-3: Simultaneous Operation Prevention - UPDATED for Model (i)
         # Use total binaries to prevent charging and discharging simultaneously
         def total_ch_binary_rule(model, t):
@@ -626,53 +612,36 @@ class BESSOptimizerModelI:
             return model.y_fcr[b] + model.y_afrr_pos[b] + model.y_afrr_neg[b] <= 1
         model.as_market_exclusivity = pyo.Constraint(model.B, rule=as_market_exclusivity_rule)
 
-        # --- COMMENTED OUT Cst-8: Cross-Market Mutual Exclusivity (Surgical Optimization V4) ---
-        # REASON: These 2 constraints depend on y_total_ch and y_total_dis binaries (commented above).
-        # REDUNDANCY: Cross-market conflicts are already handled by:
-        # - Cst-4 power limits prevent over-commitment (p_total + reserves ≤ P_max)
-        # - Cst-7 AS market exclusivity (can't bid FCR + aFRR simultaneously)
-        # - Objective function ensures economically optimal market selection
-        # Removing these saves 2T constraints, further reducing MILP complexity.
-        # --- END COMMENT ---
-        # # Cst-8: Cross-Market Mutual Exclusivity - UPDATED for Model (i)
-        # # y_total_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no total discharge with charging AS)
-        # # y_total_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no total charge with discharging AS)
-        # def cross_market_exclusivity_rule_1(model, t):
-        #     block = model.block_map[t]
-        #     return model.y_total_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
-        # model.cross_market_exclusivity1 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_1)
+        # Cst-8: Cross-Market Mutual Exclusivity - UPDATED for Model (i)
+        # y_total_dis(t) + y_fcr(b) + y_afrr_neg(b) ≤ 1  (no total discharge with charging AS)
+        # y_total_ch(t) + y_fcr(b) + y_afrr_pos(b) ≤ 1   (no total charge with discharging AS)
+        def cross_market_exclusivity_rule_1(model, t):
+            block = model.block_map[t]
+            return model.y_total_dis[t] + model.y_fcr[block] + model.y_afrr_neg[block] <= 1
+        model.cross_market_exclusivity1 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_1)
 
-        # def cross_market_exclusivity_rule_2(model, t):
-        #     block = model.block_map[t]
-        #     return model.y_total_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
-        # model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2)
+        def cross_market_exclusivity_rule_2(model, t):
+            block = model.block_map[t]
+            return model.y_total_ch[t] + model.y_fcr[block] + model.y_afrr_pos[block] <= 1
+        model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2)
 
-        # --- COMMENTED OUT Cst-9: DA Energy MinBid Constraints (Surgical Optimization V4) ---
-        # REASON: These 4 constraints enforce 0.1 MW minimum bid for DA energy market using y_ch/y_dis binaries.
-        # NON-CRITICAL: The 0.1 MW (100 kW) MinBid is very small compared to:
-        # - Battery capacity: 4,472 kWh
-        # - Typical C-rate power: 2,236 kW (C=0.5) to 1,491 kW (C=0.33)
-        # - Capacity market MinBids: 1.0 MW (10x larger, enforced with B-indexed binaries below)
-        # COST-BENEFIT: Removing 4T constraints is more valuable than enforcing this minor rule.
-        # The optimizer naturally avoids tiny bids due to transaction costs implicit in market behavior.
-        # --- END COMMENT ---
-        # # Cst-9: Minimum and Maximum Bid Size Constraints
-        # # DA Energy Bids: y(t)*MinBid*1000 ≤ p(t) ≤ y(t)*P_max_config
-        # def da_ch_min_bid_rule(model, t):
-        #     return model.p_ch[t] >= model.y_ch[t] * model.min_bid_da * 1000
-        # model.da_ch_min_bid = pyo.Constraint(model.T, rule=da_ch_min_bid_rule)
+        # Cst-9: Minimum and Maximum Bid Size Constraints
+        # DA Energy Bids: y(t)*MinBid*1000 ≤ p(t) ≤ y(t)*P_max_config
+        def da_ch_min_bid_rule(model, t):
+            return model.p_ch[t] >= model.y_ch[t] * model.min_bid_da * 1000
+        model.da_ch_min_bid = pyo.Constraint(model.T, rule=da_ch_min_bid_rule)
 
-        # def da_ch_max_bid_rule(model, t):
-        #     return model.p_ch[t] <= model.y_ch[t] * model.P_max_config
-        # model.da_ch_max_bid = pyo.Constraint(model.T, rule=da_ch_max_bid_rule)
+        def da_ch_max_bid_rule(model, t):
+            return model.p_ch[t] <= model.y_ch[t] * model.P_max_config
+        model.da_ch_max_bid = pyo.Constraint(model.T, rule=da_ch_max_bid_rule)
 
-        # def da_dis_min_bid_rule(model, t):
-        #     return model.p_dis[t] >= model.y_dis[t] * model.min_bid_da * 1000
-        # model.da_dis_min_bid = pyo.Constraint(model.T, rule=da_dis_min_bid_rule)
+        def da_dis_min_bid_rule(model, t):
+            return model.p_dis[t] >= model.y_dis[t] * model.min_bid_da * 1000
+        model.da_dis_min_bid = pyo.Constraint(model.T, rule=da_dis_min_bid_rule)
 
-        # def da_dis_max_bid_rule(model, t):
-        #     return model.p_dis[t] <= model.y_dis[t] * model.P_max_config
-        # model.da_dis_max_bid = pyo.Constraint(model.T, rule=da_dis_max_bid_rule)
+        def da_dis_max_bid_rule(model, t):
+            return model.p_dis[t] <= model.y_dis[t] * model.P_max_config
+        model.da_dis_max_bid = pyo.Constraint(model.T, rule=da_dis_max_bid_rule)
 
         # FCR Capacity Bids: y(b)*MinBid ≤ c(b) ≤ y(b)*P_max_config/1000
         def fcr_min_bid_rule(model, b):
@@ -700,50 +669,41 @@ class BESSOptimizerModelI:
             return model.c_afrr_neg[b] <= model.y_afrr_neg[b] * (model.P_max_config / 1000)
         model.afrr_neg_max_bid = pyo.Constraint(model.B, rule=afrr_neg_max_bid_rule)
 
-        # --- COMMENTED OUT Cst-9: aFRR Energy MinBid + Total Binary Linkage (Surgical Optimization V4) ---
-        # REASON: These 8 constraints enforce 0.1 MW MinBid for aFRR energy market and link binaries.
-        # Same rationale as DA energy MinBid above:
-        # - aFRR energy MinBid is 0.1 MW (same small threshold)
-        # - Total binary linkage constraints depend on all T-indexed binaries (commented above)
-        # - Removing 8T constraints significantly improves scalability
-        # CRITICAL MINBIDS RETAINED: Capacity market MinBids (1.0 MW) are still enforced below
-        # using B-indexed binaries (6 blocks × 3 markets = ~18 binaries for 7-day vs ~4.2k T-indexed).
-        # --- END COMMENT ---
-        # # PHASE II Model (i): aFRR Energy Market Bid Constraints (NEW)
-        # def afrr_pos_e_min_bid_rule(model, t):
-        #     return model.p_afrr_pos_e[t] >= model.y_afrr_pos_e[t] * model.min_bid_afrr_e * 1000
-        # model.afrr_pos_e_min_bid = pyo.Constraint(model.T, rule=afrr_pos_e_min_bid_rule)
+        # PHASE II Model (i): aFRR Energy Market Bid Constraints (NEW)
+        def afrr_pos_e_min_bid_rule(model, t):
+            return model.p_afrr_pos_e[t] >= model.y_afrr_pos_e[t] * model.min_bid_afrr_e * 1000
+        model.afrr_pos_e_min_bid = pyo.Constraint(model.T, rule=afrr_pos_e_min_bid_rule)
 
-        # def afrr_pos_e_max_bid_rule(model, t):
-        #     return model.p_afrr_pos_e[t] <= model.y_afrr_pos_e[t] * model.P_max_config
-        # model.afrr_pos_e_max_bid = pyo.Constraint(model.T, rule=afrr_pos_e_max_bid_rule)
+        def afrr_pos_e_max_bid_rule(model, t):
+            return model.p_afrr_pos_e[t] <= model.y_afrr_pos_e[t] * model.P_max_config
+        model.afrr_pos_e_max_bid = pyo.Constraint(model.T, rule=afrr_pos_e_max_bid_rule)
 
-        # def afrr_neg_e_min_bid_rule(model, t):
-        #     return model.p_afrr_neg_e[t] >= model.y_afrr_neg_e[t] * model.min_bid_afrr_e * 1000
-        # model.afrr_neg_e_min_bid = pyo.Constraint(model.T, rule=afrr_neg_e_min_bid_rule)
+        def afrr_neg_e_min_bid_rule(model, t):
+            return model.p_afrr_neg_e[t] >= model.y_afrr_neg_e[t] * model.min_bid_afrr_e * 1000
+        model.afrr_neg_e_min_bid = pyo.Constraint(model.T, rule=afrr_neg_e_min_bid_rule)
 
-        # def afrr_neg_e_max_bid_rule(model, t):
-        #     return model.p_afrr_neg_e[t] <= model.y_afrr_neg_e[t] * model.P_max_config
-        # model.afrr_neg_e_max_bid = pyo.Constraint(model.T, rule=afrr_neg_e_max_bid_rule)
+        def afrr_neg_e_max_bid_rule(model, t):
+            return model.p_afrr_neg_e[t] <= model.y_afrr_neg_e[t] * model.P_max_config
+        model.afrr_neg_e_max_bid = pyo.Constraint(model.T, rule=afrr_neg_e_max_bid_rule)
 
-        # # PHASE II Model (i): Total Binary Linkage (NEW)
-        # # y_total_ch >= y_ch and y_total_ch >= y_afrr_neg_e
-        # # y_total_dis >= y_dis and y_total_dis >= y_afrr_pos_e
-        # def total_ch_binary_link1_rule(model, t):
-        #     return model.y_total_ch[t] >= model.y_ch[t]
-        # model.total_ch_binary_link1 = pyo.Constraint(model.T, rule=total_ch_binary_link1_rule)
+        # PHASE II Model (i): Total Binary Linkage (NEW)
+        # y_total_ch >= y_ch and y_total_ch >= y_afrr_neg_e
+        # y_total_dis >= y_dis and y_total_dis >= y_afrr_pos_e
+        def total_ch_binary_link1_rule(model, t):
+            return model.y_total_ch[t] >= model.y_ch[t]
+        model.total_ch_binary_link1 = pyo.Constraint(model.T, rule=total_ch_binary_link1_rule)
 
-        # def total_ch_binary_link2_rule(model, t):
-        #     return model.y_total_ch[t] >= model.y_afrr_neg_e[t]
-        # model.total_ch_binary_link2 = pyo.Constraint(model.T, rule=total_ch_binary_link2_rule)
+        def total_ch_binary_link2_rule(model, t):
+            return model.y_total_ch[t] >= model.y_afrr_neg_e[t]
+        model.total_ch_binary_link2 = pyo.Constraint(model.T, rule=total_ch_binary_link2_rule)
 
-        # def total_dis_binary_link1_rule(model, t):
-        #     return model.y_total_dis[t] >= model.y_dis[t]
-        # model.total_dis_binary_link1 = pyo.Constraint(model.T, rule=total_dis_binary_link1_rule)
+        def total_dis_binary_link1_rule(model, t):
+            return model.y_total_dis[t] >= model.y_dis[t]
+        model.total_dis_binary_link1 = pyo.Constraint(model.T, rule=total_dis_binary_link1_rule)
 
-        # def total_dis_binary_link2_rule(model, t):
-        #     return model.y_total_dis[t] >= model.y_afrr_pos_e[t]
-        # model.total_dis_binary_link2 = pyo.Constraint(model.T, rule=total_dis_binary_link2_rule)
+        def total_dis_binary_link2_rule(model, t):
+            return model.y_total_dis[t] >= model.y_afrr_pos_e[t]
+        model.total_dis_binary_link2 = pyo.Constraint(model.T, rule=total_dis_binary_link2_rule)
 
         # OPTIMIZED OBJECTIVE FUNCTION - UPDATED for Model (i)
         def objective_rule(model):
@@ -960,44 +920,41 @@ class BESSOptimizerModelI:
                 if val_afrr_neg is not None:
                     solution["c_afrr_neg"][b] = val_afrr_neg
 
-            # Binaries - Day-ahead (OPTIONAL - may be commented out for performance)
-            if hasattr(model, 'y_ch'):
-                solution["y_ch"] = {}
-                solution["y_dis"] = {}
-                for t in model.T:
-                    val_y_ch = _safe_value(model.y_ch[t])
-                    if val_y_ch is not None:
-                        solution["y_ch"][t] = val_y_ch
+            # Binaries - Day-ahead
+            solution["y_ch"] = {}
+            solution["y_dis"] = {}
+            for t in model.T:
+                val_y_ch = _safe_value(model.y_ch[t])
+                if val_y_ch is not None:
+                    solution["y_ch"][t] = val_y_ch
 
-                    val_y_dis = _safe_value(model.y_dis[t])
-                    if val_y_dis is not None:
-                        solution["y_dis"][t] = val_y_dis
+                val_y_dis = _safe_value(model.y_dis[t])
+                if val_y_dis is not None:
+                    solution["y_dis"][t] = val_y_dis
 
-            # PHASE II Model (i): aFRR energy binaries (OPTIONAL - may be commented out for performance)
-            if hasattr(model, 'y_afrr_pos_e'):
-                solution["y_afrr_pos_e"] = {}
-                solution["y_afrr_neg_e"] = {}
-                for t in model.T:
-                    val_y_pos = _safe_value(model.y_afrr_pos_e[t])
-                    if val_y_pos is not None:
-                        solution["y_afrr_pos_e"][t] = val_y_pos
+            # PHASE II Model (i): aFRR energy binaries (NEW)
+            solution["y_afrr_pos_e"] = {}
+            solution["y_afrr_neg_e"] = {}
+            for t in model.T:
+                val_y_pos = _safe_value(model.y_afrr_pos_e[t])
+                if val_y_pos is not None:
+                    solution["y_afrr_pos_e"][t] = val_y_pos
 
-                    val_y_neg = _safe_value(model.y_afrr_neg_e[t])
-                    if val_y_neg is not None:
-                        solution["y_afrr_neg_e"][t] = val_y_neg
+                val_y_neg = _safe_value(model.y_afrr_neg_e[t])
+                if val_y_neg is not None:
+                    solution["y_afrr_neg_e"][t] = val_y_neg
 
-            # PHASE II Model (i): Total binaries (OPTIONAL - may be commented out for performance)
-            if hasattr(model, 'y_total_ch'):
-                solution["y_total_ch"] = {}
-                solution["y_total_dis"] = {}
-                for t in model.T:
-                    val_y_total_ch = _safe_value(model.y_total_ch[t])
-                    if val_y_total_ch is not None:
-                        solution["y_total_ch"][t] = val_y_total_ch
+            # PHASE II Model (i): Total binaries (NEW)
+            solution["y_total_ch"] = {}
+            solution["y_total_dis"] = {}
+            for t in model.T:
+                val_y_total_ch = _safe_value(model.y_total_ch[t])
+                if val_y_total_ch is not None:
+                    solution["y_total_ch"][t] = val_y_total_ch
 
-                    val_y_total_dis = _safe_value(model.y_total_dis[t])
-                    if val_y_total_dis is not None:
-                        solution["y_total_dis"][t] = val_y_total_dis
+                val_y_total_dis = _safe_value(model.y_total_dis[t])
+                if val_y_total_dis is not None:
+                    solution["y_total_dis"][t] = val_y_total_dis
 
             # Binaries - Ancillary service capacity
             solution["y_fcr"] = {}

@@ -333,6 +333,7 @@ Based on the methodology from Xu et al. (2017), we model cyclic aging as a \text
     \item \textbf{Logic:} The marginal cost $c^{\mathrm{cost}}_{j}$ increases as $j$ increases (deeper discharge), e.g., $c_1 < c_2 < ... < c_J$. The optimizer will naturally prefer to discharge from the "cheapest" (shallowest) available segment first, perfectly modeling the non-linear cost of deep discharges in a linear framework.
 \end{itemize}
 
+
 \subsubsection{Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
 The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
 (Details refer to `doc\p2_model\aging_cost\cyclic_aging.tex`)
@@ -381,6 +382,29 @@ The resulting costs for all segments are detailed in Table \ref{tab:marginal_cos
 \end{tabular}
 \end{table}
 \textit{This approach ensures that the sum of costs incurred by discharging all 10 segments equals exactly one "Cost per Full Cycle" (€232.92), making the model economically consistent and physically traceable.}
+
+
+\subsection{Solving the ”aFRR Energy Trap”: An Expected Value Approach}
+\label{sec:afrr_trap_solution}
+A key challenge in modeling the aFRR energy market is the significant uncertainty in activation. Historical data reveals that while aFRR energy prices are often higher than day-ahead (DA) prices, the probability of activation is low. For instance, the historical data indicates a high percentage of non-activation for positive aFRR energy bids.
+
+A deterministic optimization model, as formulated thus far, would naively interpret high aFRR energy prices as a guaranteed revenue opportunity, leading it to commit maximum available power to this market. This gives rise to the "aFRR Energy Trap," which has two primary consequences:
+\begin{enumerate}
+    \item \textbf{Profit Overestimation:} The model would calculate profits assuming 100\% activation, leading to a significant overstatement of true earnings, as many bids would not be called and would yield zero revenue.
+    \item \textbf{Inaccurate Degradation Modeling:} The model would incorrectly calculate battery degradation based on the assumption of full activation, while in reality, no physical cycling would occur for non-activated bids.
+\end{enumerate}
+To address this, we incorporate activation uncertainty directly into the deterministic framework using an \textbf{Expected Value (EV) model}. This approach avoids the computational complexity of stochastic or robust optimization methods while effectively mitigating the "aFRR trap."
+
+The EV model introduces a set of time-dependent parameters, denoted as $w^{\mathrm{pos}}_t$ and $w^{\mathrm{neg}}_t$, which represent the historical probability of activation for positive and negative aFRR energy bids at each interval $t$. These are derived from historical data on non-activation rates, $\pi^{\mathrm{pos}}_t$ and $\pi^{\mathrm{neg}}_t$:
+\begin{align}
+    w^{\mathrm{pos}}_t &= 1 - \pi^{\mathrm{pos}}_t \\
+    w^{\mathrm{neg}}_t &= 1 - \pi^{\mathrm{neg}}_t
+\end{align}
+By weighting the aFRR energy market bids with these probabilities, the model can make a more rational economic decision. For example, a high-priced aFRR bid with a low activation probability may be correctly evaluated as less profitable than a lower-priced but certain DA market bid. This modification is implemented through a minor adjustments to the objective function. The power bid variables, $p^{\mathrm{pos}}_{aFRR,E}(t)$ and $p^{\mathrm{neg}}_{aFRR,E}(t)$, are multiplied by their respective activation probabilities, $w^{\mathrm{pos}}_t$ and $w^{\mathrm{neg}}_t$:
+\begin{equation}
+\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{pos}}_{aFRR, E}(t) \cdot w_t^{\mathrm{pos}}) - \frac{P^{\mathrm{neg}}_{aFRR, E}(t)}{1000}\, (p^{\mathrm{neg}}_{aFRR, E}(t) \cdot w_t^{\mathrm{neg}}) \right)\, \Delta t
+\end{equation}
+
 
 
 \subsection{Model (iii): Model (ii) + Calendar Aging Cost}
@@ -524,6 +548,7 @@ p^{\mathrm{total}}_{\mathrm{ch}}(t) + 1000\,c_{fcr}(b) + 1000\,c^{\mathrm{neg}}_
 
 
 \subsection{Validation Needed: Explicit Cascading Constraints (Physical Rule)}
+\textbf{NOTICE: THIS SECTION IS CURRENTLY STRONGLY DIS-ENCOURAGED FOR IMPLEMENTATION DUE TO INCREASED MODEL COMPLEXITY. IT IS PROVIDED HERE FOR COMPLETENESS AND FUTURE REFERENCE.}
 To eliminate any ambiguity from the economic incentive model, we can introduce a set of explicit physical constraints to strictly enforce the 'Last-In, First-Out' (LIFO) behavior of the battery segments. While this approach increases model complexity, it ensures that the model's behavior aligns perfectly with physical reality under all conditions. This requires introducing two new sets of binary decision variables.
 
 \subsubsection{New Binary Variables for Cascading Logic}

@@ -1,0 +1,29 @@
+{
+  "solver_status": "optimal",
+  "build_time_sec": 0.039537,
+  "solve_time_sec": 2.211572,
+  "total_time_sec": 2.251109,
+  "num_variables": 3684,
+  "num_constraints": 2922,
+  "objective_value": 8649.115033973787,
+  "da_revenue": 1289.9712631000002,
+  "afrr_e_revenue": 8015.58385734371,
+  "capacity_revenue": -656.4400864699237,
+  "degradation_cost": 0,
+  "violations": {
+    "no_simultaneous_rule": [],
+    "cross_market_exclusivity": [],
+    "min_bid_rule_da": [],
+    "min_bid_rule_afrr_pos": [],
+    "min_bid_rule_afrr_neg": [],
+    "total_violations": 0
+  },
+  "config": {
+    "country": "HU",
+    "c_rate": 0.5,
+    "alpha": 1.0,
+    "num_days": 1,
+    "week": 14,
+    "base_date": "2024-04-01"
+  }
+}

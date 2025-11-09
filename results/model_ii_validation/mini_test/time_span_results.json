@@ -1,0 +1,70 @@
+[
+  {
+    "test_name": "1-day",
+    "num_days": 1,
+    "country": "HU",
+    "scenario": {
+      "c_rate": 0.5,
+      "alpha": 1.0,
+      "name": "baseline"
+    },
+    "base_date": "2024-07-22",
+    "metrics": {
+      "solver_status": "optimal",
+      "solve_time_sec": 6.046568,
+      "objective_value": 6077.716698757624,
+      "num_variables": 4068,
+      "num_constraints": 4266,
+      "energy_charged_kwh": 0.0,
+      "energy_discharged_kwh": 2862.080000000004,
+      "num_full_cycles": 0.6400000000000009,
+      "degradation_cost": 674.6719820323723,
+      "net_profit": 6077.716698757624,
+      "gross_revenue": 6752.388680789996,
+      "degradation_ratio_pct": 9.991604659129885,
+      "num_intervals": 96,
+      "num_days": 1.0,
+      "build_time_sec": 0.043516,
+      "total_time_sec": 6.090084
+    },
+    "success": true,
+    "timestamp": "2025-11-08T23:16:21.576945"
+  },
+  {
+    "test_name": "3-day",
+    "num_days": 3,
+    "country": "HU",
+    "scenario": {
+      "c_rate": 0.5,
+      "alpha": 1.0,
+      "name": "baseline"
+    },
+    "base_date": "2024-07-22",
+    "metrics": {
+      "solver_status": "optimal",
+      "solve_time_sec": 26.712819,
+      "objective_value": 23589.355597161823,
+      "num_variables": 12204,
+      "num_constraints": 12798,
+      "energy_charged_kwh": 3353.9999999999986,
+      "energy_discharged_kwh": 12064.617500000002,
+      "num_full_cycles": 2.6978125000000004,
+      "degradation_cost": 1957.282589025483,
+      "net_profit": 23589.355597161823,
+      "gross_revenue": 25546.638186187305,
+      "degradation_ratio_pct": 7.661605314799336,
+      "num_intervals": 288,
+      "num_days": 3.0,
+      "build_time_sec": 0.120047,
+      "total_time_sec": 26.832866
+    },
+    "success": true,
+    "timestamp": "2025-11-08T23:16:49.233215"
+  },
+  {
+    "test_name": "7-day",
+    "num_days": 7,
+    "success": false,
+    "error": "'objective_value'"
+  }
+]

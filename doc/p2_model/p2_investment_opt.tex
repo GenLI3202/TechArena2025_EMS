@@ -162,6 +162,57 @@ The solution approach is a simulation-based evaluation:
 \end{enumerate}
 This approach effectively decouples the high-level investment decision from the year-by-year operational decisions, while still capturing the critical long-term dynamics of degradation and discounted cash flows.
 
+
+\subsection{Motivation: Solving the "aFRR Energy Trap"}
+\label{sec:motivation}
+Our initial analysis of the \texttt{metadata.json} reveals a critical challenge: aFRR Energy prices are frequently higher than DA prices, but their activation is highly uncertain (e.g., \texttt{HU\_Pos\_zero\_pct} is 59.29\%).
+
+A deterministic model (like the one in \texttt{p2\_bi\_model\_ggdp.tex} \cite{ggdp_model}) will be "tricked" by these high prices. It will naively bid all its capacity into the aFRR Energy market, expecting 100\% activation. This leads to two failures:
+\begin{enumerate}
+    \item \textbf{Profit Overestimation:} The model's expected profit will be wildly inaccurate, as most bids will not be activated (resulting in 0 EUR revenue).
+    \item \textbf{Degradation Miscalculation:} The model will incorrectly calculate its own degradation, as the *physical* cycling does not occur.
+\end{enumerate}
+We \emph{must} account for this uncertainty.
+
+\subsection{Explanation: The "Expected Value" (EV) Approach}
+\label{sec:explanation}
+We reject computationally infeasible methods like multi-scenario SAA (Stochastic Optimization) or complex Robust Optimization (RO) with duality \cite{kazemi2017}.
+
+Instead, we implement a highly efficient \textbf{"Expected Value" (EV) model}. This approach is computationally "free" (it adds no variables or constraints) and perfectly solves the "aFRR trap".
+
+We introduce a new set of \textbf{parameters} (not variables), $w_t$, derived directly from the \texttt{metadata.json}:
+\begin{itemize}
+    \item $w^{\mathrm{pos}}_t = 1.0 - \texttt{afrr\_energy.[Country]\_Pos\_zero\_pct}(t)$
+    \item $w^{\mathrm{neg}}_t = 1.0 - \texttt{afrr\_energy.[Country]\_Neg\_zero\_pct}(t)$
+\end{itemize}
+These parameters ($w_t \in [0, 1]$) represent the historical probability of aFRR energy activation at time $t$. We then multiply our aFRR bids by these probabilities.
+
+This ensures the optimizer makes a rational economic choice:
+\begin{itemize}
+    \item \textbf{Old Model (Naive):} $\text{Profit}_{aFRR} (100) > \text{Profit}_{DA} (80)$? $\to$ Choose aFRR.
+    \item \textbf{New Model (EV):} $\text{Profit}_{aFRR} (100) \times w_t(0.5) < \text{Profit}_{DA} (80)$? $\to$ Correctly choose DA.
+\end{itemize}
+
+\subsection{Model (ii): Model (i) + Expected-Value Cyclic Aging Cost}
+\label{sec:model-ii-xu}
+The logic for the cyclic aging cost, based on Xu et al. (2017) \cite{xu2017}, remains unchanged. The core idea is still to penalize deeper cycles more heavily.
+\begin{itemize}
+    \item \textbf{Core Variables:} $e_{\mathrm{soc},j}(t)$ (energy in segment $j$), $p^{\mathrm{ch}}_{j}(t)$ (charge to segment $j$), and $p^{\mathrm{dis}}_{j}(t)$ (discharge from segment $j$).
+    \item \textbf{Cost Function:} $C^{\mathrm{cyc}} = \sum_{t \in T} \sum_{j \in J} \left( c^{\mathrm{cost}}_{j} \cdot \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \cdot \Delta t \right)$
+    \item \textbf{Logic:} The optimizer will still prefer to discharge from the "cheapest" (shallowest) segment $j$ first.
+\end{itemize}
+The "magic" is that this cost function is now fed the \textbf{expected physical power}, not the naive 100\% activation power. This is achieved by two minor, "surgical" changes in the \textbf{Objective Function} and the \textbf{Power Balance} constraints.
+
+\subsubsection{Surgical Changes to Implement the EV Model}
+To implement this, we modify two key areas of the full model:
+
+\paragraph{Update to Objective Function (Eq. 24 in \texttt{.tex})}
+The aFRR Energy profit ($\mathbb{P}^{aFRR\_E}$) is now calculated based on its *expected* revenue.
+\begin{equation}
+\mathbb{P}^{aFRR\_E} = \sum_{t\in T} \left( \frac{P^{\mathrm{pos}}_{E}(t)}{1000}\, (p^{\mathrm{pos}}_{E}(t) \cdot \mathbf{w_t^{\mathrm{pos}}}) - \frac{P^{\mathrm{neg}}_{E}(t)}{1000}\, (p^{\mathrm{neg}}_{E}(t) \cdot \mathbf{w_t^{\mathrm{neg}}}) \right)\, \Delta t
+\end{equation}
+
+
 \begin{thebibliography}{9}
 \bibitem{collath2023}
 N. Collath, M. Cornejo, V. Engwerth, H. Hesse, and A. Jossen. (2023). "Increasing the lifetime profitability of battery energy storage systems through aging aware operation." \textit{Applied Energy}, 348, 121531.
