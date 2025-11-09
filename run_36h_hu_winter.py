@@ -36,7 +36,9 @@ def main():
     country = 'HU'
     horizon_hours = 36
     horizon_steps = horizon_hours * 4  # 15-min intervals
-    data_file = "data/phase_1_data_TechArena2025_data_tidy.jsonl"
+
+    # Use archived Phase 1 JSONL (optimizer will auto-load Phase 2 parquet for aFRR energy)
+    data_file = "data/archive/phase_1_data_TechArena2025_data_tidy.jsonl"
 
     # Winter period: Use January data (week 1-2)
     start_step = 0
@@ -151,10 +153,8 @@ def main():
     print("Preparing Detailed Solution...")
     print("="*80)
 
-    # Use existing extraction function
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent / 'py_script' / 'test_scripts' / 'archive'))
-    from test_cst8_detailed_solution import extract_detailed_solution
+    # Use extraction function from visualization module
+    from py_script.visualization.optimization_analysis import extract_detailed_solution
     df = extract_detailed_solution(solution, data_slice, horizon_hours)
 
     # Save to CSV

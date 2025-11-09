@@ -1218,10 +1218,18 @@ class BESSOptimizerModelI:
                 country_df['price_afrr_energy_pos'] = data[(as_country, 'afrr_energy', 'positive')]
                 country_df['price_afrr_energy_neg'] = data[(as_country, 'afrr_energy', 'negative')]
                 logger.info(f"aFRR energy market data extracted for {country}")
+
+                # CRITICAL: Preprocess aFRR energy prices (convert 0 → NaN)
+                # Price = 0 means "market not activated", NOT "free energy"
+                # This prevents false arbitrage opportunities
+                country_df['price_afrr_energy_pos'] = country_df['price_afrr_energy_pos'].replace(0, np.nan)
+                country_df['price_afrr_energy_neg'] = country_df['price_afrr_energy_neg'].replace(0, np.nan)
+                logger.info(f"Preprocessed aFRR energy prices: 0 → NaN (prevents false arbitrage)")
+
             except KeyError:
-                logger.warning(f"aFRR energy market data not available for {country}. Setting to 0 (Model (i) will be limited).")
-                country_df['price_afrr_energy_pos'] = 0.0
-                country_df['price_afrr_energy_neg'] = 0.0
+                logger.warning(f"aFRR energy market data not available for {country}. Setting to NaN (Model (i) will be limited).")
+                country_df['price_afrr_energy_pos'] = np.nan
+                country_df['price_afrr_energy_neg'] = np.nan
 
             # Add aFRR activation probabilities for Expected Value weighting
             if self.use_afrr_ev_weighting:

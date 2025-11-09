@@ -8,12 +8,12 @@
   "max_as_ratio": 0.8,
   "optimization": {
     "status": "optimal",
-    "objective_value": 1037.1317139757723,
-    "build_time_seconds": 0.07903337478637695,
-    "solve_time_seconds": 1.4583790302276611,
-    "total_time_seconds": 1.537412405014038,
+    "objective_value": 264.22504266906964,
+    "build_time_seconds": 0.07100081443786621,
+    "solve_time_seconds": 0.605177640914917,
+    "total_time_seconds": 0.6761784553527832,
     "n_variables": 6390,
-    "n_constraints": 5370
+    "n_constraints": 5400
   },
   "bess_config": {
     "capacity_kwh": 4472,
@@ -23,5 +23,5 @@
     "initial_soc": 0.5,
     "daily_cycle_limit": null
   },
-  "timestamp": "2025-11-09T18:20:44.402966"
+  "timestamp": "2025-11-09T23:26:19.337993"
 }
