@@ -1,45 +1,58 @@
-"""Market data exploration utilities for TechArena 2025 Phase I.
+"""Market data visualization utilities for TechArena 2025 Phase II.
 
-This module loads the official Huawei TechArena 2025 data workbook, reshapes the
-Day-Ahead, FCR, and aFRR market tables into wide-format pandas DataFrames, and offers
-both Plotly-based visualizations and format conversion utilities.
+This module provides comprehensive visualization functions for electricity market data
+across multiple markets: Day-Ahead, FCR, aFRR Capacity, and aFRR Energy.
 
 Data Format
 -----------
-By default, the module loads data in    melted_df = afrr_raw.melt(
-        id_vars=[TIMESTAMP_COL],
-        value_vars=country_dir_cols,
-        var_name="country_direction",
-        value_name=PRICE_COL_MW,
-    ).dropna(subset=[PRICE_COL_MW])format:
+Supports both wide and tidy formats:
 - Day-ahead & FCR: columns [timestamp, DE_LU/DE, AT, CH, HU, CZ]  
 - aFRR: columns [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
 
-Format conversion helpers are provided to convert between wide and tidy formats
-as needed for different analysis tasks.
+Key Visualization Functions
+----------------------------
 
-Typical usage
+**Time Series (Trend Analysis):**
+- plot_price_time_series_mckinsey() - Multi-market time series for one country
+- plot_day_ahead_trend() - Day-ahead prices over time
+
+**Box Plot Distributions (NEW Phase II):**
+- plot_all_markets_distribution() - 2x2 grid showing all 4 markets
+- plot_country_market_comparison() - Single country across all markets
+- plot_market_distribution() - Flexible single-market distribution
+- Individual wrappers: plot_day_ahead_distribution(), plot_fcr_distribution(), etc.
+
+**Advanced Visualizations:**
+- plot_da_price_heatmap_mckinsey() - Hour x Month heatmap
+- plot_da_price_ridgeline_mckinsey() - Multi-country ridge plot
+- plot_price_statistics_mckinsey() - Statistical summary table
+
+Typical Usage
 -------------
 >>> from pathlib import Path
->>> from market_da import (
-...     load_market_tables,
-...     wide_to_tidy_day_ahead,
-...     plot_day_ahead_distribution,
+>>> from py_script.data.load_process_market_data import load_phase2_market_tables
+>>> from py_script.data.visualize_market_data import (
+...     plot_all_markets_distribution,
+...     plot_country_market_comparison,
+...     plot_price_time_series_mckinsey
 ... )
->>> # Load data in wide format (default)
->>> tables = load_market_tables(Path("../SoloGen_TechArena2025_Phase1/input/TechArena2025_data.xlsx"))
->>> print(tables["day_ahead"].columns)  # ['timestamp', 'DE_LU', 'AT', 'CH', 'HU', 'CZ']
 >>> 
->>> # Convert to tidy format for specific analyses
->>> tidy_da = wide_to_tidy_day_ahead(tables["day_ahead"]) 
->>> print(tidy_da.columns)  # ['timestamp', 'country', 'price_eur_mwh']
->>>
->>> # Plotting works with both formats
->>> da_fig = plot_day_ahead_distribution(tables["day_ahead"])
->>> da_fig.show()
+>>> # Load Phase 2 data
+>>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+>>> 
+>>> # Example 1: Compare all markets side-by-side
+>>> fig1 = plot_all_markets_distribution(tables, countries=['DE', 'AT', 'CH'])
+>>> fig1.show()
+>>> 
+>>> # Example 2: Single country across all markets
+>>> fig2 = plot_country_market_comparison(tables, country='DE')
+>>> fig2.show()
+>>> 
+>>> # Example 3: Time series trends
+>>> fig3 = plot_price_time_series_mckinsey(tables, country='DE', time_range='Q1')
+>>> fig3.show()
 
-All helpers return pandas DataFrames or Plotly Figure instances so they can be
-embedded into notebooks, dashboards, or downstream reports.
+All functions return Plotly Figure instances for embedding in notebooks or dashboards.
 """
 from __future__ import annotations
 
@@ -216,6 +229,11 @@ def plot_market_distribution(market_df: pd.DataFrame, market_type: str = 'day_ah
     else:
         # Data is already in tidy format
         melted = market_df.copy()
+    
+    # Special handling for day-ahead: rename DE_LU to DE for consistency
+    if market_type == 'day_ahead' and COUNTRY_COL in melted.columns:
+        if 'DE_LU' in melted[COUNTRY_COL].values:
+            melted[COUNTRY_COL] = melted[COUNTRY_COL].replace('DE_LU', 'DE')
     
     # Rename columns for plotting
     melted = melted.rename(columns={price_col: 'price', COUNTRY_COL: 'country'})
@@ -632,6 +650,275 @@ def plot_price_time_series_mckinsey(
             xanchor='right',
             x=1
         )
+    )
+
+    return fig
+
+
+def plot_all_markets_distribution(
+    tables: Dict[str, pd.DataFrame],
+    countries: list = None,
+    layout: str = '2x2'
+) -> go.Figure:
+    """Plot box distributions for all 4 markets in a single figure.
+
+    Creates a multi-panel visualization showing price distributions across
+    day-ahead, FCR, aFRR capacity, and aFRR energy markets.
+
+    Parameters
+    ----------
+    tables : dict
+        Dictionary with keys: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy'
+    countries : list, optional
+        List of country codes to include (default: all available)
+    layout : str, optional
+        Layout style: '2x2' (grid) or 'horizontal' (1x4) (default: '2x2')
+
+    Returns
+    -------
+    go.Figure
+        Multi-panel box plot figure
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_all_markets_distribution(tables, countries=['DE', 'AT', 'CH'])
+    >>> fig.show()
+    """
+    from plotly.subplots import make_subplots
+    from visualization.config import COUNTRY_COLORS, get_country_color
+
+    if countries is None:
+        countries = ['DE', 'AT', 'CH', 'HU', 'CZ']
+
+    # Define market configurations
+    market_configs = [
+        ('day_ahead', 'Day-Ahead Energy', 'EUR/MWh', PRICE_COL_MWH),
+        ('fcr', 'FCR Capacity', 'EUR/MW', PRICE_COL_MW),
+        ('afrr_capacity', 'aFRR Capacity', 'EUR/MW', PRICE_COL_MW),
+        ('afrr_energy', 'aFRR Energy', 'EUR/MWh', PRICE_COL_MWH)
+    ]
+
+    # Create subplot layout
+    if layout == '2x2':
+        rows, cols = 2, 2
+        subplot_titles = [config[1] for config in market_configs]
+    else:  # horizontal
+        rows, cols = 1, 4
+        subplot_titles = [config[1] for config in market_configs]
+
+    fig = make_subplots(
+        rows=rows, cols=cols,
+        subplot_titles=subplot_titles,
+        vertical_spacing=0.12,
+        horizontal_spacing=0.10
+    )
+
+    # Plot each market
+    for idx, (market_key, title, unit, price_col) in enumerate(market_configs):
+        if market_key not in tables:
+            continue
+
+        df = tables[market_key]
+        row = idx // cols + 1
+        col = idx % cols + 1
+
+        # Convert to tidy format for plotting
+        if market_key == 'day_ahead':
+            tidy_df = wide_to_tidy_day_ahead(df)
+            # The conversion function returns 'price_eur_mwh' column
+            actual_price_col = 'price_eur_mwh'
+            # Special handling: Day-ahead has 'DE_LU' instead of 'DE'
+            # Rename DE_LU to DE for consistency with other markets
+            if 'DE_LU' in tidy_df[COUNTRY_COL].values:
+                tidy_df[COUNTRY_COL] = tidy_df[COUNTRY_COL].replace('DE_LU', 'DE')
+        elif market_key == 'fcr':
+            tidy_df = wide_to_tidy_fcr(df)
+            # The conversion function returns 'price_eur_mw' column
+            actual_price_col = 'price_eur_mw'
+        elif market_key == 'afrr_capacity':
+            tidy_df = wide_to_tidy_afrr(df)
+            # The conversion function returns 'price_eur_mw' column
+            actual_price_col = 'price_eur_mw'
+        elif market_key == 'afrr_energy':
+            tidy_df = wide_to_tidy_afrr(df)
+            # For aFRR energy, we need to convert the price column name
+            # The wide_to_tidy_afrr returns 'price_eur_mw' but for energy it should be 'price_eur_mwh'
+            # Let's check what column actually exists
+            if 'price_eur_mw' in tidy_df.columns:
+                # Rename it to match energy pricing
+                tidy_df = tidy_df.rename(columns={'price_eur_mw': 'price_eur_mwh'})
+                actual_price_col = 'price_eur_mwh'
+            else:
+                actual_price_col = 'price_eur_mwh'
+        else:
+            continue
+
+        # Filter countries
+        if COUNTRY_COL in tidy_df.columns:
+            tidy_df = tidy_df[tidy_df[COUNTRY_COL].isin(countries)]
+        
+        # For aFRR markets, we might have direction column - need to aggregate both directions
+        if 'direction' in tidy_df.columns:
+            # Combine both Pos and Neg into the country data
+            for country in countries:
+                country_data = tidy_df[tidy_df[COUNTRY_COL] == country]
+                if len(country_data) == 0:
+                    continue
+
+                fig.add_trace(
+                    go.Box(
+                        y=country_data[actual_price_col],
+                        name=country,
+                        marker_color=get_country_color(country),
+                        showlegend=(idx == 0),  # Only show legend once
+                        legendgroup=country,
+                        boxmean='sd'  # Show mean and std dev
+                    ),
+                    row=row, col=col
+                )
+        else:
+            # Regular markets without direction
+            for country in countries:
+                country_data = tidy_df[tidy_df[COUNTRY_COL] == country]
+                if len(country_data) == 0:
+                    continue
+
+                fig.add_trace(
+                    go.Box(
+                        y=country_data[actual_price_col],
+                        name=country,
+                        marker_color=get_country_color(country),
+                        showlegend=(idx == 0),  # Only show legend once
+                        legendgroup=country,
+                        boxmean='sd'  # Show mean and std dev
+                    ),
+                    row=row, col=col
+                )
+
+        # Update axes labels
+        fig.update_xaxes(title_text="Country", row=row, col=col)
+        fig.update_yaxes(title_text=f"Price ({unit})", row=row, col=col)
+
+    # Update overall layout
+    fig.update_layout(
+        title_text="Market Price Distributions - Multi-Market Comparison",
+        height=800 if layout == '2x2' else 400,
+        showlegend=True,
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=-0.15 if layout == '2x2' else -0.3,
+            xanchor='center',
+            x=0.5
+        )
+    )
+
+    return fig
+
+
+def plot_country_market_comparison(
+    tables: Dict[str, pd.DataFrame],
+    country: str,
+    market_types: list = None
+) -> go.Figure:
+    """Compare price distributions across multiple markets for a single country.
+
+    Creates a side-by-side box plot comparison showing how prices vary
+    across different market types for a specific country.
+
+    Parameters
+    ----------
+    tables : dict
+        Dictionary with keys: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy'
+    country : str
+        Country code (DE, AT, CH, HU, CZ)
+    market_types : list, optional
+        List of markets to include (default: all)
+
+    Returns
+    -------
+    go.Figure
+        Box plot comparison figure
+
+    Example
+    -------
+    >>> tables = load_phase2_market_tables(Path("data/TechArena2025_Phase2_data.xlsx"))
+    >>> fig = plot_country_market_comparison(tables, country='DE')
+    >>> fig.show()
+    """
+    from visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
+
+    if market_types is None:
+        market_types = ['day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy']
+
+    fig = go.Figure()
+
+    colors = [
+        MCKINSEY_COLORS['cat_1'],
+        MCKINSEY_COLORS['cat_2'],
+        MCKINSEY_COLORS['teal'],
+        MCKINSEY_COLORS['cat_5']
+    ]
+
+    # Define market configurations
+    market_configs = {
+        'day_ahead': ('Day-Ahead', 'EUR/MWh', 'DE_LU' if country == 'DE' else country),
+        'fcr': ('FCR', 'EUR/MW', country),
+        'afrr_capacity': ('aFRR Cap', 'EUR/MW', None),  # Has Pos/Neg
+        'afrr_energy': ('aFRR Energy', 'EUR/MWh', None)  # Has Pos/Neg
+    }
+
+    x_labels = []
+    color_idx = 0
+
+    for market_key in market_types:
+        if market_key not in tables or market_key not in market_configs:
+            continue
+
+        df = tables[market_key]
+        label, unit, col_name = market_configs[market_key]
+
+        # Handle markets with Pos/Neg directions
+        if market_key in ['afrr_capacity', 'afrr_energy']:
+            for direction in ['Pos', 'Neg']:
+                col = f'{country}_{direction}'
+                if col in df.columns:
+                    prices = df[col].dropna()
+                    if len(prices) > 0:
+                        fig.add_trace(go.Box(
+                            y=prices,
+                            name=f'{label} ({direction})',
+                            marker_color=colors[color_idx % len(colors)],
+                            boxmean='sd'
+                        ))
+                        x_labels.append(f'{label}<br>({direction})')
+                        color_idx += 1
+        else:
+            # Regular markets (day-ahead, FCR)
+            if col_name and col_name in df.columns:
+                prices = df[col_name].dropna()
+                if len(prices) > 0:
+                    fig.add_trace(go.Box(
+                        y=prices,
+                        name=label,
+                        marker_color=colors[color_idx % len(colors)],
+                        boxmean='sd'
+                    ))
+                    x_labels.append(label)
+                    color_idx += 1
+
+    # Apply styling
+    fig = apply_mckinsey_style(
+        fig,
+        title=f'Price Distribution Comparison - {country} (All Markets)'
+    )
+
+    fig.update_layout(
+        xaxis_title='Market Type',
+        yaxis_title='Price (EUR)',
+        height=500,
+        showlegend=False
     )
 
     return fig
