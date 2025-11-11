@@ -31,381 +31,114 @@ from ..visualization.config import MCKINSEY_COLORS, MCKINSEY_FONTS
 # Constants
 TIMESTAMP_COL = "timestamp"
 
-def plot_battery_operation_schedule(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
-    """Plot battery charge/discharge schedule with market prices."""
-    required_vars = ['p_ch', 'p_dis', 'e_soc']
-    if not all(var in solution_data for var in required_vars):
-        raise ValueError(f"Solution data must contain {required_vars}")
 
-    time_indices = sorted(solution_data['p_ch'].keys())
-    charge_values = [solution_data['p_ch'][t] for t in time_indices]
-    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
-    soc_values = [solution_data['e_soc'][t] for t in time_indices]
-    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
-    day_ahead_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
+# ---------------------------------------------------------------------------
+# Solution Analysis 
+# ---------------------------------------------------------------------------
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=datetime_values, y=charge_values, mode='lines', name='Charge (kW)', line=dict(color='green', width=2), fill='tozeroy', fillcolor='rgba(0,255,0,0.3)'))
-    fig.add_trace(go.Scatter(x=datetime_values, y=[-d for d in discharge_values], mode='lines', name='Discharge (kW)', line=dict(color='red', width=2), fill='tozeroy', fillcolor='rgba(255,0,0,0.3)'))
-    fig.add_trace(go.Scatter(x=datetime_values, y=soc_values, mode='lines', name='State of Charge (kWh)', line=dict(color='blue', width=2, dash='dash'), yaxis='y2'))
-    fig.add_trace(go.Scatter(x=datetime_values, y=day_ahead_prices, mode='lines', name='Day-Ahead Price (€/MWh)', line=dict(color='orange', width=1), yaxis='y3', opacity=0.7))
 
-    fig.update_layout(
-        title=f'Battery Operation Schedule {title_suffix}', xaxis_title='Time',
-        yaxis=dict(title='Power (kW)', side='left'),
-        yaxis2=dict(title='SoC (kWh)', side='right', overlaying='y', showgrid=False),
-        yaxis3=dict(title='Price (€/MWh)', side='right', overlaying='y', position=0.95, showgrid=False),
-        hovermode='x unified', width=1000, height=500
-    )
-    return fig
+def extract_detailed_solution(solution: dict, test_data: pd.DataFrame, horizon_hours: int):
+    """Extract all decision variables and market data into a DataFrame."""
 
-def plot_market_price_bid_comparison(solution_data: Dict, country_data: pd.DataFrame, market_type: str = 'day_ahead', title_suffix: str = "") -> go.Figure:
-    """Plot market prices vs battery bids for arbitrage analysis."""
-    required_vars = ['p_ch', 'p_dis']
-    if not all(var in solution_data for var in required_vars):
-        raise ValueError(f"Solution data must contain {required_vars}")
+    T = len(solution.get('e_soc', {}))
 
-    price_col_map = {'day_ahead': 'price_day_ahead', 'fcr': 'price_fcr', 'afrr': 'price_afrr_pos'}
-    if market_type not in price_col_map:
-        raise ValueError(f"Market type must be one of {list(price_col_map.keys())}")
-    price_col = price_col_map[market_type]
+    # Initialize data dictionary
+    data = {
+        'time_step': list(range(T)),
+        'hour': [t * 0.25 for t in range(T)],  # 15-min intervals
+    }
 
-    time_indices = sorted(solution_data['p_ch'].keys())
-    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
-    market_prices = country_data[price_col].iloc[:len(time_indices)].tolist()
-    charge_vals = [solution_data['p_ch'][t] for t in time_indices]
-    discharge_vals = [solution_data['p_dis'][t] for t in time_indices]
-    net_power = [c - d for c, d in zip(charge_vals, discharge_vals)]
+    # SOC and segment data
+    data['soc_kwh'] = [solution.get('e_soc', {}).get(t, 0) for t in range(T)]
+    data['soc_pct'] = [solution.get('e_soc', {}).get(t, 0) / 4472 * 100 for t in range(T)]
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=datetime_values, y=market_prices, mode='lines', name=f'{market_type.replace("_", " ").title()} Price (€/MWh)', line=dict(color='blue', width=2)))
-    fig.add_trace(go.Scatter(x=datetime_values, y=charge_vals, mode='lines', name='Battery Charging (kW)', line=dict(color='green', width=1.5, dash='dot'), yaxis='y2'))
-    fig.add_trace(go.Scatter(x=datetime_values, y=discharge_vals, mode='lines', name='Battery Discharging (kW)', line=dict(color='red', width=1.5, dash='dot'), yaxis='y2'))
-    fig.add_trace(go.Scatter(x=datetime_values, y=net_power, mode='lines', name='Net Power (kW)', line=dict(color='purple', width=1, dash='dash'), yaxis='y2'))
+    # Power variables
+    data['p_ch_kw'] = [solution.get('p_ch', {}).get(t, 0) for t in range(T)]
+    data['p_dis_kw'] = [solution.get('p_dis', {}).get(t, 0) for t in range(T)]
+    data['p_total_ch_kw'] = [solution.get('p_total_ch', {}).get(t, 0) for t in range(T)]
+    data['p_total_dis_kw'] = [solution.get('p_total_dis', {}).get(t, 0) for t in range(T)]
 
-    fig.update_layout(
-        title=f'{market_type.replace("_", " ").title()} Market: Price vs Battery Actions {title_suffix}',
-        xaxis_title='Time',
-        yaxis=dict(title='Market Price (€/MWh)', side='left'),
-        yaxis2=dict(title='Battery Power (kW)', side='right', overlaying='y'),
-        hovermode='x unified', width=1000, height=500
-    )
-    return fig
+    # aFRR energy power
+    data['p_afrr_pos_e_kw'] = [solution.get('p_afrr_pos_e', {}).get(t, 0) for t in range(T)]
+    data['p_afrr_neg_e_kw'] = [solution.get('p_afrr_neg_e', {}).get(t, 0) for t in range(T)]
 
-def plot_arbitrage_opportunities(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
-    """Plot arbitrage opportunities highlighting profitable periods."""
-    required_vars = ['p_ch', 'p_dis']
-    if not all(var in solution_data for var in required_vars):
-        raise ValueError(f"Solution data must contain {required_vars}")
+    # Binary decisions (time-indexed)
+    data['y_ch'] = [solution.get('y_ch', {}).get(t, 0) for t in range(T)]
+    data['y_dis'] = [solution.get('y_dis', {}).get(t, 0) for t in range(T)]
+    data['y_total_ch'] = [solution.get('y_total_ch', {}).get(t, 0) for t in range(T)]
+    data['y_total_dis'] = [solution.get('y_total_dis', {}).get(t, 0) for t in range(T)]
 
-    time_indices = sorted(solution_data['p_ch'].keys())
-    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
-    day_ahead_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
-    charge_values = [solution_data['p_ch'][t] for t in time_indices]
-    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+    # Block-indexed variables (need to map to time steps)
+    block_map = solution.get('block_map', {})
 
-    charge_periods = [i for i, c in enumerate(charge_values) if c > 1e-6]
-    discharge_periods = [i for i, d in enumerate(discharge_values) if d > 1e-6]
-    price_rolling_mean = pd.Series(day_ahead_prices).rolling(window=4, center=True).mean()
-    price_deviations = [p - pm if pd.notna(pm) else 0 for p, pm in zip(day_ahead_prices, price_rolling_mean)]
+    # Capacity bids (MW)
+    data['c_fcr_mw'] = [solution.get('c_fcr', {}).get(block_map.get(t, 0), 0) for t in range(T)]
+    data['c_afrr_pos_mw'] = [solution.get('c_afrr_pos', {}).get(block_map.get(t, 0), 0) for t in range(T)]
+    data['c_afrr_neg_mw'] = [solution.get('c_afrr_neg', {}).get(block_map.get(t, 0), 0) for t in range(T)]
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=datetime_values, y=day_ahead_prices, mode='lines', name='Day-Ahead Price (€/MWh)', line=dict(color='blue', width=2)))
-    fig.add_trace(go.Scatter(x=datetime_values, y=price_rolling_mean.tolist(), mode='lines', name='Price Moving Average', line=dict(color='gray', width=1, dash='dash'), opacity=0.7))
-    if charge_periods:
-        fig.add_trace(go.Scatter(x=[datetime_values[i] for i in charge_periods], y=[day_ahead_prices[i] for i in charge_periods], mode='markers', name='Battery Charging (Buy)', marker=dict(color='green', size=8, symbol='circle')))
-    if discharge_periods:
-        fig.add_trace(go.Scatter(x=[datetime_values[i] for i in discharge_periods], y=[day_ahead_prices[i] for i in discharge_periods], mode='markers', name='Battery Discharging (Sell)', marker=dict(color='red', size=8, symbol='triangle-up')))
-    fig.add_trace(go.Scatter(x=datetime_values, y=price_deviations, mode='lines', name='Price Deviation from Average', line=dict(color='orange', width=1), yaxis='y2', opacity=0.5))
+    # Binary decisions (block-indexed)
+    data['y_fcr'] = [solution.get('y_fcr', {}).get(block_map.get(t, 0), 0) for t in range(T)]
+    data['y_afrr_pos'] = [solution.get('y_afrr_pos', {}).get(block_map.get(t, 0), 0) for t in range(T)]
+    data['y_afrr_neg'] = [solution.get('y_afrr_neg', {}).get(block_map.get(t, 0), 0) for t in range(T)]
 
-    fig.update_layout(
-        title=f'Arbitrage Opportunities Analysis {title_suffix}', xaxis_title='Time',
-        yaxis=dict(title='Price (€/MWh)', side='left'),
-        yaxis2=dict(title='Price Deviation (€/MWh)', side='right', overlaying='y', showgrid=False),
-        hovermode='x unified', width=1000, height=500
-    )
-    return fig
+    # Market prices (from test_data)
+    if len(test_data) >= T:
+        data['price_da_eur_mwh'] = test_data['price_day_ahead'].iloc[:T].values
+        data['price_fcr_eur_mw'] = test_data['price_fcr'].iloc[:T].values
+        # aFRR capacity prices (price_afrr_pos/neg are capacity prices)
+        data['price_afrr_cap_pos_eur_mw'] = test_data['price_afrr_pos'].iloc[:T].values
+        data['price_afrr_cap_neg_eur_mw'] = test_data['price_afrr_neg'].iloc[:T].values
+        # aFRR energy prices
+        data['price_afrr_energy_pos_eur_mwh'] = test_data['price_afrr_energy_pos'].iloc[:T].values
+        data['price_afrr_energy_neg_eur_mwh'] = test_data['price_afrr_energy_neg'].iloc[:T].values
 
-def plot_revenue_breakdown(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
-    """Plot revenue breakdown by market and time period."""
-    required_vars = ['p_ch', 'p_dis']
-    if not all(var in solution_data for var in required_vars):
-        raise ValueError(f"Solution data must contain {required_vars}")
+    # Cst-8 check values
+    data['cst8_discharge_sum'] = [
+        data['y_total_dis'][t] + data['y_fcr'][t] + data['y_afrr_neg'][t]
+        for t in range(T)
+    ]
+    data['cst8_charge_sum'] = [
+        data['y_total_ch'][t] + data['y_fcr'][t] + data['y_afrr_pos'][t]
+        for t in range(T)
+    ]
 
-    time_indices = sorted(solution_data['p_ch'].keys())
-    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
-    charge_values = [solution_data['p_ch'][t] for t in time_indices]
-    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
-    da_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
-    da_revenue = [(d - c) * p * 0.25 for c, d, p in zip(charge_values, discharge_values, da_prices)]
-    cumulative_revenue = pd.Series(da_revenue).cumsum().tolist()
+    # Revenue calculations (per time step)
+    data['revenue_da_eur'] = [
+        (data['p_dis_kw'][t] * data['price_da_eur_mwh'][t] / 1000 -
+         data['p_ch_kw'][t] * data['price_da_eur_mwh'][t] / 1000) * 0.25
+        if 'price_da_eur_mwh' in data else 0
+        for t in range(T)
+    ]
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=datetime_values, y=da_revenue, mode='lines', name='Instantaneous Revenue (€/15min)', line=dict(color='green', width=1), opacity=0.7))
-    fig.add_trace(go.Scatter(x=datetime_values, y=cumulative_revenue, mode='lines', name='Cumulative Revenue (€)', line=dict(color='blue', width=2), yaxis='y2'))
+    data['revenue_afrr_energy_eur'] = [
+        (data['p_afrr_pos_e_kw'][t] * data['price_afrr_energy_pos_eur_mwh'][t] / 1000 +
+         data['p_afrr_neg_e_kw'][t] * data['price_afrr_energy_neg_eur_mwh'][t] / 1000) * 0.25
+        if 'price_afrr_energy_pos_eur_mwh' in data else 0
+        for t in range(T)
+    ]
 
-    fig.update_layout(
-        title=f'Revenue Analysis {title_suffix}', xaxis_title='Time',
-        yaxis=dict(title='Instantaneous Revenue (€/15min)', side='left'),
-        yaxis2=dict(title='Cumulative Revenue (€)', side='right', overlaying='y'),
-        hovermode='x unified', width=1000, height=500
-    )
-    return fig
+    data['revenue_as_capacity_eur'] = [
+        (data['c_fcr_mw'][t] * data['price_fcr_eur_mw'][t] +
+         data['c_afrr_pos_mw'][t] * data['price_afrr_cap_pos_eur_mw'][t] +
+         data['c_afrr_neg_mw'][t] * data['price_afrr_cap_neg_eur_mw'][t]) * 0.25
+        if 'price_fcr_eur_mw' in data else 0
+        for t in range(T)
+    ]
 
-def plot_battery_efficiency_analysis(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
-    """Plot battery efficiency and cycling analysis."""
-    required_vars = ['p_ch', 'p_dis', 'e_soc']
-    if not all(var in solution_data for var in required_vars):
-        raise ValueError(f"Solution data must contain {required_vars}")
+    df = pd.DataFrame(data)
 
-    time_indices = sorted(solution_data['p_ch'].keys())
-    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
-    charge_values = [solution_data['p_ch'][t] for t in time_indices]
-    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
-    soc_values = [solution_data['e_soc'][t] for t in time_indices]
+    # Add metadata
+    df.attrs['horizon_hours'] = horizon_hours
+    df.attrs['intervals'] = T
+    df.attrs['objective_value'] = solution.get('objective_value', 0)
+    df.attrs['status'] = solution.get('status', 'unknown')
 
-    total_charge = sum(charge_values) * 0.25
-    total_discharge = sum(discharge_values) * 0.25
-    round_trip_efficiency = total_discharge / total_charge if total_charge > 0 else 0
-    soc_range = max(soc_values) - min(soc_values)
-    soc_utilization = soc_range / max(soc_values) if max(soc_values) > 0 else 0
-    soc_diff = [abs(soc_values[i] - soc_values[i-1]) for i in range(1, len(soc_values))]
-    avg_soc_change = sum(soc_diff) / len(soc_diff) if soc_diff else 0
+    return df
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=datetime_values, y=soc_values, mode='lines', name='State of Charge (MWh)', line=dict(color='blue', width=2)))
-    charge_mask = [c > 1e-6 for c in charge_values]
-    if any(charge_mask):
-        fig.add_trace(go.Scatter(x=[datetime_values[i] for i, m in enumerate(charge_mask) if m], y=[soc_values[i] for i, m in enumerate(charge_mask) if m], mode='markers', name='Charging Periods', marker=dict(color='green', size=4, symbol='circle')))
-    discharge_mask = [d > 1e-6 for d in discharge_values]
-    if any(discharge_mask):
-        fig.add_trace(go.Scatter(x=[datetime_values[i] for i, m in enumerate(discharge_mask) if m], y=[soc_values[i] for i, m in enumerate(discharge_mask) if m], mode='markers', name='Discharging Periods', marker=dict(color='red', size=4, symbol='triangle-up')))
 
-    fig.add_annotation(
-        x=0.02, y=0.98, xref="paper", yref="paper",
-        text=f"Round-trip Efficiency: {round_trip_efficiency:.2%}<br>SoC Utilization: {soc_utilization:.2%}<br>Avg SoC Change: {avg_soc_change:.2f} MWh",
-        showarrow=False, bgcolor="white", bordercolor="black", borderwidth=1
-    )
-    fig.update_layout(
-        title=f'Battery Efficiency Analysis {title_suffix}', xaxis_title='Time',
-        yaxis_title='State of Charge (MWh)', hovermode='x unified', width=1000, height=500
-    )
-    return fig
-
-def plot_power_scheduling_overview(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
-    """Plot 1: Power scheduling overview with SOC profile."""
-    fig = plt.figure(figsize=(16, 10))
-    gs = gridspec.GridSpec(3, 1, height_ratios=[1.2, 1, 1], hspace=0.3)
-    hours = df['hour'].values
-
-    ax1 = fig.add_subplot(gs[0])
-    p_ch = df['p_ch_kw'].values / 1000
-    p_dis = -df['p_dis_kw'].values / 1000
-    p_afrr_pos_e = df['p_afrr_pos_e_kw'].values / 1000
-    p_afrr_neg_e = -df['p_afrr_neg_e_kw'].values / 1000
-    ax1.fill_between(hours, 0, p_ch, step='post', alpha=0.6, color=MCKINSEY_COLORS['positive'], label='Charge (DA)')
-    ax1.fill_between(hours, 0, p_dis, step='post', alpha=0.6, color=MCKINSEY_COLORS['negative'], label='Discharge (DA)')
-    ax1.fill_between(hours, 0, p_afrr_pos_e, step='post', alpha=0.4, color='#4ECDC4', label='aFRR+ Energy')
-    ax1.fill_between(hours, 0, p_afrr_neg_e, step='post', alpha=0.4, color='#FF6B6B', label='aFRR- Energy')
-    ax1.axhline(y=0, color='black', linewidth=1, alpha=0.5)
-    ax1.set_ylabel('Power (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
-    ax1.set_title(f'Battery Power Scheduling - {horizon_hours}h Horizon', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
-    ax1.grid(True, alpha=0.3, color=MCKINSEY_COLORS['gray_light'])
-    ax1.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
-    ax1.set_xlim(0, horizon_hours)
-
-    ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    c_fcr = df['c_fcr_mw'].values
-    c_afrr_pos = df['c_afrr_pos_mw'].values
-    c_afrr_neg = df['c_afrr_neg_mw'].values
-    ax2.fill_between(hours, 0, c_fcr, step='post', alpha=0.7, color='#FFD700', label='FCR Capacity')
-    ax2.fill_between(hours, c_fcr, c_fcr + c_afrr_pos, step='post', alpha=0.7, color='#4ECDC4', label='aFRR+ Capacity')
-    ax2.fill_between(hours, c_fcr + c_afrr_pos, c_fcr + c_afrr_pos + c_afrr_neg, step='post', alpha=0.7, color='#FF6B6B', label='aFRR- Capacity')
-    ax2.set_ylabel('Capacity (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
-    ax2.set_title('Ancillary Service Capacity Reservations', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
-    ax2.grid(True, alpha=0.3, color=MCKINSEY_COLORS['gray_light'])
-    ax2.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
-
-    ax3 = fig.add_subplot(gs[2], sharex=ax1)
-    soc_pct = df['soc_pct'].values
-    ax3.plot(hours, soc_pct, linewidth=2.5, color=MCKINSEY_COLORS['navy'], label='SOC')
-    ax3.fill_between(hours, 0, soc_pct, alpha=0.2, color=MCKINSEY_COLORS['navy'])
-    ax3.axhline(y=0, color='red', linestyle='--', linewidth=1, alpha=0.7, label='Min SOC')
-    ax3.axhline(y=100, color='red', linestyle='--', linewidth=1, alpha=0.7, label='Max SOC')
-    ax3.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
-    ax3.set_ylabel('SOC (%)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
-    ax3.set_title('State of Charge Trajectory', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
-    ax3.grid(True, alpha=0.3, color=MCKINSEY_COLORS['gray_light'])
-    ax3.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
-    ax3.set_ylim(-5, 105)
-    ax3.set_xlim(0, horizon_hours)
-
-    plt.tight_layout()
-    if save:
-        plt.savefig(f"{plot_dir}/{horizon_hours}h_power_scheduling_overview.png", dpi=300, bbox_inches='tight')
-    return fig
-
-def plot_market_participation_timeline(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
-    """Plot 2: Market participation timeline with binary decisions."""
-    fig, ax = plt.subplots(figsize=(16, 6))
-    binary_vars = pd.DataFrame({
-        'DA Charge': df['y_ch'].values, 'DA Discharge': df['y_dis'].values,
-        'FCR Reserve': df['y_fcr'].values, 'aFRR+ Reserve': df['y_afrr_pos'].values,
-        'aFRR- Reserve': df['y_afrr_neg'].values,
-    })
-    im = ax.imshow(binary_vars.T, aspect='auto', cmap='YlGn', interpolation='nearest', vmin=0, vmax=1, extent=[0, horizon_hours, -0.5, 4.5])
-    ax.set_yticks(range(5))
-    ax.set_yticklabels(binary_vars.columns, fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
-    ax.set_title(f'Market Participation Timeline - {horizon_hours}h Horizon\n(0 = Inactive, 1 = Active)', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
-    cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.02)
-    cbar.set_label('Decision Value', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax.set_xticks(np.arange(0, horizon_hours + 1, 6))
-    ax.grid(True, which='major', axis='x', alpha=0.3, color='white', linewidth=1)
-    plt.tight_layout()
-    if save:
-        plt.savefig(f"{plot_dir}/{horizon_hours}h_market_participation_timeline.png", dpi=300, bbox_inches='tight')
-    return fig
-
-def plot_price_action_correlation(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
-    """Plot 3: Price-action correlation analysis."""
-    fig = plt.figure(figsize=(16, 10))
-    gs = gridspec.GridSpec(3, 1, height_ratios=[1, 1, 1], hspace=0.3)
-    hours = df['hour'].values
-
-    ax1 = fig.add_subplot(gs[0])
-    ax1_price = ax1.twinx()
-    ax1_price.plot(hours, df['price_da_eur_mwh'].values, linewidth=2, color=MCKINSEY_COLORS['navy'], label='DA Price', alpha=0.7)
-    ax1_price.set_ylabel('DA Price (EUR/MWh)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['navy'])
-    p_net = (df['p_dis_kw'].values - df['p_ch_kw'].values) / 1000
-    ax1.bar(hours, p_net, width=0.25, color=['green' if p >= 0 else 'red' for p in p_net], alpha=0.5, label='Net Power (MW)')
-    ax1.set_ylabel('Net Power (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax1.set_title('Day-Ahead Market: Price vs Battery Action', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
-    ax1.set_xlim(0, horizon_hours)
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax1_price.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
-
-    ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    ax2_price = ax2.twinx()
-    ax2_price.plot(hours, df['price_fcr_eur_mw'].values, linewidth=2, color='#FFD700', label='FCR Price', alpha=0.7)
-    ax2_price.set_ylabel('FCR Price (EUR/MW)', fontsize=MCKINSEY_FONTS['axis_label_size'], color='#FFD700')
-    ax2.bar(hours, df['c_fcr_mw'].values, width=0.25, color='#FFD700', alpha=0.5, label='FCR Bid (MW)')
-    ax2.set_ylabel('FCR Capacity (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax2.set_title('FCR Market: Price vs Capacity Bid', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
-    lines1, labels1 = ax2.get_legend_handles_labels()
-    lines2, labels2 = ax2_price.get_legend_handles_labels()
-    ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
-
-    ax3 = fig.add_subplot(gs[2], sharex=ax1)
-    ax3_price = ax3.twinx()
-    ax3_price.plot(hours, df['price_afrr_cap_pos_eur_mw'].values, linewidth=2, color='#4ECDC4', label='aFRR+ Price', alpha=0.7, linestyle='--')
-    ax3_price.plot(hours, df['price_afrr_cap_neg_eur_mw'].values, linewidth=2, color='#FF6B6B', label='aFRR- Price', alpha=0.7, linestyle='--')
-    ax3_price.set_ylabel('aFRR Price (EUR/MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    width = 0.12
-    ax3.bar(hours - width/2, df['c_afrr_pos_mw'].values, width=width, color='#4ECDC4', alpha=0.5, label='aFRR+ Bid')
-    ax3.bar(hours + width/2, df['c_afrr_neg_mw'].values, width=width, color='#FF6B6B', alpha=0.5, label='aFRR- Bid')
-    ax3.set_ylabel('aFRR Capacity (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax3.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax3.set_title('aFRR Markets: Price vs Capacity Bids', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
-    ax3.set_xlim(0, horizon_hours)
-    lines1, labels1 = ax3.get_legend_handles_labels()
-    lines2, labels2 = ax3_price.get_legend_handles_labels()
-    ax3.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
-
-    plt.tight_layout()
-    if save:
-        plt.savefig(f"{plot_dir}/{horizon_hours}h_price_action_correlation.png", dpi=300, bbox_inches='tight')
-    return fig
-
-def plot_cst8_revenue_breakdown(df: pd.DataFrame, summary: dict, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
-    """Plot 4: Revenue breakdown by market and time (Cst8 version)."""
-    fig = plt.figure(figsize=(16, 8))
-    gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[2, 1], hspace=0.3, wspace=0.3)
-    hours = df['hour'].values
-
-    ax1 = fig.add_subplot(gs[0, 0])
-    rev_da = df['revenue_da_eur'].values
-    rev_afrr_e = df['revenue_afrr_energy_eur'].values
-    rev_as_cap = df['revenue_as_capacity_eur'].values
-    ax1.fill_between(hours, 0, rev_da, step='post', alpha=0.6, color=MCKINSEY_COLORS['navy'], label='DA Energy')
-    ax1.fill_between(hours, rev_da, rev_da + rev_afrr_e, step='post', alpha=0.6, color='#4ECDC4', label='aFRR Energy')
-    ax1.fill_between(hours, rev_da + rev_afrr_e, rev_da + rev_afrr_e + rev_as_cap, step='post', alpha=0.6, color='#FFD700', label='AS Capacity')
-    ax1.set_ylabel('Revenue (EUR/interval)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax1.set_title('Instantaneous Revenue by Market', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold')
-    ax1.legend(loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
-    ax1.set_xlim(0, horizon_hours)
-
-    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
-    cum_total = np.cumsum(rev_da + rev_afrr_e + rev_as_cap)
-    ax2.plot(hours, np.cumsum(rev_da), linewidth=2.5, color=MCKINSEY_COLORS['navy'], label='DA Energy')
-    ax2.plot(hours, np.cumsum(rev_afrr_e), linewidth=2.5, color='#4ECDC4', label='aFRR Energy')
-    ax2.plot(hours, np.cumsum(rev_as_cap), linewidth=2.5, color='#FFD700', label='AS Capacity')
-    ax2.plot(hours, cum_total, linewidth=3, color='black', linestyle='--', label='Total', alpha=0.7)
-    ax2.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax2.set_ylabel('Cumulative Revenue (EUR)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax2.set_title('Cumulative Revenue Over Time', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold')
-    ax2.legend(loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
-    ax2.set_xlim(0, horizon_hours)
-
-    ax3 = fig.add_subplot(gs[0, 1])
-    revenues = [summary['total_revenue_da'], summary['total_revenue_afrr_e'], summary['total_revenue_as_cap']]
-    labels = ['DA Energy', 'aFRR Energy', 'AS Capacity']
-    colors = [MCKINSEY_COLORS['navy'], '#4ECDC4', '#FFD700']
-    filtered_data = [(r, l, c) for r, l, c in zip(revenues, labels, colors) if abs(r) > 0.01]
-    if filtered_data:
-        revenues_f, labels_f, colors_f = zip(*filtered_data)
-        wedges, texts, autotexts = ax3.pie(revenues_f, labels=labels_f, colors=colors_f, autopct='%1.1f%%', startangle=90, textprops={'fontsize': MCKINSEY_FONTS['legend_size']})
-        for autotext in autotexts:
-            autotext.set_color('white')
-    ax3.set_title(f'Total Revenue\n{sum(revenues):.2f} EUR', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold')
-
-    ax4 = fig.add_subplot(gs[1, 1])
-    ax4.axis('off')
-    stats_text = f"REVENUE SUMMARY\n{'='*30}\n\nTotal Revenue: {sum(revenues):.2f} EUR\n\nBy Market:\n• DA Energy:    {revenues[0]:>10.2f} EUR\n• aFRR Energy:  {revenues[1]:>10.2f} EUR\n• AS Capacity:  {revenues[2]:>10.2f} EUR\n\nObjective Value: {summary['objective_value']:.2f} EUR"
-    ax4.text(0.1, 0.5, stats_text, fontsize=10, family='monospace', verticalalignment='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
-
-    plt.suptitle(f'Revenue Analysis - {horizon_hours}h Horizon', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
-    plt.tight_layout()
-    if save:
-        plt.savefig(f"{plot_dir}/{horizon_hours}h_revenue_breakdown.png", dpi=300, bbox_inches='tight')
-    return fig
-
-def plot_cst8_validation(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
-    """Plot 5: Cst-8 constraint validation visualization."""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
-    hours = df['hour'].values
-
-    sum_discharge = df['cst8_discharge_sum'].values
-    ax1.plot(hours, sum_discharge, linewidth=2, color=MCKINSEY_COLORS['negative'], label='Discharge Binary Sum', marker='o', markersize=3)
-    ax1.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Constraint Limit (≤ 1.0)')
-    ax1.set_ylabel('Binary Sum', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax1.set_title('Cst-8a: Discharge + AS Reserves Binary Sum', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
-    ax1.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
-    violations_dis = sum_discharge > 1.000001
-    if violations_dis.any():
-        ax1.scatter(hours[violations_dis], sum_discharge[violations_dis], color='red', s=100, marker='X', label=f'Violations: {violations_dis.sum()}', zorder=10)
-
-    sum_charge = df['cst8_charge_sum'].values
-    ax2.plot(hours, sum_charge, linewidth=2, color=MCKINSEY_COLORS['positive'], label='Charge Binary Sum', marker='o', markersize=3)
-    ax2.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Constraint Limit (≤ 1.0)')
-    ax2.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax2.set_ylabel('Binary Sum', fontsize=MCKINSEY_FONTS['axis_label_size'])
-    ax2.set_title('Cst-8b: Charge + AS Reserves Binary Sum', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
-    ax2.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
-    ax2.set_xlim(0, horizon_hours)
-    violations_ch = sum_charge > 1.000001
-    if violations_ch.any():
-        ax2.scatter(hours[violations_ch], sum_charge[violations_ch], color='red', s=100, marker='X', label=f'Violations: {violations_ch.sum()}', zorder=10)
-
-    total_violations = violations_dis.sum() + violations_ch.sum()
-    status_text = 'PASS' if total_violations == 0 else f'FAIL ({total_violations} violations)'
-    fig.suptitle(f'Cst-8 Constraint Validation - {horizon_hours}h Horizon\nStatus: {status_text}', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color='green' if total_violations == 0 else 'red')
-
-    plt.tight_layout()
-    if save:
-        plt.savefig(f"{plot_dir}/{horizon_hours}h_cst8_validation.png", dpi=300, bbox_inches='tight')
-    return fig
+# ---------------------------------------------------------------------------
+# Visualization Functions
+# ---------------------------------------------------------------------------
 
 def plot_da_market_price_bid(df: pd.DataFrame, title_suffix: str = "", use_timestamp: bool = False) -> go.Figure:
     """
@@ -995,100 +728,957 @@ def plot_capacity_markets_price_bid(df: pd.DataFrame, title_suffix: str = "", us
 
     return fig
 
-def extract_detailed_solution(solution: dict, test_data: pd.DataFrame, horizon_hours: int):
-    """Extract all decision variables and market data into a DataFrame."""
 
-    T = len(solution.get('e_soc', {}))
 
-    # Initialize data dictionary
-    data = {
-        'time_step': list(range(T)),
-        'hour': [t * 0.25 for t in range(T)],  # 15-min intervals
-    }
+def plot_cst8_validation(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
+    """Plot 5: Cst-8 constraint validation visualization."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
+    hours = df['hour'].values
 
-    # SOC and segment data
-    data['soc_kwh'] = [solution.get('e_soc', {}).get(t, 0) for t in range(T)]
-    data['soc_pct'] = [solution.get('e_soc', {}).get(t, 0) / 4472 * 100 for t in range(T)]
+    sum_discharge = df['cst8_discharge_sum'].values
+    ax1.plot(hours, sum_discharge, linewidth=2, color=MCKINSEY_COLORS['negative'], label='Discharge Binary Sum', marker='o', markersize=3)
+    ax1.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Constraint Limit (≤ 1.0)')
+    ax1.set_ylabel('Binary Sum', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax1.set_title('Cst-8a: Discharge + AS Reserves Binary Sum', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
+    ax1.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
+    violations_dis = sum_discharge > 1.000001
+    if violations_dis.any():
+        ax1.scatter(hours[violations_dis], sum_discharge[violations_dis], color='red', s=100, marker='X', label=f'Violations: {violations_dis.sum()}', zorder=10)
 
-    # Power variables
-    data['p_ch_kw'] = [solution.get('p_ch', {}).get(t, 0) for t in range(T)]
-    data['p_dis_kw'] = [solution.get('p_dis', {}).get(t, 0) for t in range(T)]
-    data['p_total_ch_kw'] = [solution.get('p_total_ch', {}).get(t, 0) for t in range(T)]
-    data['p_total_dis_kw'] = [solution.get('p_total_dis', {}).get(t, 0) for t in range(T)]
+    sum_charge = df['cst8_charge_sum'].values
+    ax2.plot(hours, sum_charge, linewidth=2, color=MCKINSEY_COLORS['positive'], label='Charge Binary Sum', marker='o', markersize=3)
+    ax2.axhline(y=1.0, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Constraint Limit (≤ 1.0)')
+    ax2.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax2.set_ylabel('Binary Sum', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax2.set_title('Cst-8b: Charge + AS Reserves Binary Sum', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
+    ax2.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
+    ax2.set_xlim(0, horizon_hours)
+    violations_ch = sum_charge > 1.000001
+    if violations_ch.any():
+        ax2.scatter(hours[violations_ch], sum_charge[violations_ch], color='red', s=100, marker='X', label=f'Violations: {violations_ch.sum()}', zorder=10)
 
-    # aFRR energy power
-    data['p_afrr_pos_e_kw'] = [solution.get('p_afrr_pos_e', {}).get(t, 0) for t in range(T)]
-    data['p_afrr_neg_e_kw'] = [solution.get('p_afrr_neg_e', {}).get(t, 0) for t in range(T)]
+    total_violations = violations_dis.sum() + violations_ch.sum()
+    status_text = 'PASS' if total_violations == 0 else f'FAIL ({total_violations} violations)'
+    fig.suptitle(f'Cst-8 Constraint Validation - {horizon_hours}h Horizon\nStatus: {status_text}', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color='green' if total_violations == 0 else 'red')
 
-    # Binary decisions (time-indexed)
-    data['y_ch'] = [solution.get('y_ch', {}).get(t, 0) for t in range(T)]
-    data['y_dis'] = [solution.get('y_dis', {}).get(t, 0) for t in range(T)]
-    data['y_total_ch'] = [solution.get('y_total_ch', {}).get(t, 0) for t in range(T)]
-    data['y_total_dis'] = [solution.get('y_total_dis', {}).get(t, 0) for t in range(T)]
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"{plot_dir}/{horizon_hours}h_cst8_validation.png", dpi=300, bbox_inches='tight')
+    return fig
 
-    # Block-indexed variables (need to map to time steps)
-    block_map = solution.get('block_map', {})
 
-    # Capacity bids (MW)
-    data['c_fcr_mw'] = [solution.get('c_fcr', {}).get(block_map.get(t, 0), 0) for t in range(T)]
-    data['c_afrr_pos_mw'] = [solution.get('c_afrr_pos', {}).get(block_map.get(t, 0), 0) for t in range(T)]
-    data['c_afrr_neg_mw'] = [solution.get('c_afrr_neg', {}).get(block_map.get(t, 0), 0) for t in range(T)]
+def plot_battery_operation_schedule(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
+    """Plot battery charge/discharge schedule with market prices."""
+    required_vars = ['p_ch', 'p_dis', 'e_soc']
+    if not all(var in solution_data for var in required_vars):
+        raise ValueError(f"Solution data must contain {required_vars}")
 
-    # Binary decisions (block-indexed)
-    data['y_fcr'] = [solution.get('y_fcr', {}).get(block_map.get(t, 0), 0) for t in range(T)]
-    data['y_afrr_pos'] = [solution.get('y_afrr_pos', {}).get(block_map.get(t, 0), 0) for t in range(T)]
-    data['y_afrr_neg'] = [solution.get('y_afrr_neg', {}).get(block_map.get(t, 0), 0) for t in range(T)]
+    time_indices = sorted(solution_data['p_ch'].keys())
+    charge_values = [solution_data['p_ch'][t] for t in time_indices]
+    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+    soc_values = [solution_data['e_soc'][t] for t in time_indices]
+    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
+    day_ahead_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
 
-    # Market prices (from test_data)
-    if len(test_data) >= T:
-        data['price_da_eur_mwh'] = test_data['price_day_ahead'].iloc[:T].values
-        data['price_fcr_eur_mw'] = test_data['price_fcr'].iloc[:T].values
-        # aFRR capacity prices (price_afrr_pos/neg are capacity prices)
-        data['price_afrr_cap_pos_eur_mw'] = test_data['price_afrr_pos'].iloc[:T].values
-        data['price_afrr_cap_neg_eur_mw'] = test_data['price_afrr_neg'].iloc[:T].values
-        # aFRR energy prices
-        data['price_afrr_energy_pos_eur_mwh'] = test_data['price_afrr_energy_pos'].iloc[:T].values
-        data['price_afrr_energy_neg_eur_mwh'] = test_data['price_afrr_energy_neg'].iloc[:T].values
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=datetime_values, y=charge_values, mode='lines', name='Charge (kW)', line=dict(color='green', width=2), fill='tozeroy', fillcolor='rgba(0,255,0,0.3)'))
+    fig.add_trace(go.Scatter(x=datetime_values, y=[-d for d in discharge_values], mode='lines', name='Discharge (kW)', line=dict(color='red', width=2), fill='tozeroy', fillcolor='rgba(255,0,0,0.3)'))
+    fig.add_trace(go.Scatter(x=datetime_values, y=soc_values, mode='lines', name='State of Charge (kWh)', line=dict(color='blue', width=2, dash='dash'), yaxis='y2'))
+    fig.add_trace(go.Scatter(x=datetime_values, y=day_ahead_prices, mode='lines', name='Day-Ahead Price (€/MWh)', line=dict(color='orange', width=1), yaxis='y3', opacity=0.7))
 
-    # Cst-8 check values
-    data['cst8_discharge_sum'] = [
-        data['y_total_dis'][t] + data['y_fcr'][t] + data['y_afrr_neg'][t]
-        for t in range(T)
-    ]
-    data['cst8_charge_sum'] = [
-        data['y_total_ch'][t] + data['y_fcr'][t] + data['y_afrr_pos'][t]
-        for t in range(T)
-    ]
+    fig.update_layout(
+        title=f'Battery Operation Schedule {title_suffix}', xaxis_title='Time',
+        yaxis=dict(title='Power (kW)', side='left'),
+        yaxis2=dict(title='SoC (kWh)', side='right', overlaying='y', showgrid=False),
+        yaxis3=dict(title='Price (€/MWh)', side='right', overlaying='y', position=0.95, showgrid=False),
+        hovermode='x unified', width=1000, height=500
+    )
+    return fig
 
-    # Revenue calculations (per time step)
-    data['revenue_da_eur'] = [
-        (data['p_dis_kw'][t] * data['price_da_eur_mwh'][t] / 1000 -
-         data['p_ch_kw'][t] * data['price_da_eur_mwh'][t] / 1000) * 0.25
-        if 'price_da_eur_mwh' in data else 0
-        for t in range(T)
-    ]
+def plot_market_price_bid_comparison(solution_data: Dict, country_data: pd.DataFrame, market_type: str = 'day_ahead', title_suffix: str = "") -> go.Figure:
+    """Plot market prices vs battery bids for arbitrage analysis."""
+    required_vars = ['p_ch', 'p_dis']
+    if not all(var in solution_data for var in required_vars):
+        raise ValueError(f"Solution data must contain {required_vars}")
 
-    data['revenue_afrr_energy_eur'] = [
-        (data['p_afrr_pos_e_kw'][t] * data['price_afrr_energy_pos_eur_mwh'][t] / 1000 +
-         data['p_afrr_neg_e_kw'][t] * data['price_afrr_energy_neg_eur_mwh'][t] / 1000) * 0.25
-        if 'price_afrr_energy_pos_eur_mwh' in data else 0
-        for t in range(T)
-    ]
+    price_col_map = {'day_ahead': 'price_day_ahead', 'fcr': 'price_fcr', 'afrr': 'price_afrr_pos'}
+    if market_type not in price_col_map:
+        raise ValueError(f"Market type must be one of {list(price_col_map.keys())}")
+    price_col = price_col_map[market_type]
 
-    data['revenue_as_capacity_eur'] = [
-        (data['c_fcr_mw'][t] * data['price_fcr_eur_mw'][t] +
-         data['c_afrr_pos_mw'][t] * data['price_afrr_cap_pos_eur_mw'][t] +
-         data['c_afrr_neg_mw'][t] * data['price_afrr_cap_neg_eur_mw'][t]) * 0.25
-        if 'price_fcr_eur_mw' in data else 0
-        for t in range(T)
-    ]
+    time_indices = sorted(solution_data['p_ch'].keys())
+    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
+    market_prices = country_data[price_col].iloc[:len(time_indices)].tolist()
+    charge_vals = [solution_data['p_ch'][t] for t in time_indices]
+    discharge_vals = [solution_data['p_dis'][t] for t in time_indices]
+    net_power = [c - d for c, d in zip(charge_vals, discharge_vals)]
 
-    df = pd.DataFrame(data)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=datetime_values, y=market_prices, mode='lines', name=f'{market_type.replace("_", " ").title()} Price (€/MWh)', line=dict(color='blue', width=2)))
+    fig.add_trace(go.Scatter(x=datetime_values, y=charge_vals, mode='lines', name='Battery Charging (kW)', line=dict(color='green', width=1.5, dash='dot'), yaxis='y2'))
+    fig.add_trace(go.Scatter(x=datetime_values, y=discharge_vals, mode='lines', name='Battery Discharging (kW)', line=dict(color='red', width=1.5, dash='dot'), yaxis='y2'))
+    fig.add_trace(go.Scatter(x=datetime_values, y=net_power, mode='lines', name='Net Power (kW)', line=dict(color='purple', width=1, dash='dash'), yaxis='y2'))
 
-    # Add metadata
-    df.attrs['horizon_hours'] = horizon_hours
-    df.attrs['intervals'] = T
-    df.attrs['objective_value'] = solution.get('objective_value', 0)
-    df.attrs['status'] = solution.get('status', 'unknown')
+    fig.update_layout(
+        title=f'{market_type.replace("_", " ").title()} Market: Price vs Battery Actions {title_suffix}',
+        xaxis_title='Time',
+        yaxis=dict(title='Market Price (€/MWh)', side='left'),
+        yaxis2=dict(title='Battery Power (kW)', side='right', overlaying='y'),
+        hovermode='x unified', width=1000, height=500
+    )
+    return fig
 
-    return df
+def plot_arbitrage_opportunities(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
+    """Plot arbitrage opportunities highlighting profitable periods."""
+    required_vars = ['p_ch', 'p_dis']
+    if not all(var in solution_data for var in required_vars):
+        raise ValueError(f"Solution data must contain {required_vars}")
+
+    time_indices = sorted(solution_data['p_ch'].keys())
+    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
+    day_ahead_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
+    charge_values = [solution_data['p_ch'][t] for t in time_indices]
+    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+
+    charge_periods = [i for i, c in enumerate(charge_values) if c > 1e-6]
+    discharge_periods = [i for i, d in enumerate(discharge_values) if d > 1e-6]
+    price_rolling_mean = pd.Series(day_ahead_prices).rolling(window=4, center=True).mean()
+    price_deviations = [p - pm if pd.notna(pm) else 0 for p, pm in zip(day_ahead_prices, price_rolling_mean)]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=datetime_values, y=day_ahead_prices, mode='lines', name='Day-Ahead Price (€/MWh)', line=dict(color='blue', width=2)))
+    fig.add_trace(go.Scatter(x=datetime_values, y=price_rolling_mean.tolist(), mode='lines', name='Price Moving Average', line=dict(color='gray', width=1, dash='dash'), opacity=0.7))
+    if charge_periods:
+        fig.add_trace(go.Scatter(x=[datetime_values[i] for i in charge_periods], y=[day_ahead_prices[i] for i in charge_periods], mode='markers', name='Battery Charging (Buy)', marker=dict(color='green', size=8, symbol='circle')))
+    if discharge_periods:
+        fig.add_trace(go.Scatter(x=[datetime_values[i] for i in discharge_periods], y=[day_ahead_prices[i] for i in discharge_periods], mode='markers', name='Battery Discharging (Sell)', marker=dict(color='red', size=8, symbol='triangle-up')))
+    fig.add_trace(go.Scatter(x=datetime_values, y=price_deviations, mode='lines', name='Price Deviation from Average', line=dict(color='orange', width=1), yaxis='y2', opacity=0.5))
+
+    fig.update_layout(
+        title=f'Arbitrage Opportunities Analysis {title_suffix}', xaxis_title='Time',
+        yaxis=dict(title='Price (€/MWh)', side='left'),
+        yaxis2=dict(title='Price Deviation (€/MWh)', side='right', overlaying='y', showgrid=False),
+        hovermode='x unified', width=1000, height=500
+    )
+    return fig
+
+def plot_revenue_breakdown(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
+    """Plot revenue breakdown by market and time period."""
+    required_vars = ['p_ch', 'p_dis']
+    if not all(var in solution_data for var in required_vars):
+        raise ValueError(f"Solution data must contain {required_vars}")
+
+    time_indices = sorted(solution_data['p_ch'].keys())
+    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
+    charge_values = [solution_data['p_ch'][t] for t in time_indices]
+    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+    da_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
+    da_revenue = [(d - c) * p * 0.25 for c, d, p in zip(charge_values, discharge_values, da_prices)]
+    cumulative_revenue = pd.Series(da_revenue).cumsum().tolist()
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=datetime_values, y=da_revenue, mode='lines', name='Instantaneous Revenue (€/15min)', line=dict(color='green', width=1), opacity=0.7))
+    fig.add_trace(go.Scatter(x=datetime_values, y=cumulative_revenue, mode='lines', name='Cumulative Revenue (€)', line=dict(color='blue', width=2), yaxis='y2'))
+
+    fig.update_layout(
+        title=f'Revenue Analysis {title_suffix}', xaxis_title='Time',
+        yaxis=dict(title='Instantaneous Revenue (€/15min)', side='left'),
+        yaxis2=dict(title='Cumulative Revenue (€)', side='right', overlaying='y'),
+        hovermode='x unified', width=1000, height=500
+    )
+    return fig
+
+def plot_battery_efficiency_analysis(solution_data: Dict, country_data: pd.DataFrame, title_suffix: str = "") -> go.Figure:
+    """Plot battery efficiency and cycling analysis."""
+    required_vars = ['p_ch', 'p_dis', 'e_soc']
+    if not all(var in solution_data for var in required_vars):
+        raise ValueError(f"Solution data must contain {required_vars}")
+
+    time_indices = sorted(solution_data['p_ch'].keys())
+    datetime_values = country_data[TIMESTAMP_COL].iloc[:len(time_indices)].tolist()
+    charge_values = [solution_data['p_ch'][t] for t in time_indices]
+    discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+    soc_values = [solution_data['e_soc'][t] for t in time_indices]
+
+    total_charge = sum(charge_values) * 0.25
+    total_discharge = sum(discharge_values) * 0.25
+    round_trip_efficiency = total_discharge / total_charge if total_charge > 0 else 0
+    soc_range = max(soc_values) - min(soc_values)
+    soc_utilization = soc_range / max(soc_values) if max(soc_values) > 0 else 0
+    soc_diff = [abs(soc_values[i] - soc_values[i-1]) for i in range(1, len(soc_values))]
+    avg_soc_change = sum(soc_diff) / len(soc_diff) if soc_diff else 0
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=datetime_values, y=soc_values, mode='lines', name='State of Charge (MWh)', line=dict(color='blue', width=2)))
+    charge_mask = [c > 1e-6 for c in charge_values]
+    if any(charge_mask):
+        fig.add_trace(go.Scatter(x=[datetime_values[i] for i, m in enumerate(charge_mask) if m], y=[soc_values[i] for i, m in enumerate(charge_mask) if m], mode='markers', name='Charging Periods', marker=dict(color='green', size=4, symbol='circle')))
+    discharge_mask = [d > 1e-6 for d in discharge_values]
+    if any(discharge_mask):
+        fig.add_trace(go.Scatter(x=[datetime_values[i] for i, m in enumerate(discharge_mask) if m], y=[soc_values[i] for i, m in enumerate(discharge_mask) if m], mode='markers', name='Discharging Periods', marker=dict(color='red', size=4, symbol='triangle-up')))
+
+    fig.add_annotation(
+        x=0.02, y=0.98, xref="paper", yref="paper",
+        text=f"Round-trip Efficiency: {round_trip_efficiency:.2%}<br>SoC Utilization: {soc_utilization:.2%}<br>Avg SoC Change: {avg_soc_change:.2f} MWh",
+        showarrow=False, bgcolor="white", bordercolor="black", borderwidth=1
+    )
+    fig.update_layout(
+        title=f'Battery Efficiency Analysis {title_suffix}', xaxis_title='Time',
+        yaxis_title='State of Charge (MWh)', hovermode='x unified', width=1000, height=500
+    )
+    return fig
+
+def plot_power_scheduling_overview(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
+    """Plot 1: Power scheduling overview with SOC profile."""
+    fig = plt.figure(figsize=(16, 10))
+    gs = gridspec.GridSpec(3, 1, height_ratios=[1.2, 1, 1], hspace=0.3)
+    hours = df['hour'].values
+
+    ax1 = fig.add_subplot(gs[0])
+    p_ch = df['p_ch_kw'].values / 1000
+    p_dis = -df['p_dis_kw'].values / 1000
+    p_afrr_pos_e = df['p_afrr_pos_e_kw'].values / 1000
+    p_afrr_neg_e = -df['p_afrr_neg_e_kw'].values / 1000
+    ax1.fill_between(hours, 0, p_ch, step='post', alpha=0.6, color=MCKINSEY_COLORS['positive'], label='Charge (DA)')
+    ax1.fill_between(hours, 0, p_dis, step='post', alpha=0.6, color=MCKINSEY_COLORS['negative'], label='Discharge (DA)')
+    ax1.fill_between(hours, 0, p_afrr_pos_e, step='post', alpha=0.4, color='#4ECDC4', label='aFRR+ Energy')
+    ax1.fill_between(hours, 0, p_afrr_neg_e, step='post', alpha=0.4, color='#FF6B6B', label='aFRR- Energy')
+    ax1.axhline(y=0, color='black', linewidth=1, alpha=0.5)
+    ax1.set_ylabel('Power (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
+    ax1.set_title(f'Battery Power Scheduling - {horizon_hours}h Horizon', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
+    ax1.grid(True, alpha=0.3, color=MCKINSEY_COLORS['gray_light'])
+    ax1.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
+    ax1.set_xlim(0, horizon_hours)
+
+    ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    c_fcr = df['c_fcr_mw'].values
+    c_afrr_pos = df['c_afrr_pos_mw'].values
+    c_afrr_neg = df['c_afrr_neg_mw'].values
+    ax2.fill_between(hours, 0, c_fcr, step='post', alpha=0.7, color='#FFD700', label='FCR Capacity')
+    ax2.fill_between(hours, c_fcr, c_fcr + c_afrr_pos, step='post', alpha=0.7, color='#4ECDC4', label='aFRR+ Capacity')
+    ax2.fill_between(hours, c_fcr + c_afrr_pos, c_fcr + c_afrr_pos + c_afrr_neg, step='post', alpha=0.7, color='#FF6B6B', label='aFRR- Capacity')
+    ax2.set_ylabel('Capacity (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
+    ax2.set_title('Ancillary Service Capacity Reservations', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
+    ax2.grid(True, alpha=0.3, color=MCKINSEY_COLORS['gray_light'])
+    ax2.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
+
+    ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    soc_pct = df['soc_pct'].values
+    ax3.plot(hours, soc_pct, linewidth=2.5, color=MCKINSEY_COLORS['navy'], label='SOC')
+    ax3.fill_between(hours, 0, soc_pct, alpha=0.2, color=MCKINSEY_COLORS['navy'])
+    ax3.axhline(y=0, color='red', linestyle='--', linewidth=1, alpha=0.7, label='Min SOC')
+    ax3.axhline(y=100, color='red', linestyle='--', linewidth=1, alpha=0.7, label='Max SOC')
+    ax3.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
+    ax3.set_ylabel('SOC (%)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
+    ax3.set_title('State of Charge Trajectory', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
+    ax3.grid(True, alpha=0.3, color=MCKINSEY_COLORS['gray_light'])
+    ax3.legend(loc='upper right', fontsize=MCKINSEY_FONTS['legend_size'])
+    ax3.set_ylim(-5, 105)
+    ax3.set_xlim(0, horizon_hours)
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"{plot_dir}/{horizon_hours}h_power_scheduling_overview.png", dpi=300, bbox_inches='tight')
+    return fig
+
+def plot_market_participation_timeline(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
+    """Plot 2: Market participation timeline with binary decisions."""
+    fig, ax = plt.subplots(figsize=(16, 6))
+    binary_vars = pd.DataFrame({
+        'DA Charge': df['y_ch'].values, 'DA Discharge': df['y_dis'].values,
+        'FCR Reserve': df['y_fcr'].values, 'aFRR+ Reserve': df['y_afrr_pos'].values,
+        'aFRR- Reserve': df['y_afrr_neg'].values,
+    })
+    im = ax.imshow(binary_vars.T, aspect='auto', cmap='YlGn', interpolation='nearest', vmin=0, vmax=1, extent=[0, horizon_hours, -0.5, 4.5])
+    ax.set_yticks(range(5))
+    ax.set_yticklabels(binary_vars.columns, fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['gray_dark'])
+    ax.set_title(f'Market Participation Timeline - {horizon_hours}h Horizon\n(0 = Inactive, 1 = Active)', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
+    cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.02)
+    cbar.set_label('Decision Value', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax.set_xticks(np.arange(0, horizon_hours + 1, 6))
+    ax.grid(True, which='major', axis='x', alpha=0.3, color='white', linewidth=1)
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"{plot_dir}/{horizon_hours}h_market_participation_timeline.png", dpi=300, bbox_inches='tight')
+    return fig
+
+def plot_price_action_correlation(df: pd.DataFrame, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
+    """Plot 3: Price-action correlation analysis."""
+    fig = plt.figure(figsize=(16, 10))
+    gs = gridspec.GridSpec(3, 1, height_ratios=[1, 1, 1], hspace=0.3)
+    hours = df['hour'].values
+
+    ax1 = fig.add_subplot(gs[0])
+    ax1_price = ax1.twinx()
+    ax1_price.plot(hours, df['price_da_eur_mwh'].values, linewidth=2, color=MCKINSEY_COLORS['navy'], label='DA Price', alpha=0.7)
+    ax1_price.set_ylabel('DA Price (EUR/MWh)', fontsize=MCKINSEY_FONTS['axis_label_size'], color=MCKINSEY_COLORS['navy'])
+    p_net = (df['p_dis_kw'].values - df['p_ch_kw'].values) / 1000
+    ax1.bar(hours, p_net, width=0.25, color=['green' if p >= 0 else 'red' for p in p_net], alpha=0.5, label='Net Power (MW)')
+    ax1.set_ylabel('Net Power (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax1.set_title('Day-Ahead Market: Price vs Battery Action', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
+    ax1.set_xlim(0, horizon_hours)
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax1_price.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
+
+    ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    ax2_price = ax2.twinx()
+    ax2_price.plot(hours, df['price_fcr_eur_mw'].values, linewidth=2, color='#FFD700', label='FCR Price', alpha=0.7)
+    ax2_price.set_ylabel('FCR Price (EUR/MW)', fontsize=MCKINSEY_FONTS['axis_label_size'], color='#FFD700')
+    ax2.bar(hours, df['c_fcr_mw'].values, width=0.25, color='#FFD700', alpha=0.5, label='FCR Bid (MW)')
+    ax2.set_ylabel('FCR Capacity (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax2.set_title('FCR Market: Price vs Capacity Bid', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
+    lines1, labels1 = ax2.get_legend_handles_labels()
+    lines2, labels2 = ax2_price.get_legend_handles_labels()
+    ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
+
+    ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    ax3_price = ax3.twinx()
+    ax3_price.plot(hours, df['price_afrr_cap_pos_eur_mw'].values, linewidth=2, color='#4ECDC4', label='aFRR+ Price', alpha=0.7, linestyle='--')
+    ax3_price.plot(hours, df['price_afrr_cap_neg_eur_mw'].values, linewidth=2, color='#FF6B6B', label='aFRR- Price', alpha=0.7, linestyle='--')
+    ax3_price.set_ylabel('aFRR Price (EUR/MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    width = 0.12
+    ax3.bar(hours - width/2, df['c_afrr_pos_mw'].values, width=width, color='#4ECDC4', alpha=0.5, label='aFRR+ Bid')
+    ax3.bar(hours + width/2, df['c_afrr_neg_mw'].values, width=width, color='#FF6B6B', alpha=0.5, label='aFRR- Bid')
+    ax3.set_ylabel('aFRR Capacity (MW)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax3.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax3.set_title('aFRR Markets: Price vs Capacity Bids', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold', color=MCKINSEY_COLORS['dark_blue'])
+    ax3.set_xlim(0, horizon_hours)
+    lines1, labels1 = ax3.get_legend_handles_labels()
+    lines2, labels2 = ax3_price.get_legend_handles_labels()
+    ax3.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"{plot_dir}/{horizon_hours}h_price_action_correlation.png", dpi=300, bbox_inches='tight')
+    return fig
+
+def plot_revenue_breakdown_v2(df: pd.DataFrame, summary: dict, horizon_hours: int, save: bool = True, plot_dir: str = '.') -> plt.Figure:
+    """Plot 4: Revenue breakdown by market and time (Cst8 version)."""
+    fig = plt.figure(figsize=(16, 8))
+    gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[2, 1], hspace=0.3, wspace=0.3)
+    hours = df['hour'].values
+
+    ax1 = fig.add_subplot(gs[0, 0])
+    rev_da = df['revenue_da_eur'].values
+    rev_afrr_e = df['revenue_afrr_energy_eur'].values
+    rev_as_cap = df['revenue_as_capacity_eur'].values
+    ax1.fill_between(hours, 0, rev_da, step='post', alpha=0.6, color=MCKINSEY_COLORS['navy'], label='DA Energy')
+    ax1.fill_between(hours, rev_da, rev_da + rev_afrr_e, step='post', alpha=0.6, color='#4ECDC4', label='aFRR Energy')
+    ax1.fill_between(hours, rev_da + rev_afrr_e, rev_da + rev_afrr_e + rev_as_cap, step='post', alpha=0.6, color='#FFD700', label='AS Capacity')
+    ax1.set_ylabel('Revenue (EUR/interval)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax1.set_title('Instantaneous Revenue by Market', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold')
+    ax1.legend(loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
+    ax1.set_xlim(0, horizon_hours)
+
+    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    cum_total = np.cumsum(rev_da + rev_afrr_e + rev_as_cap)
+    ax2.plot(hours, np.cumsum(rev_da), linewidth=2.5, color=MCKINSEY_COLORS['navy'], label='DA Energy')
+    ax2.plot(hours, np.cumsum(rev_afrr_e), linewidth=2.5, color='#4ECDC4', label='aFRR Energy')
+    ax2.plot(hours, np.cumsum(rev_as_cap), linewidth=2.5, color='#FFD700', label='AS Capacity')
+    ax2.plot(hours, cum_total, linewidth=3, color='black', linestyle='--', label='Total', alpha=0.7)
+    ax2.set_xlabel('Time (hours)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax2.set_ylabel('Cumulative Revenue (EUR)', fontsize=MCKINSEY_FONTS['axis_label_size'])
+    ax2.set_title('Cumulative Revenue Over Time', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold')
+    ax2.legend(loc='upper left', fontsize=MCKINSEY_FONTS['legend_size'])
+    ax2.set_xlim(0, horizon_hours)
+
+    ax3 = fig.add_subplot(gs[0, 1])
+    revenues = [summary['total_revenue_da'], summary['total_revenue_afrr_e'], summary['total_revenue_as_cap']]
+    labels = ['DA Energy', 'aFRR Energy', 'AS Capacity']
+    colors = [MCKINSEY_COLORS['navy'], '#4ECDC4', '#FFD700']
+    filtered_data = [(r, l, c) for r, l, c in zip(revenues, labels, colors) if abs(r) > 0.01]
+    if filtered_data:
+        revenues_f, labels_f, colors_f = zip(*filtered_data)
+        wedges, texts, autotexts = ax3.pie(revenues_f, labels=labels_f, colors=colors_f, autopct='%1.1f%%', startangle=90, textprops={'fontsize': MCKINSEY_FONTS['legend_size']})
+        for autotext in autotexts:
+            autotext.set_color('white')
+    ax3.set_title(f'Total Revenue\n{sum(revenues):.2f} EUR', fontsize=MCKINSEY_FONTS['subtitle_size'], fontweight='bold')
+
+    ax4 = fig.add_subplot(gs[1, 1])
+    ax4.axis('off')
+    stats_text = f"REVENUE SUMMARY\n{'='*30}\n\nTotal Revenue: {sum(revenues):.2f} EUR\n\nBy Market:\n• DA Energy:    {revenues[0]:>10.2f} EUR\n• aFRR Energy:  {revenues[1]:>10.2f} EUR\n• AS Capacity:  {revenues[2]:>10.2f} EUR\n\nObjective Value: {summary['objective_value']:.2f} EUR"
+    ax4.text(0.1, 0.5, stats_text, fontsize=10, family='monospace', verticalalignment='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
+
+    plt.suptitle(f'Revenue Analysis - {horizon_hours}h Horizon', fontsize=MCKINSEY_FONTS['title_size'], fontweight='bold', color=MCKINSEY_COLORS['navy'])
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"{plot_dir}/{horizon_hours}h_revenue_breakdown.png", dpi=300, bbox_inches='tight')
+    return fig
+
+
+
+# =================================================================================
+# ARCHIVED OLD PLOT CODE - Kept for reference
+# =================================================================================
+
+
+# def plot_battery_operation_schedule(solution_data: Dict, country_data: pd.DataFrame, 
+#                                    title_suffix: str = "") -> go.Figure:
+#     """Plot battery charge/discharge schedule with market prices.
+    
+#     Parameters
+#     ----------
+#     solution_data : dict
+#         Solution dictionary containing charge ('p_ch'), discharge ('p_dis'), soc ('e_soc') data
+#     country_data : pd.DataFrame
+#         Market data with datetime, price_day_ahead, price_fcr, price_afrr_pos columns
+#     title_suffix : str
+#         Additional text for plot title
+        
+#     Returns
+#     -------
+#     go.Figure
+#         Plotly figure with battery operation schedule
+#     """
+#     # Check if we have the required data
+#     required_vars = ['p_ch', 'p_dis', 'e_soc']
+#     for var in required_vars:
+#         if var not in solution_data:
+#             raise ValueError(f"Solution data must contain '{var}' key")
+    
+#     # Extract time series data
+#     time_indices = sorted(solution_data['p_ch'].keys())
+    
+#     charge_values = [solution_data['p_ch'][t] for t in time_indices]
+#     discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+#     soc_values = [solution_data['e_soc'][t] for t in time_indices]
+    
+#     # Get corresponding datetime values from country_data
+#     if 'timestamp' in country_data.columns:
+#         datetime_values = country_data['timestamp'].iloc[:len(time_indices)].tolist()
+#     else:
+#         # Generate datetime index if not available
+#         datetime_values = pd.date_range(start='2024-01-01', periods=len(time_indices), freq='15min').tolist()
+    
+#     day_ahead_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
+    
+#     # Create figure with secondary y-axes
+#     fig = go.Figure()
+    
+#     # Add battery charge (positive values)
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=charge_values,
+#         mode='lines',
+#         name='Charge (kW)',
+#         line=dict(color='green', width=2),
+#         fill='tozeroy',
+#         fillcolor='rgba(0,255,0,0.3)'
+#     ))
+    
+#     # Add battery discharge (negative for visualization)
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=[-d for d in discharge_values],  # Negative for discharge
+#         mode='lines',
+#         name='Discharge (kW)',
+#         line=dict(color='red', width=2),
+#         fill='tozeroy',
+#         fillcolor='rgba(255,0,0,0.3)'
+#     ))
+    
+#     # Add SoC on secondary y-axis
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=soc_values,
+#         mode='lines',
+#         name='State of Charge (kWh)',
+#         line=dict(color='blue', width=2, dash='dash'),
+#         yaxis='y2'
+#     ))
+    
+#     # Add day-ahead prices on tertiary y-axis
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=day_ahead_prices,
+#         mode='lines',
+#         name='Day-Ahead Price (€/MWh)',
+#         line=dict(color='orange', width=1),
+#         yaxis='y3',
+#         opacity=0.7
+#     ))
+    
+#     # Update layout
+#     fig.update_layout(
+#         title=f'Battery Operation Schedule {title_suffix}',
+#         xaxis_title='Time',
+#         yaxis=dict(
+#             title='Power (kW)',
+#             side='left'
+#         ),
+#         yaxis2=dict(
+#             title='SoC (kWh)',
+#             side='right',
+#             overlaying='y',
+#             showgrid=False
+#         ),
+#         yaxis3=dict(
+#             title='Price (€/MWh)',
+#             side='right',
+#             overlaying='y',
+#             position=0.95,
+#             showgrid=False
+#         ),
+#         hovermode='x unified',
+#         width=1000,
+#         height=500
+#     )
+    
+#     return fig
+
+
+# def plot_market_price_bid_comparison(solution_data: Dict, country_data: pd.DataFrame, 
+#                                     market_type: str = 'day_ahead', 
+#                                     title_suffix: str = "") -> go.Figure:
+#     """Plot market prices vs battery bids for arbitrage analysis.
+    
+#     Parameters
+#     ----------
+#     solution_data : dict
+#         Solution dictionary containing charge ('p_ch'), discharge ('p_dis') data
+#     country_data : pd.DataFrame
+#         Market data with price information
+#     market_type : str
+#         Type of market ('day_ahead', 'fcr', 'afrr')
+#     title_suffix : str
+#         Additional text for plot title
+        
+#     Returns
+#     -------
+#     go.Figure
+#         Plotly figure comparing market prices and bids
+#     """
+#     # Check required variables
+#     required_vars = ['p_ch', 'p_dis']
+#     for var in required_vars:
+#         if var not in solution_data:
+#             raise ValueError(f"Solution data must contain '{var}' key")
+    
+#     # Determine price column
+#     price_col_map = {
+#         'day_ahead': 'price_day_ahead',
+#         'fcr': 'price_fcr', 
+#         'afrr': 'price_afrr_pos'  # Use positive aFRR as representative
+#     }
+    
+#     if market_type not in price_col_map:
+#         raise ValueError(f"Market type must be one of {list(price_col_map.keys())}")
+    
+#     price_col = price_col_map[market_type]
+    
+#     # Extract time series data
+#     time_indices = sorted(solution_data['p_ch'].keys())
+    
+#     # Get datetime values
+#     if 'timestamp' in country_data.columns:
+#         datetime_values = country_data['timestamp'].iloc[:len(time_indices)].tolist()
+#     else:
+#         datetime_values = pd.date_range(start='2024-01-01', periods=len(time_indices), freq='15min').tolist()
+    
+#     market_prices = country_data[price_col].iloc[:len(time_indices)].tolist()
+    
+#     # Calculate net power (charge - discharge)
+#     charge_vals = [solution_data['p_ch'][t] for t in time_indices]
+#     discharge_vals = [solution_data['p_dis'][t] for t in time_indices]
+#     net_power = [c - d for c, d in zip(charge_vals, discharge_vals)]
+    
+#     fig = go.Figure()
+    
+#     # Add market prices
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=market_prices,
+#         mode='lines',
+#         name=f'{market_type.replace("_", " ").title()} Price (€/MWh)',
+#         line=dict(color='blue', width=2)
+#     ))
+    
+#     # Add battery actions
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=charge_vals,
+#         mode='lines',
+#         name='Battery Charging (kW)',
+#         line=dict(color='green', width=1.5, dash='dot'),
+#         yaxis='y2'
+#     ))
+    
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=discharge_vals,
+#         mode='lines',
+#         name='Battery Discharging (kW)',
+#         line=dict(color='red', width=1.5, dash='dot'),
+#         yaxis='y2'
+#     ))
+    
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=net_power,
+#         mode='lines',
+#         name='Net Power (kW)',
+#         line=dict(color='purple', width=1, dash='dash'),
+#         yaxis='y2'
+#     ))
+    
+#     # Update layout
+#     fig.update_layout(
+#         title=f'{market_type.replace("_", " ").title()} Market: Price vs Battery Actions {title_suffix}',
+#         xaxis_title='Time',
+#         yaxis=dict(
+#             title='Market Price (€/MWh)',
+#             side='left'
+#         ),
+#         yaxis2=dict(
+#             title='Battery Power (kW)',
+#             side='right',
+#             overlaying='y'
+#         ),
+#         hovermode='x unified',
+#         width=1000,
+#         height=500
+#     )
+    
+#     return fig
+
+
+# def plot_arbitrage_opportunities(solution_data: Dict, country_data: pd.DataFrame,
+#                                 title_suffix: str = "") -> go.Figure:
+#     """Plot arbitrage opportunities highlighting profitable periods.
+    
+#     Parameters
+#     ----------
+#     solution_data : dict
+#         Solution dictionary with charge ('p_ch'), discharge ('p_dis') data
+#     country_data : pd.DataFrame
+#         Market data with price information
+#     title_suffix : str
+#         Additional text for plot title
+        
+#     Returns
+#     -------
+#     go.Figure
+#         Plotly figure showing arbitrage analysis
+#     """
+#     # Check required variables
+#     required_vars = ['p_ch', 'p_dis']
+#     for var in required_vars:
+#         if var not in solution_data:
+#             raise ValueError(f"Solution data must contain '{var}' key")
+    
+#     # Extract time series
+#     time_indices = sorted(solution_data['p_ch'].keys())
+    
+#     # Get datetime values
+#     if 'timestamp' in country_data.columns:
+#         datetime_values = country_data['timestamp'].iloc[:len(time_indices)].tolist()
+#     else:
+#         datetime_values = pd.date_range(start='2024-01-01', periods=len(time_indices), freq='15min').tolist()
+    
+#     day_ahead_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
+    
+#     charge_values = [solution_data['p_ch'][t] for t in time_indices]
+#     discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+    
+#     # Calculate arbitrage indicators
+#     charge_periods = [i for i, c in enumerate(charge_values) if c > 1e-6]
+#     discharge_periods = [i for i, d in enumerate(discharge_values) if d > 1e-6]
+    
+#     # Calculate price differences for arbitrage analysis
+#     price_rolling_mean = pd.Series(day_ahead_prices).rolling(window=4, center=True).mean()
+#     price_deviations = [p - pm if pd.notna(pm) else 0 for p, pm in zip(day_ahead_prices, price_rolling_mean)]
+    
+#     fig = go.Figure()
+    
+#     # Add price line
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=day_ahead_prices,
+#         mode='lines',
+#         name='Day-Ahead Price (€/MWh)',
+#         line=dict(color='blue', width=2)
+#     ))
+    
+#     # Add rolling mean
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=price_rolling_mean.tolist(),
+#         mode='lines',
+#         name='Price Moving Average',
+#         line=dict(color='gray', width=1, dash='dash'),
+#         opacity=0.7
+#     ))
+    
+#     # Highlight charging periods (low prices)
+#     if charge_periods:
+#         charge_times = [datetime_values[i] for i in charge_periods]
+#         charge_prices = [day_ahead_prices[i] for i in charge_periods]
+#         fig.add_trace(go.Scatter(
+#             x=charge_times,
+#             y=charge_prices,
+#             mode='markers',
+#             name='Battery Charging (Buy)',
+#             marker=dict(color='green', size=8, symbol='circle')
+#         ))
+    
+#     # Highlight discharging periods (high prices)
+#     if discharge_periods:
+#         discharge_times = [datetime_values[i] for i in discharge_periods]
+#         discharge_prices = [day_ahead_prices[i] for i in discharge_periods]
+#         fig.add_trace(go.Scatter(
+#             x=discharge_times,
+#             y=discharge_prices,
+#             mode='markers',
+#             name='Battery Discharging (Sell)',
+#             marker=dict(color='red', size=8, symbol='triangle-up')
+#         ))
+    
+#     # Add price deviation as background color
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=price_deviations,
+#         mode='lines',
+#         name='Price Deviation from Average',
+#         line=dict(color='orange', width=1),
+#         yaxis='y2',
+#         opacity=0.5
+#     ))
+    
+#     # Update layout
+#     fig.update_layout(
+#         title=f'Arbitrage Opportunities Analysis {title_suffix}',
+#         xaxis_title='Time',
+#         yaxis=dict(
+#             title='Price (€/MWh)',
+#             side='left'
+#         ),
+#         yaxis2=dict(
+#             title='Price Deviation (€/MWh)',
+#             side='right',
+#             overlaying='y',
+#             showgrid=False
+#         ),
+#         hovermode='x unified',
+#         width=1000,
+#         height=500
+#     )
+    
+#     return fig
+
+
+# def plot_revenue_breakdown(solution_data: Dict, country_data: pd.DataFrame,
+#                           title_suffix: str = "") -> go.Figure:
+#     """Plot revenue breakdown by market and time period.
+    
+#     Parameters
+#     ----------
+#     solution_data : dict
+#         Solution dictionary with charge ('p_ch'), discharge ('p_dis') data
+#     country_data : pd.DataFrame
+#         Market data for revenue calculation
+#     title_suffix : str
+#         Additional text for plot title
+        
+#     Returns
+#     -------
+#     go.Figure
+#         Plotly figure showing revenue breakdown
+#     """
+#     # Check required variables
+#     required_vars = ['p_ch', 'p_dis']
+#     for var in required_vars:
+#         if var not in solution_data:
+#             raise ValueError(f"Solution data must contain '{var}' key")
+    
+#     # Calculate revenue streams
+#     time_indices = sorted(solution_data['p_ch'].keys())
+    
+#     # Get datetime values
+#     if 'timestamp' in country_data.columns:
+#         datetime_values = country_data['timestamp'].iloc[:len(time_indices)].tolist()
+#     else:
+#         datetime_values = pd.date_range(start='2024-01-01', periods=len(time_indices), freq='15min').tolist()
+    
+#     # Day-ahead revenue calculation
+#     charge_values = [solution_data['p_ch'][t] for t in time_indices]
+#     discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+#     da_prices = country_data['price_day_ahead'].iloc[:len(time_indices)].tolist()
+    
+#     # Calculate instantaneous revenue (simplified)
+#     da_revenue = []
+#     for i, (c, d, price) in enumerate(zip(charge_values, discharge_values, da_prices)):
+#         # Revenue = discharge * price - charge * price (simplified, no efficiency loss here)
+#         instant_revenue = (d - c) * price * 0.25  # 0.25 for 15-min to 1-hour conversion
+#         da_revenue.append(instant_revenue)
+    
+#     # Cumulative revenue
+#     cumulative_revenue = pd.Series(da_revenue).cumsum().tolist()
+    
+#     # Daily aggregation
+#     df_temp = pd.DataFrame({
+#         'datetime': datetime_values,
+#         'revenue': da_revenue
+#     })
+#     df_temp['date'] = pd.to_datetime(df_temp['datetime']).dt.date
+#     daily_revenue = df_temp.groupby('date')['revenue'].sum().reset_index()
+    
+#     # Create subplots
+#     fig = go.Figure()
+    
+#     # Instantaneous revenue
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=da_revenue,
+#         mode='lines',
+#         name='Instantaneous Revenue (€/15min)',
+#         line=dict(color='green', width=1),
+#         opacity=0.7
+#     ))
+    
+#     # Cumulative revenue
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=cumulative_revenue,
+#         mode='lines',
+#         name='Cumulative Revenue (€)',
+#         line=dict(color='blue', width=2),
+#         yaxis='y2'
+#     ))
+    
+#     # Update layout
+#     fig.update_layout(
+#         title=f'Revenue Analysis {title_suffix}',
+#         xaxis_title='Time',
+#         yaxis=dict(
+#             title='Instantaneous Revenue (€/15min)',
+#             side='left'
+#         ),
+#         yaxis2=dict(
+#             title='Cumulative Revenue (€)',
+#             side='right',
+#             overlaying='y'
+#         ),
+#         hovermode='x unified',
+#         width=1000,
+#         height=500
+#     )
+    
+#     return fig
+
+
+# def plot_battery_efficiency_analysis(solution_data: Dict, country_data: pd.DataFrame,
+#                                     title_suffix: str = "") -> go.Figure:
+#     """Plot battery efficiency and cycling analysis.
+    
+#     Parameters
+#     ----------
+#     solution_data : dict
+#         Solution dictionary with charge ('p_ch'), discharge ('p_dis'), soc ('e_soc') data
+#     country_data : pd.DataFrame
+#         Market data
+#     title_suffix : str
+#         Additional text for plot title
+        
+#     Returns
+#     -------
+#     go.Figure
+#         Plotly figure showing efficiency analysis
+#     """
+#     # Check required variables
+#     required_vars = ['p_ch', 'p_dis', 'e_soc']
+#     for var in required_vars:
+#         if var not in solution_data:
+#             raise ValueError(f"Solution data must contain '{var}' key")
+    
+#     # Extract time series
+#     time_indices = sorted(solution_data['p_ch'].keys())
+    
+#     # Get datetime values
+#     if 'timestamp' in country_data.columns:
+#         datetime_values = country_data['timestamp'].iloc[:len(time_indices)].tolist()
+#     else:
+#         datetime_values = pd.date_range(start='2024-01-01', periods=len(time_indices), freq='15min').tolist()
+    
+#     charge_values = [solution_data['p_ch'][t] for t in time_indices]
+#     discharge_values = [solution_data['p_dis'][t] for t in time_indices]
+#     soc_values = [solution_data['e_soc'][t] for t in time_indices]
+    
+#     # Calculate efficiency metrics
+#     total_charge = sum(charge_values) * 0.25  # Convert to MWh
+#     total_discharge = sum(discharge_values) * 0.25  # Convert to MWh
+#     round_trip_efficiency = total_discharge / total_charge if total_charge > 0 else 0
+    
+#     # Calculate SoC utilization
+#     soc_range = max(soc_values) - min(soc_values)
+#     soc_utilization = soc_range / max(soc_values) if max(soc_values) > 0 else 0
+    
+#     # Calculate cycling frequency (simplified)
+#     soc_diff = [abs(soc_values[i] - soc_values[i-1]) for i in range(1, len(soc_values))]
+#     avg_soc_change = sum(soc_diff) / len(soc_diff) if soc_diff else 0
+    
+#     fig = go.Figure()
+    
+#     # SoC profile
+#     fig.add_trace(go.Scatter(
+#         x=datetime_values,
+#         y=soc_values,
+#         mode='lines',
+#         name='State of Charge (MWh)',
+#         line=dict(color='blue', width=2)
+#     ))
+    
+#     # Add charge/discharge indicators
+#     charge_mask = [c > 1e-6 for c in charge_values]
+#     discharge_mask = [d > 1e-6 for d in discharge_values]
+    
+#     # Charging periods
+#     if any(charge_mask):
+#         charge_times = [datetime_values[i] for i, mask in enumerate(charge_mask) if mask]
+#         charge_soc = [soc_values[i] for i, mask in enumerate(charge_mask) if mask]
+#         fig.add_trace(go.Scatter(
+#             x=charge_times,
+#             y=charge_soc,
+#             mode='markers',
+#             name='Charging Periods',
+#             marker=dict(color='green', size=4, symbol='circle')
+#         ))
+    
+#     # Discharging periods
+#     if any(discharge_mask):
+#         discharge_times = [datetime_values[i] for i, mask in enumerate(discharge_mask) if mask]
+#         discharge_soc = [soc_values[i] for i, mask in enumerate(discharge_mask) if mask]
+#         fig.add_trace(go.Scatter(
+#             x=discharge_times,
+#             y=discharge_soc,
+#             mode='markers',
+#             name='Discharging Periods',
+#             marker=dict(color='red', size=4, symbol='triangle-up')
+#         ))
+    
+#     # Add efficiency metrics as annotations
+#     fig.add_annotation(
+#         x=0.02, y=0.98,
+#         xref="paper", yref="paper",
+#         text=f"Round-trip Efficiency: {round_trip_efficiency:.2%}<br>"
+#              f"SoC Utilization: {soc_utilization:.2%}<br>"
+#              f"Avg SoC Change: {avg_soc_change:.2f} MWh",
+#         showarrow=False,
+#         bgcolor="white",
+#         bordercolor="black",
+#         borderwidth=1
+#     )
+    
+#     # Update layout
+#     fig.update_layout(
+#         title=f'Battery Efficiency Analysis {title_suffix}',
+#         xaxis_title='Time',
+#         yaxis_title='State of Charge (MWh)',
+#         hovermode='x unified',
+#         width=1000,
+#         height=500
+#     )
+    
+#     return fig
+
