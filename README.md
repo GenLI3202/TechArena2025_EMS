@@ -12,7 +12,6 @@ An advanced Energy Management System (EMS) that optimizes battery storage operat
 - **Quick Start Guide:** `py_script/README.md`
 - **Model Formulation Details:** `doc\p2_model\p2_bi_model_ggdp.tex`
 - **Project Overview:** `doc/whole_project_description.md`
-- **Model Naming Scheme:** `doc/p2_model/MODEL_NAMING_SCHEME.md`
 ---
 
 ## Project Overview
@@ -123,42 +122,73 @@ The system employs **Mixed-Integer Linear Programming (MILP)** to solve a multi-
 ---
 
 ## Repository Structure
-<!-- 
-The Project Structure below is outdated. Please refer to the actual repository for the current structure.
+
 ```
 TechArena2025_EMS/
-├── py_script/                      # Main Python package
-│   ├── core/                       # Optimization engine
-│   │   ├── optimizer.py            # BESSOptimizerV2 - Main model
-│   │   └── exceptions.py           # Error handling
-│   ├── data/                       # Market data processing
-│   │   └── market_data.py          # Data loading & transformation
-│   ├── analysis/                   # Financial analysis
-│   │   └── investment.py           # DCF, NPV, ROI calculations
-│   ├── visualization/              # Results visualization
-│   │   ├── config.py               # Plotting templates
-│   │   └── validation_plots.py     # Diagnostic plots
-│   └── scripts/                    # Executable tools
-│       ├── main.py                 # CLI entry point
-│       ├── run_all_scenarios.py    # 45-scenario runner
-│       ├── validate_week.py        # Model validation
-│       └── process_phase2_data.py  # Data preprocessing
-│
-├── data/                           # Market price data
-│   └── TechArena2025_Phase2_data.xlsx
-│
-├── doc/                            # Documentation & analysis
-│   ├── mathematical_formulation.md # Detailed model equations
-│   ├── Phase_II_Model.md           # Phase II specifications
-│   └── dev_plan/                   # Development roadmap
-│
-├── results/                        # Optimization outputs
-│   └── phase1_validation/          # Phase I validation results
-│
-└── README.md                       # This file
-``` -->
-
-### Quick Navigation
+├── .github/                      # GitHub Actions workflows and templates
+├── .vscode/                      # VSCode settings
+├── data/                         # Raw and processed market data
+│   ├── metadata.json
+│   ├── TechArena2025_Phase2_data.xlsx
+│   ├── aging_config/             # Configuration files for battery aging models
+│   ├── archive_p1_3markets/      # Archived Phase 1 data
+│   ├── json/                     # Processed market data in JSON format
+│   └── parquet/                  # Processed market data in Parquet format
+├── doc/                          # Project documentation, mathematical formulations, literature
+│   ├── Pyomo_OptModelingInPython_3rdVersion.pdf
+│   ├── whole_project_description.md
+│   ├── dev_log/                  # Development logs and plans
+│   ├── Literature/               # Relevant research papers
+│   ├── official_instruction_docs/# Official competition documents
+│   └── p2_model/                 # Phase 2 model formulations (LaTeX, PDF)
+├── notebook/                     # Jupyter notebooks for data exploration, analysis, and prototyping
+│   ├── p1_final_validation.ipynb
+│   ├── p2a_market_data.ipynb
+│   ├── p2b_optimizer.ipynb
+│   ├── p2c_mpc.ipynb
+│   ├── p2d_result_ana.ipynb
+│   └── ...                       # More notebooks for various analyses
+├── py_script/                    # Main Python package for the BESS optimizer
+│   ├── README.md                 # Detailed README for the Python package
+│   ├── requirements.txt          # Python package dependencies
+│   ├── core/                     # Core optimization logic
+│   │   ├── __init__.py
+│   │   ├── optimizer.py          # Main optimization model (BESSOptimizerV2, ModelI, etc.)
+│   │   └── investment/           # Investment analysis and DCF calculations
+│   ├── data/                     # Data loading and processing
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── load_process_market_data.py
+│   │   └── visualize_market_data.py
+│   ├── mpc/                      # Model Predictive Control (MPC) implementation
+│   │   ├── meta_optimizer.py
+│   │   └── mpc_simulator.py
+│   ├── test/                     # Unit and integration tests
+│   │   ├── __init__.py
+│   │   ├── test_optimizer_core.py
+│   │   └── validate_optimizer_behavior.py
+│   ├── validation/               # Validation scripts and constraint checks
+│   │   ├── __init__.py
+│   │   └── constraint_validator.py
+│   └── visualization/            # Plotting and visualization tools
+│       ├── __init__.py
+│       ├── config.py
+│       ├── optimization_analysis.py
+│       └── visualize_as_revenue_fix.py
+├── validation_results/           # Outputs from validation runs
+│   ├── market_data_analysis/
+│   ├── model_iii_validation/
+│   └── mpc_validation/
+├── .gitignore
+├── CLAUDE.md
+├── LICENSE
+├── quick_plot_results.py         # Script for quick plotting of results
+├── README.md                     # Project overview (this file)
+├── requirements.txt              # Project-level Python dependencies
+├── run_36h_hu_winter.py          # Specific scenario run script
+├── test_mpc_5day_visualize.py    # Test script for MPC visualization
+└── test_single_32h_vs_mpc.py     # Test script for single vs MPC comparison
+```
 
 - **Implementation Details:** See `py_script/README.md`
 
@@ -229,19 +259,21 @@ TechArena2025_EMS/
 **Three-Stage Model Development:**
 - ✅ **Model (i): Base + aFRR Energy Market** [IMPLEMENTED]
   - Four-market co-optimization (DA, aFRR-E, FCR, aFRR capacity)
-  - Class: `BESSOptimizerModelI`
-  - Test: `test_model_i.py` ✓ PASSING
-  - Branch: `p2-model-stage1-afrr-energy`
+  - Class: `BESSOptimizerModelI` (in `py_script/core/optimizer.py`)
+  - Test: `py_script/test/test_optimizer_core.py` ✓ PASSING
 
 - 🔄 **Model (ii): Model (i) + Cyclic Aging Cost** [NEXT]
   - Piecewise-linear cyclic degradation (Xu et al., 2017)
   - Segment-based SOC tracking
   - Economic cost replaces rigid cycle limits
+  - Class: `BESSOptimizerModelII` (in `py_script/core/optimizer.py`)
+  - Introduces `alpha` parameter to weight degradation cost in objective.
 
 - 🔄 **Model (iii): Model (ii) + Calendar Aging Cost** [PLANNED]
   - SOS2-based calendar aging (Collath et al., 2023)
   - Complete Phase II degradation modeling
-  - Meta-optimization of degradation price α
+  - Meta-optimization of degradation price `alpha`
+  - Class: `BESSOptimizerModelIII` (in `py_script/core/optimizer.py`)
 
 **Integration Tasks:**
 - 🔄 Rolling horizon (MPC) implementation for computational feasibility
@@ -279,20 +311,26 @@ TechArena2025_EMS/
 
 **Installation:**
 ```bash
-# Install dependencies
-pip install -r py_script/requirements.txt
-
-# Test Model (i) implementation
-python test_model_i.py
+# Install project dependencies
+pip install -r requirements.txt
 ```
 
-**Using the Optimizers:**
+**Testing:**
+```bash
+# Run core optimizer tests
+python py_script/test/test_optimizer_core.py
+```
+
+**Using the Optimizers (Model I example):**
 ```python
-# Model (i): Base + aFRR Energy Market (4 markets)
+import sys
+sys.path.insert(0, './py_script') # Add py_script to the Python path
+
 from core.optimizer import BESSOptimizerModelI
 
 optimizer = BESSOptimizerModelI()
-data = optimizer.load_and_preprocess_data("data/TechArena2025_data_tidy.jsonl")
+# Note: Use full data path or ensure script is run from project root
+data = optimizer.load_and_preprocess_data("data/TechArena2025_Phase2_data.xlsx") 
 country_data = optimizer.extract_country_data(data, 'DE_LU')
 model = optimizer.build_optimization_model(country_data, c_rate=0.5, daily_cycle_limit=1.5)
 solution = optimizer.solve_model(model)
@@ -301,14 +339,7 @@ solution = optimizer.solve_model(model)
 afrr_energy_bids = solution['p_afrr_pos_e']  # Positive (discharge)
 ```
 
-**Backward Compatibility:**
-```python
-# These still work (aliases for Model (i))
-from core.optimizer import BESSOptimizer  # Main alias
-from core.optimizer import BESSOptimizerV2  # Old V2 naming
-```
-
-For detailed usage instructions, see `py_script/README.md` and `doc/p2_model/MODEL_NAMING_SCHEME.md`.
+For detailed usage instructions, see `py_script/README.md`.
 
 ---
 
