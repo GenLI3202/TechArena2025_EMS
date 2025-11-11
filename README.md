@@ -177,17 +177,13 @@ TechArena2025_EMS/
 │       └── visualize_as_revenue_fix.py
 ├── validation_results/           # Outputs from validation runs
 │   ├── market_data_analysis/
-│   ├── model_iii_validation/
+│   ├── optimizer_validation/
 │   └── mpc_validation/
 ├── .gitignore
 ├── CLAUDE.md
 ├── LICENSE
-├── quick_plot_results.py         # Script for quick plotting of results
 ├── README.md                     # Project overview (this file)
 ├── requirements.txt              # Project-level Python dependencies
-├── run_36h_hu_winter.py          # Specific scenario run script
-├── test_mpc_5day_visualize.py    # Test script for MPC visualization
-└── test_single_32h_vs_mpc.py     # Test script for single vs MPC comparison
 ```
 
 - **Implementation Details:** See `py_script/README.md`
