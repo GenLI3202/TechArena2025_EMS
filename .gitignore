@@ -26,17 +26,15 @@ doc/*.synctex.gz
 # ============================================
 
 # Large JSON result files (8.5GB+)
-results/optimization_results_full.json
-results/optimization_results_full.jsonl
-results/*.json
-results/*.jsonl
+validation_results/**/*.html
+
 
 # Large JSONL data files (200K+ lines)
 **/input/TechArena2025_data_tidy.jsonl
 **/TechArena2025_data_tidy.jsonl
 
 # Large notebook files with embedded outputs
-jb_notebook/final_validation.ipynb
+# notebook/final_validation.ipynb
 
 # ZIP archives
 *.zip
@@ -83,13 +81,8 @@ nul
 validation_*.log
 
 # Result directories (reorganized structure)
-py_script/**/results/
-py_script/**/*_results/
-results/phase1_validation/
-results/phase2_validation/
-**/validation_week_results/
-**/final_45_scenarios_results/
-final_submission_csvs/
+# validation_results
+
 
 # Script-generated progress files
 **/progress.json
@@ -100,5 +93,5 @@ gha-creds-*.json
 # ============================================
 # Archived Code and Scripts
 # ============================================
-py_script/test_scripts/archive/
+py_script/test/archive/
 py_script/visualization/archive/

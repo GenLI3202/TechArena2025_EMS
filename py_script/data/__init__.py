@@ -10,7 +10,7 @@ Main Functions:
 - Visualization functions for market price analysis
 """
 
-from .market_data import (
+from .load_process_market_data import (
     MarketTables,
     load_market_tables,
     load_data,
