@@ -48,8 +48,15 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Tuple
 from .load_process_market_data import (
     wide_to_tidy_day_ahead,
-    # wide_to_tidy_fcr,
-    # wide_to_tidy_afrr,
+    wide_to_tidy_fcr,
+    wide_to_tidy_afrr,
+    load_market_tables,
+    load_phase2_market_tables,
+    TIMESTAMP_COL as _TIMESTAMP_COL,
+    COUNTRY_COL as _COUNTRY_COL,
+    PRICE_COL_MWH as _PRICE_COL_MWH,
+    PRICE_COL_MW as _PRICE_COL_MW,
+    DIRECTION_COL as _DIRECTION_COL,
 )   
 
 import pandas as pd
@@ -152,18 +159,66 @@ def summarize_afrr(afrr_df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Plotting helpers
 # ---------------------------------------------------------------------------
+#
+# UNIFIED PLOTTING ARCHITECTURE (Phase 2)
+# ========================================
+# Core function: plot_market_distribution(market_df, market_type)
+#   - Supports all market types: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy'
+#   - Automatically handles wide ↔ tidy format conversion
+#   - Uses appropriate price column (EUR/MWh vs EUR/MW) per market type
+#
+# Convenience wrappers (backward compatible):
+#   - plot_day_ahead_distribution(df) → wraps market_type='day_ahead'
+#   - plot_fcr_distribution(df) → wraps market_type='fcr'
+#   - plot_afrr_capacity_distribution(df) → wraps market_type='afrr_capacity'
+#   - plot_afrr_energy_distribution(df) → wraps market_type='afrr_energy'
+#   - plot_afrr_distribution(df) → auto-detects capacity vs energy
+#
+# Format conversion functions imported from load_process_market_data:
+#   - wide_to_tidy_day_ahead, wide_to_tidy_fcr, wide_to_tidy_afrr
+# ---------------------------------------------------------------------------
 
 
-def plot_day_ahead_distribution(day_ahead_df: pd.DataFrame) -> go.Figure:
-    """Box plot comparing Day-Ahead price distributions across countries."""
+def plot_market_distribution(market_df: pd.DataFrame, market_type: str = 'day_ahead') -> go.Figure:
+    """Box plot comparing price distributions across countries for any market.
+    
+    Parameters
+    ----------
+    market_df : pd.DataFrame
+        Market data in wide or tidy format
+    market_type : str, optional
+        Market type: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy' (default: 'day_ahead')
+        
+    Returns
+    -------
+    go.Figure
+        Box plot of price distributions
+    """
+    
+    # Determine price column and conversion function based on market type
+    if market_type in ['day_ahead', 'afrr_energy']:
+        price_col = PRICE_COL_MWH
+        convert_func = wide_to_tidy_day_ahead  # Works for both DA and aFRR energy (EUR/MWh)
+        price_unit = "EUR/MWh"
+        tidy_columns = [TIMESTAMP_COL, COUNTRY_COL, PRICE_COL_MWH]
+    elif market_type in ['fcr', 'afrr_capacity']:
+        price_col = PRICE_COL_MW
+        convert_func = wide_to_tidy_fcr
+        price_unit = "EUR/MW"
+        tidy_columns = [TIMESTAMP_COL, COUNTRY_COL, PRICE_COL_MW]
+    else:
+        raise ValueError(f"Unknown market_type: {market_type}")
     
     # Check if data is in tidy format
-    if not _is_tidy_format(day_ahead_df, [TIMESTAMP_COL, COUNTRY_COL, PRICE_COL_MWH]):
-        # Data is in wide format, convert to long format for plotting using `tidy_to_wide_day_ahead`
-        melted = wide_to_tidy_day_ahead(day_ahead_df.copy())
-    else: # Data is already in tidy format 
-        melted = day_ahead_df.copy()
-    melted = melted.rename(columns={PRICE_COL_MWH: 'price', COUNTRY_COL: 'country'})
+    if not _is_tidy_format(market_df, tidy_columns):
+        # Data is in wide format, convert to tidy format
+        melted = convert_func(market_df.copy())
+    else:
+        # Data is already in tidy format
+        melted = market_df.copy()
+    
+    # Rename columns for plotting
+    melted = melted.rename(columns={price_col: 'price', COUNTRY_COL: 'country'})
     
     # Drop NaN values
     melted = melted.dropna(subset=['price'])
@@ -180,19 +235,52 @@ def plot_day_ahead_distribution(day_ahead_df: pd.DataFrame) -> go.Figure:
             xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False
         )
-        fig.update_layout(title="Day-Ahead Price Distribution by Country")
+        fig.update_layout(title=f"{market_type.replace('_', ' ').title()} Price Distribution by Country")
         return fig
     
+    # Create box plot
     fig = px.box(
         melted,
         x='country',
         y='price',
         color='country',
-        title="Day-Ahead Price Distribution by Country",
+        title=f"{market_type.replace('_', ' ').title()} Price Distribution by Country",
         points="suspectedoutliers",
     )
-    fig.update_layout(showlegend=False, xaxis_title="Country", yaxis_title="Price [EUR/MWh]")
+    fig.update_layout(showlegend=False, xaxis_title="Country", yaxis_title=f"Price [{price_unit}]")
     return fig
+
+def plot_day_ahead_distribution(day_ahead_df: pd.DataFrame) -> go.Figure:
+    """Box plot comparing Day-Ahead price distributions across countries.
+    
+    Convenience wrapper for plot_market_distribution with market_type='day_ahead'.
+    """
+    return plot_market_distribution(day_ahead_df, market_type='day_ahead')
+
+
+def plot_fcr_distribution(fcr_df: pd.DataFrame) -> go.Figure:
+    """Box plot comparing FCR price distributions across countries.
+    
+    Convenience wrapper for plot_market_distribution with market_type='fcr'.
+    """
+    return plot_market_distribution(fcr_df, market_type='fcr')
+
+
+def plot_afrr_capacity_distribution(afrr_capacity_df: pd.DataFrame) -> go.Figure:
+    """Box plot comparing aFRR capacity price distributions across countries.
+    
+    Convenience wrapper for plot_market_distribution with market_type='afrr_capacity'.
+    """
+    return plot_market_distribution(afrr_capacity_df, market_type='afrr_capacity')
+
+
+def plot_afrr_energy_distribution(afrr_energy_df: pd.DataFrame) -> go.Figure:
+    """Box plot comparing aFRR energy price distributions across countries.
+    
+    Convenience wrapper for plot_market_distribution with market_type='afrr_energy'.
+    """
+    return plot_market_distribution(afrr_energy_df, market_type='afrr_energy')
+
 
 def plot_day_ahead_trend(day_ahead_df: pd.DataFrame, *, countries: Optional[Iterable[str]] = None) -> go.Figure:
     """Line plot of Day-Ahead prices across 2024, optionally filtered by country."""
@@ -250,134 +338,32 @@ def plot_day_ahead_trend(day_ahead_df: pd.DataFrame, *, countries: Optional[Iter
     fig.update_layout(xaxis_title="Timestamp", yaxis_title="Price [EUR/MWh]")
     return fig
 
-def plot_fcr_distribution(fcr_df: pd.DataFrame) -> go.Figure:
-    """Box plot comparing FCR price distributions across countries."""
-    
-    # Check if data is in tidy format
-    if _is_tidy_format(fcr_df, [TIMESTAMP_COL, COUNTRY_COL, PRICE_COL_MW]):
-        # Data is already in tidy format
-        melted = fcr_df.copy()
-        melted = melted.rename(columns={PRICE_COL_MW: 'price', COUNTRY_COL: 'country'})
-    else:
-        # Data is in wide format, convert to long format for plotting
-        country_cols = [col for col in fcr_df.columns if col != TIMESTAMP_COL]
-        melted = fcr_df.melt(
-            id_vars=[TIMESTAMP_COL],
-            value_vars=country_cols,
-            var_name='country',
-            value_name='price'
-        )
-    
-    # Clean data
-    melted = melted.dropna(subset=['price'])
-    melted['price'] = pd.to_numeric(melted['price'], errors='coerce')
-    melted = melted.dropna(subset=['price'])
-    
-    if melted.empty:
-        # Return empty figure if no valid data
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No valid price data available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False
-        )
-        fig.update_layout(title="FCR Price Distribution by Country")
-        return fig
-    
-    fig = px.box(
-        melted,
-        x='country',
-        y='price',
-        color='country',
-        title="FCR Price Distribution by Country",
-        points="suspectedoutliers",
-    )
-    fig.update_layout(showlegend=False, xaxis_title="Country", yaxis_title="Price [EUR/MW]")
-    return fig
 
 def plot_afrr_distribution(afrr_df: pd.DataFrame) -> go.Figure:
-    """Box plots for aFRR positive and negative capacity prices by country."""
+    """Box plots for aFRR positive and negative capacity/energy prices by country.
     
-    # Check if data is in tidy format
-    if _is_tidy_format(afrr_df, [TIMESTAMP_COL, COUNTRY_COL, DIRECTION_COL, PRICE_COL_MW]):
-        # Data is already in tidy format
-        melted = afrr_df.copy()
+    This function wraps plot_market_distribution for backward compatibility.
+    For aFRR capacity, use plot_afrr_capacity_distribution().
+    For aFRR energy, use plot_afrr_energy_distribution().
+    """
+    # Try to detect if it's capacity or energy based on data range
+    # Capacity prices are typically in EUR/MW (higher values)
+    # Energy prices are typically in EUR/MWh (similar to day-ahead)
+    
+    # Get first non-timestamp column to check values
+    price_cols = [col for col in afrr_df.columns if col != TIMESTAMP_COL]
+    if price_cols:
+        sample_values = afrr_df[price_cols[0]].dropna().abs()
+        mean_val = sample_values.mean() if len(sample_values) > 0 else 0
         
-        # Standardize direction values using aliases
-        melted[DIRECTION_COL] = melted[DIRECTION_COL].str.lower().map(AFRR_DIRECTION_ALIASES).fillna(melted[DIRECTION_COL])
-        
-    else:
-        # Data is in wide format, convert to long format for plotting
-        country_dir_cols = [col for col in afrr_df.columns if col != TIMESTAMP_COL]
-        
-        melted_data = []
-        for col in country_dir_cols:
-            if '_' in col:
-                country, direction = col.rsplit('_', 1)
-                # Standardize direction using aliases
-                direction = AFRR_DIRECTION_ALIASES.get(direction.lower(), direction.lower())
-            else:
-                country = col
-                direction = 'unknown'
-            
-            col_data = afrr_df[[TIMESTAMP_COL, col]].dropna()
-            for _, row in col_data.iterrows():
-                melted_data.append({
-                    TIMESTAMP_COL: row[TIMESTAMP_COL],
-                    COUNTRY_COL: country,
-                    DIRECTION_COL: direction,
-                    PRICE_COL_MW: row[col]
-                })
-        
-        melted = pd.DataFrame(melted_data)
+        # Heuristic: capacity prices typically > 100, energy prices < 500
+        if mean_val > 100:
+            return plot_market_distribution(afrr_df, market_type='afrr_capacity')
+        else:
+            return plot_market_distribution(afrr_df, market_type='afrr_energy')
     
-    if melted.empty:
-        # Return empty figure if no valid data
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No valid price data available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False
-        )
-        fig.update_layout(title="aFRR Capacity Price Distribution")
-        return fig
-    
-    # Clean data
-    melted = melted.dropna(subset=[PRICE_COL_MW])
-    melted[PRICE_COL_MW] = pd.to_numeric(melted[PRICE_COL_MW], errors='coerce')
-    melted = melted.dropna(subset=[PRICE_COL_MW])
-    
-    # Filter out unknown directions for cleaner visualization
-    melted = melted[melted[DIRECTION_COL].isin(['positive', 'negative'])]
-    
-    if melted.empty:
-        # Return empty figure if no valid data after cleaning
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No valid price data available after cleaning",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False
-        )
-        fig.update_layout(title="aFRR Capacity Price Distribution")
-        return fig
-    
-    fig = px.box(
-        melted,
-        x=COUNTRY_COL,
-        y=PRICE_COL_MW,
-        color=DIRECTION_COL,
-        facet_col=DIRECTION_COL,
-        facet_col_spacing=0.07,
-        category_orders={DIRECTION_COL: ['positive', 'negative']},
-        title="aFRR Capacity Price Distribution (Positive vs Negative)",
-    )
-    fig.update_layout(
-        xaxis_title="Country", 
-        yaxis_title="Price [EUR/MW]", 
-        showlegend=False
-    )
-    fig.update_xaxes(tickangle=45)  # Rotate country labels for better readability
-    return fig
+    # Default to capacity if can't determine
+    return plot_market_distribution(afrr_df, market_type='afrr_capacity')
 
 def plot_day_ahead_heatmap(day_ahead_df: pd.DataFrame, country: str) -> go.Figure:
     """Hourly-by-month heatmap to reveal charging/discharging windows for a country."""
@@ -1292,11 +1278,11 @@ def _cli_example(workbook: Path) -> None:
     print(afrr_summary)
 
 
-if __name__ == "__main__":
-    default_path = Path(__file__).resolve().parents[1] / "SoloGen_TechArena2025_Phase1" / "input" / "TechArena2025_data.xlsx"
-    if default_path.exists():
-        _cli_example(default_path)
-    else:
-        raise SystemExit(
-            "Unable to locate the default workbook. Pass a valid path or adjust the script."
-        )
+# if __name__ == "__main__":
+#     default_path = Path(__file__).resolve().parents[1] / "SoloGen_TechArena2025_Phase1" / "input" / "TechArena2025_data.xlsx"
+#     if default_path.exists():
+#         _cli_example(default_path)
+#     else:
+#         raise SystemExit(
+#             "Unable to locate the default workbook. Pass a valid path or adjust the script."
+#         )

@@ -191,6 +191,110 @@ def load_data(jsonl_path: str) -> list:
     return data
 
 
+
+# ===========================================================================
+# PHASE 2 EXTENSIONS
+# ===========================================================================
+
+# Phase 2 Constants
+AFRR_ENERGY_SHEET = "aFRR energy prices"
+
+# Validation Constants
+PRICE_BOUNDS = {
+    'day_ahead': (-500, 2000),    # EUR/MWh (allow extreme scarcity prices)
+    'fcr': (0, 10000),             # EUR/MW (capacity always non-negative)
+    'afrr_capacity': (0, 10000),   # EUR/MW
+    'afrr_energy': (-500, 2000)    # EUR/MWh (allow extreme scarcity prices)
+}
+
+ZERO_THRESHOLD_PCT = 95  # Flag if >95% zeros
+
+
+def load_phase2_market_tables(workbook_path: Path, *, prefer_csv: bool = False) -> Dict[str, pd.DataFrame]:
+    """Load Phase 2 market tables including aFRR energy prices.
+
+    Parameters
+    ----------
+    workbook_path : Path
+        Path to TechArena2025_Phase2_data.xlsx
+    prefer_csv : bool, optional
+        If True and CSV cache exists, use it instead of Excel
+
+    Returns
+    -------
+    dict
+        Keys: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy' (NEW)
+        Values: Wide-format DataFrames
+
+    DataFrame Formats
+    -----------------
+    day_ahead:
+        Columns: [timestamp, DE_LU, AT, CH, HU, CZ]
+
+    fcr:
+        Columns: [timestamp, DE, AT, CH, HU, CZ]
+
+    afrr_capacity:
+        Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
+
+    afrr_energy (NEW):
+        Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
+    """
+    from core.exceptions import DataLoadingError
+    import logging
+
+    logger = logging.getLogger(__name__)
+    workbook_path = workbook_path.expanduser().resolve()
+
+    try:
+        xl = pd.ExcelFile(workbook_path)
+    except FileNotFoundError:
+        raise DataLoadingError(f"Excel file not found: {workbook_path}")
+    except Exception as e:
+        raise DataLoadingError(f"Failed to open Excel file: {e}")
+
+    tables = {}
+
+    # Load each sheet with individual error handling
+    sheet_configs = [
+        (DAY_AHEAD_SHEET, 'day_ahead', _tidy_market_frame, PRICE_COL_MWH),
+        (FCR_SHEET, 'fcr', _tidy_market_frame, PRICE_COL_MW),
+        (AFRR_SHEET, 'afrr_capacity', _tidy_afrr_frame, None),
+        (AFRR_ENERGY_SHEET, 'afrr_energy', _tidy_afrr_frame, None)  # NEW
+    ]
+
+    for sheet_name, table_key, loader_func, value_name in sheet_configs:
+        try:
+            raw_df = xl.parse(sheet_name)
+
+            if value_name:
+                processed_df = loader_func(raw_df, value_name=value_name)
+            else:
+                processed_df = loader_func(raw_df)
+
+            # Convert to numeric
+            for col in processed_df.columns[1:]:  # Skip timestamp
+                processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce')
+
+            tables[table_key] = processed_df
+            logger.info(f"Loaded {table_key}: {len(processed_df)} rows, {len(processed_df.columns)} columns")
+
+        except KeyError:
+            logger.warning(f"Sheet '{sheet_name}' not found, skipping...")
+            continue  # Allow partial loading
+        except Exception as e:
+            logger.error(f"Error processing sheet '{sheet_name}': {e}")
+            raise DataLoadingError(f"Failed to process sheet '{sheet_name}': {e}")
+
+    # Validate we have minimum required tables
+    if 'day_ahead' not in tables:
+        raise DataLoadingError("Critical: Day-ahead data missing")
+
+    return tables
+
+
+# ===========================================================================  
+
 def _coerce_timestamp_column(series: pd.Series) -> pd.Series:
     """Coerce heterogeneous timestamp column into pandas datetime, dropping header artifacts."""
     if pd.api.types.is_datetime64_any_dtype(series):
@@ -571,21 +675,6 @@ def ensure_csv_exports(tables: Dict[str, pd.DataFrame], directory: Path) -> None
         df.to_csv(directory / f"{key}.csv", index=False)
 
 
-# ===========================================================================
-# PHASE 2 EXTENSIONS
-# ===========================================================================
-
-# Phase 2 Constants
-AFRR_ENERGY_SHEET = "aFRR energy prices"
-
-# Validation Constants
-PRICE_BOUNDS = {
-    'day_ahead': (-500, 2000),    # EUR/MWh (allow extreme scarcity prices)
-    'fcr': (0, 10000),             # EUR/MW (capacity always non-negative)
-    'afrr_capacity': (0, 10000),   # EUR/MW
-    'afrr_energy': (-500, 2000)    # EUR/MWh (allow extreme scarcity prices)
-}
-ZERO_THRESHOLD_PCT = 95  # Flag if >95% zeros
 
 def convert_afrr_energy_zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -612,89 +701,6 @@ def convert_afrr_energy_zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
         df_processed['price_afrr_energy_neg'] = df_processed['price_afrr_energy_neg'].replace(0, np.nan)
         
     return df_processed
-
-
-def load_phase2_market_tables(workbook_path: Path, *, prefer_csv: bool = False) -> Dict[str, pd.DataFrame]:
-    """Load Phase 2 market tables including aFRR energy prices.
-
-    Parameters
-    ----------
-    workbook_path : Path
-        Path to TechArena2025_Phase2_data.xlsx
-    prefer_csv : bool, optional
-        If True and CSV cache exists, use it instead of Excel
-
-    Returns
-    -------
-    dict
-        Keys: 'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy' (NEW)
-        Values: Wide-format DataFrames
-
-    DataFrame Formats
-    -----------------
-    day_ahead:
-        Columns: [timestamp, DE_LU, AT, CH, HU, CZ]
-
-    fcr:
-        Columns: [timestamp, DE, AT, CH, HU, CZ]
-
-    afrr_capacity:
-        Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
-
-    afrr_energy (NEW):
-        Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
-    """
-    from core.exceptions import DataLoadingError
-    import logging
-
-    logger = logging.getLogger(__name__)
-    workbook_path = workbook_path.expanduser().resolve()
-
-    try:
-        xl = pd.ExcelFile(workbook_path)
-    except FileNotFoundError:
-        raise DataLoadingError(f"Excel file not found: {workbook_path}")
-    except Exception as e:
-        raise DataLoadingError(f"Failed to open Excel file: {e}")
-
-    tables = {}
-
-    # Load each sheet with individual error handling
-    sheet_configs = [
-        (DAY_AHEAD_SHEET, 'day_ahead', _tidy_market_frame, PRICE_COL_MWH),
-        (FCR_SHEET, 'fcr', _tidy_market_frame, PRICE_COL_MW),
-        (AFRR_SHEET, 'afrr_capacity', _tidy_afrr_frame, None),
-        (AFRR_ENERGY_SHEET, 'afrr_energy', _tidy_afrr_frame, None)  # NEW
-    ]
-
-    for sheet_name, table_key, loader_func, value_name in sheet_configs:
-        try:
-            raw_df = xl.parse(sheet_name)
-
-            if value_name:
-                processed_df = loader_func(raw_df, value_name=value_name)
-            else:
-                processed_df = loader_func(raw_df)
-
-            # Convert to numeric
-            for col in processed_df.columns[1:]:  # Skip timestamp
-                processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce')
-
-            tables[table_key] = processed_df
-            logger.info(f"Loaded {table_key}: {len(processed_df)} rows, {len(processed_df.columns)} columns")
-
-        except KeyError:
-            logger.warning(f"Sheet '{sheet_name}' not found, skipping...")
-            continue  # Allow partial loading
-        except Exception as e:
-            logger.error(f"Error processing sheet '{sheet_name}': {e}")
-            raise DataLoadingError(f"Failed to process sheet '{sheet_name}': {e}")
-
-    # Validate we have minimum required tables
-    if 'day_ahead' not in tables:
-        raise DataLoadingError("Critical: Day-ahead data missing")
-
-    return tables
 
 
 def validate_phase2_data(tables: Dict[str, pd.DataFrame]) -> Dict[str, any]:
