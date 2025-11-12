@@ -15,6 +15,17 @@ The plots cover:
 
 These functions typically consume a `solution_data` dictionary produced by the
 optimizer and the corresponding market data to provide rich, contextual plots.
+
+Important Notes
+---------------
+.. note::
+    For degradation analysis (cyclic and calendar aging), use the dedicated
+    ``py_script.visualization.aging_analysis`` module instead. The aging
+    analysis functions work directly with solution dicts from
+    ``optimizer.extract_solution()``, providing a simpler API without
+    requiring test_data or horizon_hours.
+
+    See: py_script.visualization.aging_analysis.plot_aging_validation_suite()
 """
 
 from __future__ import annotations
@@ -38,7 +49,41 @@ TIMESTAMP_COL = "timestamp"
 
 
 def extract_detailed_solution(solution: dict, test_data: pd.DataFrame, horizon_hours: int):
-    """Extract all decision variables and market data into a DataFrame."""
+    """
+    Extract all decision variables and market data into a DataFrame.
+
+    .. deprecated:: 2025-11
+        This is a LEGACY approach for backward compatibility.
+
+        PREFERRED: Use the solution dict directly from optimizer.extract_solution()
+        with the visualization functions in py_script.visualization.aging_analysis.
+
+        The aging analysis functions (plot_stacked_cyclic_soc, plot_calendar_aging_curve)
+        now accept solution dicts directly, eliminating the need for this intermediate
+        DataFrame conversion and the test_data dependency.
+
+        Example (PREFERRED):
+            >>> solution = optimizer.extract_solution(model, results)
+            >>> fig = plot_stacked_cyclic_soc(solution, title_suffix="Test")
+
+        Example (LEGACY - still works):
+            >>> df = extract_detailed_solution(solution, test_data, horizon_hours)
+            >>> fig = plot_stacked_cyclic_soc(df, title_suffix="Test")
+
+    Parameters
+    ----------
+    solution : dict
+        Solution dictionary from optimizer.extract_solution()
+    test_data : pd.DataFrame
+        Market data DataFrame (required for legacy DataFrame extraction)
+    horizon_hours : int
+        Optimization horizon in hours
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with all decision variables and market prices
+    """
 
     T = len(solution.get('e_soc', {}))
 

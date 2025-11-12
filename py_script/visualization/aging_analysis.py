@@ -42,14 +42,14 @@ def _extract_segment_soc_from_solution(solution: Dict, num_timesteps: int) -> pd
     Extract segmented SOC data from solution dictionary.
 
     Args:
-        solution: Solution dictionary from extract_solution()
+        solution: Solution dictionary from optimizer.extract_solution()
         num_timesteps: Number of time steps in the optimization horizon
 
     Returns:
         DataFrame with columns: time_step, segment_1, segment_2, ..., segment_10
     """
     # Extract e_soc_j from solution dictionary
-    # Format: e_soc_j[(t, j)] = value
+    # Format: e_soc_j[(t, j)] = value (from BESSOptimizerModelII/III)
     e_soc_j = solution.get('e_soc_j', {})
 
     # Initialize data structure
@@ -68,13 +68,14 @@ def _extract_calendar_data_from_solution(solution: Dict, num_timesteps: int) -> 
     Extract calendar aging data from solution dictionary.
 
     Args:
-        solution: Solution dictionary from extract_solution()
+        solution: Solution dictionary from optimizer.extract_solution()
         num_timesteps: Number of time steps in the optimization horizon
 
     Returns:
         DataFrame with columns: time_step, soc_kwh, cal_cost_eur_hr
     """
-    # Extract total SOC and calendar costs
+    # Extract total SOC and calendar costs from solution dict
+    # Format: e_soc[t] = value, c_cal_cost[t] = value (from BESSOptimizerModelIII)
     e_soc = solution.get('e_soc', {})
     c_cal_cost = solution.get('c_cal_cost', {})
 
@@ -93,7 +94,7 @@ def _extract_calendar_data_from_solution(solution: Dict, num_timesteps: int) -> 
 # ---------------------------------------------------------------------------
 
 def plot_stacked_cyclic_soc(
-    df: pd.DataFrame,
+    data: Dict[str, any],
     title_suffix: str = "",
     save_path: Optional[str] = None
 ) -> go.Figure:
@@ -108,12 +109,9 @@ def plot_stacked_cyclic_soc(
 
     Parameters
     ----------
-    df : pd.DataFrame
-        Solution DataFrame from extract_detailed_solution() or similar.
-        Must contain either:
-        - Columns: 'hour', 'segment_1', 'segment_2', ..., 'segment_10'
-        OR
-        - Can be generated from solution dict using internal helper
+    data : dict or pd.DataFrame
+        PREFERRED: Solution dictionary from optimizer.extract_solution()
+        LEGACY: DataFrame from extract_detailed_solution() with segment columns
 
     title_suffix : str, optional
         Additional text to append to plot title (e.g., "HU Winter 36h")
@@ -128,27 +126,46 @@ def plot_stacked_cyclic_soc(
 
     Examples
     --------
+    >>> # PREFERRED: Use solution dict directly
     >>> solution = optimizer.extract_solution(model, results)
+    >>> fig = plot_stacked_cyclic_soc(solution, title_suffix="HU Winter 36h")
+    >>> fig.show()
+    >>>
+    >>> # LEGACY: Use DataFrame (for backward compatibility)
     >>> df = extract_detailed_solution(solution, test_data, 36)
     >>> fig = plot_stacked_cyclic_soc(df, title_suffix="HU Winter 36h")
     >>> fig.show()
-    >>>
-    >>> # Save to file
-    >>> plot_stacked_cyclic_soc(df, save_path="results/cyclic_soc_validation.html")
     """
+    # Handle both dict and DataFrame inputs
+    if isinstance(data, dict):
+        # Extract from solution dictionary
+        e_soc = data.get('e_soc', {})
+        if not e_soc:
+            raise ValueError("Solution dict missing 'e_soc' key")
+        num_timesteps = len(e_soc)
+
+        # Extract segment data
+        df = _extract_segment_soc_from_solution(data, num_timesteps)
+
+        # Add hour column for x-axis
+        df['hour'] = [t * 0.25 for t in range(num_timesteps)]
+
+    else:
+        # Assume it's a DataFrame (backward compatibility)
+        df = data
+
+        # Check if segment columns exist
+        segment_cols = [f'segment_{j}' for j in range(1, NUM_SEGMENTS + 1)]
+        if not all(col in df.columns for col in segment_cols):
+            raise ValueError(
+                f"DataFrame missing segment columns. Expected: {segment_cols}\n"
+                f"Found columns: {list(df.columns)}"
+            )
+
     # Determine x-axis column
     x_col = 'timestamp' if 'timestamp' in df.columns else 'hour'
     x_values = df[x_col].values
     x_title = 'Time' if x_col == 'timestamp' else 'Hour'
-
-    # Check if segment columns exist, if not, try to extract from solution
-    segment_cols = [f'segment_{j}' for j in range(1, NUM_SEGMENTS + 1)]
-
-    if not all(col in df.columns for col in segment_cols):
-        raise ValueError(
-            f"DataFrame missing segment columns. Expected: {segment_cols}\n"
-            f"Found columns: {list(df.columns)}"
-        )
 
     # Create figure
     fig = go.Figure()
@@ -230,7 +247,7 @@ def plot_stacked_cyclic_soc(
 
 
 def plot_calendar_aging_curve(
-    df: pd.DataFrame,
+    data: Dict[str, any],
     aging_config: Optional[Dict] = None,
     title_suffix: str = "",
     save_path: Optional[str] = None
@@ -247,11 +264,9 @@ def plot_calendar_aging_curve(
 
     Parameters
     ----------
-    df : pd.DataFrame
-        Solution DataFrame containing:
-        - 'e_soc' or 'soc_kwh': Total state of charge (kWh)
-        - 'c_cal_cost' or similar: Calendar aging cost (EUR/hr)
-        OR can be a solution dictionary from extract_solution()
+    data : dict or pd.DataFrame
+        PREFERRED: Solution dictionary from optimizer.extract_solution()
+        LEGACY: DataFrame with 'soc_kwh' and 'cal_cost_eur_hr' columns
 
     aging_config : dict, optional
         Aging configuration dictionary with 'calendar_aging']['breakpoints'].
@@ -271,40 +286,63 @@ def plot_calendar_aging_curve(
     Examples
     --------
     >>> import json
+    >>> # PREFERRED: Use solution dict directly
     >>> solution = optimizer.extract_solution(model, results)
-    >>> df = extract_detailed_solution(solution, test_data, 36)
     >>>
     >>> # Load aging config for breakpoint overlay
     >>> with open('data/p2_config/aging_config.json') as f:
     >>>     aging_config = json.load(f)
     >>>
-    >>> fig = plot_calendar_aging_curve(df, aging_config, title_suffix="HU Winter")
+    >>> fig = plot_calendar_aging_curve(solution, aging_config, title_suffix="HU Winter")
     >>> fig.show()
     """
-    # Extract SOC and calendar cost columns
-    if 'soc_kwh' in df.columns:
+    # Handle both dict and DataFrame inputs
+    if isinstance(data, dict):
+        # Extract from solution dictionary
+        e_soc = data.get('e_soc', {})
+        c_cal_cost = data.get('c_cal_cost', {})
+
+        if not e_soc:
+            raise ValueError("Solution dict missing 'e_soc' key")
+        if not c_cal_cost:
+            raise ValueError("Solution dict missing 'c_cal_cost' key (Model III required)")
+
+        num_timesteps = len(e_soc)
+
+        # Extract calendar aging data
+        df = _extract_calendar_data_from_solution(data, num_timesteps)
+
         soc_col = 'soc_kwh'
-    elif 'e_soc' in df.columns:
-        soc_col = 'e_soc'
+        cal_cost_col = 'cal_cost_eur_hr'
+
     else:
-        raise ValueError(
-            "DataFrame missing SOC column. Expected 'soc_kwh' or 'e_soc'\n"
-            f"Found columns: {list(df.columns)}"
-        )
+        # Assume it's a DataFrame (backward compatibility)
+        df = data
 
-    # Find calendar cost column
-    cal_cost_col = None
-    for col in ['cal_cost_eur_hr', 'c_cal_cost', 'calendar_cost']:
-        if col in df.columns:
-            cal_cost_col = col
-            break
+        # Extract SOC and calendar cost columns
+        if 'soc_kwh' in df.columns:
+            soc_col = 'soc_kwh'
+        elif 'e_soc' in df.columns:
+            soc_col = 'e_soc'
+        else:
+            raise ValueError(
+                "DataFrame missing SOC column. Expected 'soc_kwh' or 'e_soc'\n"
+                f"Found columns: {list(df.columns)}"
+            )
 
-    if cal_cost_col is None:
-        raise ValueError(
-            "DataFrame missing calendar cost column.\n"
-            f"Expected one of: 'cal_cost_eur_hr', 'c_cal_cost', 'calendar_cost'\n"
-            f"Found columns: {list(df.columns)}"
-        )
+        # Find calendar cost column
+        cal_cost_col = None
+        for col in ['cal_cost_eur_hr', 'c_cal_cost', 'calendar_cost']:
+            if col in df.columns:
+                cal_cost_col = col
+                break
+
+        if cal_cost_col is None:
+            raise ValueError(
+                "DataFrame missing calendar cost column.\n"
+                f"Expected one of: 'cal_cost_eur_hr', 'c_cal_cost', 'calendar_cost'\n"
+                f"Found columns: {list(df.columns)}"
+            )
 
     # Extract data
     soc_kwh = df[soc_col].values
@@ -413,8 +451,6 @@ def plot_calendar_aging_curve(
 
 def plot_aging_validation_suite(
     solution: Dict,
-    test_data: pd.DataFrame,
-    horizon_hours: int,
     aging_config: Optional[Dict] = None,
     output_dir: str = ".",
     test_name: str = "aging_validation"
@@ -428,13 +464,11 @@ def plot_aging_validation_suite(
     Parameters
     ----------
     solution : dict
-        Solution dictionary from extract_solution()
-    test_data : pd.DataFrame
-        Market data used for the optimization
-    horizon_hours : int
-        Optimization horizon in hours
+        Solution dictionary from optimizer.extract_solution()
+        Must be from BESSOptimizerModelII or ModelIII (contains e_soc_j)
     aging_config : dict, optional
-        Aging configuration for breakpoint overlay
+        Aging configuration for breakpoint overlay on calendar curve.
+        If None and using Model III, calendar plot will show data without breakpoints.
     output_dir : str, optional
         Directory to save plots (default: current directory)
     test_name : str, optional
@@ -444,27 +478,27 @@ def plot_aging_validation_suite(
     -------
     dict
         Dictionary mapping plot names to Plotly figures:
-        - 'cyclic_soc': Stacked SOC segment plot
-        - 'calendar_curve': Calendar aging cost curve
+        - 'cyclic_soc': Stacked SOC segment plot (if e_soc_j present)
+        - 'calendar_curve': Calendar aging cost curve (if c_cal_cost present)
 
     Examples
     --------
     >>> import json
     >>> from pathlib import Path
     >>>
-    >>> # Run optimization
+    >>> # Run optimization with Model III
     >>> optimizer = BESSOptimizerModelIII(alpha=1.0)
     >>> model = optimizer.build_model(test_data, horizon_hours=36)
     >>> solved_model, results = optimizer.solve_model(model)
     >>> solution = optimizer.extract_solution(solved_model, results)
     >>>
-    >>> # Load aging config
+    >>> # Load aging config for breakpoint overlay
     >>> with open('data/p2_config/aging_config.json') as f:
     >>>     aging_config = json.load(f)
     >>>
-    >>> # Generate all plots
+    >>> # Generate all plots (no need for test_data or horizon_hours!)
     >>> figs = plot_aging_validation_suite(
-    >>>     solution, test_data, 36,
+    >>>     solution,
     >>>     aging_config=aging_config,
     >>>     output_dir="results/hu_winter",
     >>>     test_name="hu_winter_36h"
@@ -472,38 +506,38 @@ def plot_aging_validation_suite(
     """
     from pathlib import Path
 
-    # Import the detailed solution extractor from optimization_analysis
-    from ..visualization.optimization_analysis import extract_detailed_solution
-
     # Create output directory
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    # Extract detailed solution
-    df = extract_detailed_solution(solution, test_data, horizon_hours)
 
     # Dictionary to store figures
     figures = {}
 
-    # 1. Stacked Cyclic SOC Plot
-    print(f"\nGenerating cyclic SOC plot...")
-    cyclic_path = Path(output_dir) / f"{test_name}_cyclic_soc.html"
-    fig_cyclic = plot_stacked_cyclic_soc(
-        df,
-        title_suffix=test_name.replace('_', ' ').title(),
-        save_path=str(cyclic_path)
-    )
-    figures['cyclic_soc'] = fig_cyclic
+    # 1. Stacked Cyclic SOC Plot (Model II and III)
+    if 'e_soc_j' in solution and solution['e_soc_j']:
+        print(f"\nGenerating cyclic SOC plot...")
+        cyclic_path = Path(output_dir) / f"{test_name}_cyclic_soc.html"
+        fig_cyclic = plot_stacked_cyclic_soc(
+            solution,  # Pass solution dict directly!
+            title_suffix=test_name.replace('_', ' ').title(),
+            save_path=str(cyclic_path)
+        )
+        figures['cyclic_soc'] = fig_cyclic
+    else:
+        print(f"\nSkipping cyclic SOC plot (no segment data - Model I?)")
 
-    # 2. Calendar Aging Curve Plot
-    print(f"Generating calendar aging curve plot...")
-    calendar_path = Path(output_dir) / f"{test_name}_calendar_curve.html"
-    fig_calendar = plot_calendar_aging_curve(
-        df,
-        aging_config=aging_config,
-        title_suffix=test_name.replace('_', ' ').title(),
-        save_path=str(calendar_path)
-    )
-    figures['calendar_curve'] = fig_calendar
+    # 2. Calendar Aging Curve Plot (Model III only)
+    if 'c_cal_cost' in solution and solution['c_cal_cost']:
+        print(f"Generating calendar aging curve plot...")
+        calendar_path = Path(output_dir) / f"{test_name}_calendar_curve.html"
+        fig_calendar = plot_calendar_aging_curve(
+            solution,  # Pass solution dict directly!
+            aging_config=aging_config,
+            title_suffix=test_name.replace('_', ' ').title(),
+            save_path=str(calendar_path)
+        )
+        figures['calendar_curve'] = fig_calendar
+    else:
+        print(f"Skipping calendar aging curve (no calendar cost data - Model I or II?)")
 
     print(f"\nAging validation plots saved to: {output_dir}")
 
