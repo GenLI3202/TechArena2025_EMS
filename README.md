@@ -2,7 +2,7 @@
 
 > **Project Status:** Phase II Development (Round 2)
 > **Phase I Archive:** See branch `r1-static-battery` for Phase I submission
-> **Active Branch:** `r2-with-bat-config`
+> **Active Branch:** `p2-full-model-3-clean`
 
 An advanced Energy Management System (EMS) that optimizes battery storage operations across multiple European electricity markets to maximize profitability while meeting operational constraints. And 
 
@@ -151,9 +151,12 @@ TechArena2025_EMS/
 ├── py_script/                    # Main Python package for the BESS optimizer
 │   ├── README.md                 # Detailed README for the Python package
 │   ├── requirements.txt          # Python package dependencies
-│   ├── core/                     # Core optimization logic
+│   ├── core/                     # Core optimization logic (REFACTORED)
 │   │   ├── __init__.py
-│   │   ├── optimizer.py          # Main optimization model (BESSOptimizerV2, ModelI, etc.)
+│   │   ├── optimizer.py          # Main optimization models with clean solve/extract separation
+│   │   │                         # - BESSOptimizerModelI: Base 4-market optimization
+│   │   │                         # - BESSOptimizerModelII: + Cyclic aging cost
+│   │   │                         # - BESSOptimizerModelIII: + Calendar aging cost
 │   │   └── investment/           # Investment analysis and DCF calculations
 │   ├── data/                     # Data loading and processing
 │   │   ├── __init__.py
@@ -165,16 +168,20 @@ TechArena2025_EMS/
 │   │   └── mpc_simulator.py
 │   ├── test/                     # Unit and integration tests
 │   │   ├── __init__.py
-│   │   ├── test_optimizer_core.py
-│   │   └── validate_optimizer_behavior.py
-│   ├── validation/               # Validation scripts and constraint checks
-│   │   ├── __init__.py
-│   │   └── constraint_validator.py
+│   │   ├── test_optimizer_core.py    # Formal pytest unit tests
+│   │   ├── run_36h_hu_winter.py      # Example validation script (legacy)
+│   │   └── test_single_32h_vs_mpc.py # Example comparison script (legacy)
+│   ├── validation/               # General-purpose validation utilities (NEW)
+│   │   ├── README.md             # Comprehensive validation utilities guide
+│   │   ├── run_optimization.py   # General CLI runner (replaces hardcoded scripts)
+│   │   ├── compare_optimizations.py  # General comparison framework
+│   │   ├── results_exporter.py   # Standardized results saving/loading
+│   │   └── constraint_validator.py   # Constraint verification utilities
 │   └── visualization/            # Plotting and visualization tools
 │       ├── __init__.py
 │       ├── config.py
-│       ├── optimization_analysis.py
-│       └── visualize_as_revenue_fix.py
+│       ├── optimization_analysis.py  # Standard 4-plot suite
+│       └── aging_analysis.py         # Degradation-specific visualizations
 ├── validation_results/           # Outputs from validation runs
 │   ├── market_data_analysis/
 │   ├── optimizer_validation/
@@ -197,8 +204,12 @@ TechArena2025_EMS/
 - Full-year horizon optimization (35,040 time intervals)
 - **Four-market co-optimization** (DA energy, FCR, aFRR capacity & energy)
 - **Battery degradation modeling** with aging-aware strategies
+  - Cyclic aging: 10-segment piecewise-linear SOC tracking
+  - Calendar aging: SOS2 piecewise-linear SOC-dependent cost
+  - Configurable degradation weight (`alpha` parameter)
 - Support for multiple MILP solvers (CBC, GLPK, Gurobi, CPLEX)
 - Trade-off optimization between revenue and battery lifetime
+- **Clean architecture:** Decoupled solving and result extraction
 
 ### Data Processing
 - Automated loading from Excel/JSONL formats
@@ -214,10 +225,14 @@ TechArena2025_EMS/
 - NPV, IRR, and payback period calculations accounting for aging
 
 ### Validation & Diagnostics
-- Week-scale validation framework
+- **General-purpose CLI validation tools** (NEW)
+  - Flexible optimization runner (`run_optimization.py`)
+  - Systematic comparison framework (`compare_optimizations.py`)
+  - 5 comparison types: single-vs-mpc, models, alpha, countries, c-rates
+- Standardized result export/import with timestamped directories
 - Constraint satisfaction verification
 - Performance benchmarking across scenarios
-- Automated plot generation for results analysis
+- Automated plot generation (4 standard plots per run)
 
 ---
 
@@ -258,18 +273,31 @@ TechArena2025_EMS/
   - Class: `BESSOptimizerModelI` (in `py_script/core/optimizer.py`)
   - Test: `py_script/test/test_optimizer_core.py` ✓ PASSING
 
-- 🔄 **Model (ii): Model (i) + Cyclic Aging Cost** [NEXT]
+- ✅ **Model (ii): Model (i) + Cyclic Aging Cost** [IMPLEMENTED]
   - Piecewise-linear cyclic degradation (Xu et al., 2017)
-  - Segment-based SOC tracking
+  - Segment-based SOC tracking (10 segments)
   - Economic cost replaces rigid cycle limits
   - Class: `BESSOptimizerModelII` (in `py_script/core/optimizer.py`)
-  - Introduces `alpha` parameter to weight degradation cost in objective.
+  - Introduces `alpha` parameter to weight degradation cost in objective
 
-- 🔄 **Model (iii): Model (ii) + Calendar Aging Cost** [PLANNED]
+- ✅ **Model (iii): Model (ii) + Calendar Aging Cost** [IMPLEMENTED]
   - SOS2-based calendar aging (Collath et al., 2023)
   - Complete Phase II degradation modeling
-  - Meta-optimization of degradation price `alpha`
+  - Combined cyclic + calendar aging optimization
   - Class: `BESSOptimizerModelIII` (in `py_script/core/optimizer.py`)
+
+**Code Quality Improvements:**
+- ✅ **Clean Architecture Refactoring** [COMPLETED - Nov 2025]
+  - Decoupled solving logic from result extraction
+  - Proper inheritance chain with `solve_model()` + `extract_solution()`
+  - Eliminates fragile method override patterns
+  - Easier to extend and maintain
+
+- ✅ **General-Purpose Validation Framework** [COMPLETED - Nov 2025]
+  - CLI-based optimization runner (`run_optimization.py`)
+  - Flexible comparison framework (`compare_optimizations.py`)
+  - Standardized result export/import (`results_exporter.py`)
+  - See: `py_script/validation/README.md`
 
 **Integration Tasks:**
 - 🔄 Rolling horizon (MPC) implementation for computational feasibility
@@ -317,25 +345,55 @@ pip install -r requirements.txt
 python py_script/test/test_optimizer_core.py
 ```
 
-**Using the Optimizers (Model I example):**
-```python
-import sys
-sys.path.insert(0, './py_script') # Add py_script to the Python path
+**Running Optimizations (Recommended - NEW CLI Tools):**
+```bash
+# Run 36-hour optimization for Hungary with Model III
+python py_script/validation/run_optimization.py \
+    --model III \
+    --country HU \
+    --hours 36 \
+    --alpha 0.5 \
+    --plots
 
-from core.optimizer import BESSOptimizerModelI
+# Compare different models
+python py_script/validation/compare_optimizations.py \
+    --compare-type models \
+    --models I II III \
+    --hours 24 \
+    --country DE
 
-optimizer = BESSOptimizerModelI()
-# Note: Use full data path or ensure script is run from project root
-data = optimizer.load_and_preprocess_data("data/TechArena2025_Phase2_data.xlsx") 
-country_data = optimizer.extract_country_data(data, 'DE_LU')
-model = optimizer.build_optimization_model(country_data, c_rate=0.5, daily_cycle_limit=1.5)
-solution = optimizer.solve_model(model)
-
-# Access new aFRR energy variables
-afrr_energy_bids = solution['p_afrr_pos_e']  # Positive (discharge)
+# For more options and examples
+python py_script/validation/run_optimization.py --help
 ```
 
-For detailed usage instructions, see `py_script/README.md`.
+**Using the Optimizers (Python API):**
+```python
+import sys
+sys.path.insert(0, './py_script')
+
+from core.optimizer import BESSOptimizerModelIII
+
+# Initialize Model III (with cyclic + calendar aging)
+optimizer = BESSOptimizerModelIII(alpha=1.0)
+
+# Load data
+data = optimizer.load_and_preprocess_data("data/TechArena2025_data_tidy.jsonl")
+country_data = optimizer.extract_country_data(data, 'HU')
+
+# Build and solve model (refactored for clean separation)
+model = optimizer.build_optimization_model(country_data, c_rate=0.5)
+solved_model, solver_results = optimizer.solve_model(model)
+solution = optimizer.extract_solution(solved_model, solver_results)
+
+# Access results
+print(f"Total profit: {solution['objective_value']:.2f} EUR")
+print(f"Degradation cost: {solution['degradation_metrics']['total_degradation_cost_eur']:.2f} EUR")
+afrr_energy_bids = solution['p_afrr_pos_e']  # aFRR energy bids
+```
+
+For detailed usage instructions, see:
+- **CLI Tools:** `py_script/validation/README.md`
+- **Python API:** `py_script/README.md`
 
 ---
 
@@ -360,6 +418,25 @@ For detailed usage instructions, see `py_script/README.md`.
 - **Comprehensive Documentation:** 20% evaluation weight on code quality
 - -->
 - **Production-Ready Codebase:** Professional structure and validation 
+
+---
+
+## Recent Updates
+
+### November 2025 - Code Quality Sprint
+- ✅ **Refactored optimizer architecture** for clean separation of concerns
+  - `solve_model()` now only handles solving (returns model + results)
+  - `extract_solution()` handles all result extraction (proper inheritance chain)
+  - Eliminates fragile override patterns across Model I/II/III
+- ✅ **Built general-purpose validation framework**
+  - CLI-driven optimization runner with flexible parameters
+  - Systematic comparison framework (5 comparison types)
+  - Standardized result export/import utilities
+  - Comprehensive documentation in `py_script/validation/README.md`
+- ✅ **Updated all test scripts** to use new refactored API
+- ✅ **Improved code maintainability** and extensibility
+
+See `VALIDATION_UTILITIES_SUMMARY.md` for detailed implementation notes.
 
 ---
 
