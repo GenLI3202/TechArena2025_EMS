@@ -81,6 +81,7 @@ Refer to `doc\p2_model\p2_bi_model_ggdp.tex`
    1. `validation_results/{validation_name}/solution_*.csv` (detailed decision variable time series)
    2. `validation_results/{validation_name}/performance_*.json` (Summary statistics, such as total profit including coponents profits, degradation costs, solver status, runtime, etc.)
 - **Visualizations**: `validation_results/{validation_name}/plots/*.html` (or png)
+- **Python Scripts**: Build minimum number of new wheels. When develop or test, first look at `./pyscript/` for existing utilities. If new scripts are needed, place in appropriate subfolder under `./pyscript/`.
 - **Metadata**: JSON files with optimization statistics
 
 ### Visualization Outputs
