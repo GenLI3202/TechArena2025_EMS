@@ -60,7 +60,8 @@ def main():
     print()
 
     print("  Solving...")
-    solution = optimizer.solve_model(model)
+    solved_model, solver_results = optimizer.solve_model(model)
+    solution = optimizer.extract_solution(solved_model, solver_results)
 
     print(f"  Status: {solution['status']}")
     print(f"  Solve time: {solution['solve_time']:.2f} seconds")

@@ -15,7 +15,7 @@ from .optimizer import (
     BESSOptimizerV3,
     BESSOptimizer_Phase2_ModelII,
 )
-from .exceptions import (
+from ..data.exceptions import (
     DataProcessingError,
     DataLoadingError,
     DataValidationError,

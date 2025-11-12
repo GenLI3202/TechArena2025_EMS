@@ -370,7 +370,8 @@ class MPCSimulator:
                         model.e_soc_j[0, j].setub(initial_segment_soc[j])
 
                 # Solve
-                solution = self.optimizer.solve_model(model)
+                solved_model, solver_results = self.optimizer.solve_model(model)
+                solution = self.optimizer.extract_solution(solved_model, solver_results)
 
                 if solution['status'] not in ['optimal', 'feasible']:
                     logger.error("Solver failed at iteration %d: %s",

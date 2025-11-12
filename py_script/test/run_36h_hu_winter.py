@@ -120,7 +120,8 @@ def main():
         # Solve model
         print(f"\n[OK] Solving optimization problem...")
         solve_start = time_module.time()
-        solution = optimizer.solve_model(model)
+        solved_model, solver_results = optimizer.solve_model(model)
+        solution = optimizer.extract_solution(solved_model, solver_results)
         solve_time = time_module.time() - solve_start
 
         if solution['status'] == 'optimal':

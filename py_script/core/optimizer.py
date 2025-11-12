@@ -960,34 +960,37 @@ class BESSOptimizerModelI:
             "Install HiGHS: pip install highspy"
         )
     
-    def solve_model(self, model: pyo.ConcreteModel, solver_name: str = None) -> Dict:
+    def solve_model(self, model: pyo.ConcreteModel, solver_name: str = None) -> tuple[pyo.ConcreteModel, Any]:
         """
         Solve the optimization model with automatic solver detection.
-        
+
+        This method is responsible ONLY for solving the model, not extracting results.
+        Use extract_solution() to get solution data from the solved model.
+
         Args:
             model: Pyomo model to solve
             solver_name: Solver to use. If None, auto-detect best available.
                         Options: 'cplex', 'gurobi', 'highs' (recommended for competition)
-            
+
         Returns:
-            Dict: Solution results with performance metrics
+            tuple: (solved_model, solver_results)
         """
         # Auto-detect solver if not specified
         if solver_name is None:
             solver_name = self.detect_available_solver()
         else:
             logger.info(f"Using specified solver: {solver_name}")
-        
+
         try:
             # Create solver
             solver = pyo.SolverFactory(solver_name)
-            
+
             # Verify solver is available
             if not solver.available():
                 logger.warning(f"⚠️  Solver {solver_name} not available, auto-detecting...")
                 solver_name = self.detect_available_solver()
                 solver = pyo.SolverFactory(solver_name)
-            
+
             # CONSISTENT SOLVER TIME LIMITS (Addresses Critical Issue #6)
             if solver_name.lower() == 'cplex':
                 solver.options['timelimit'] = self.market_params['solver_time_limit']
@@ -1006,185 +1009,224 @@ class BESSOptimizerModelI:
             elif solver_name.lower() == 'cbc':
                 solver.options['seconds'] = self.market_params['solver_time_limit']
                 solver.options['ratio'] = 0.01
-            
+
             # Solve
             start_time = datetime.now()
             results = solver.solve(model, tee=False)
             solve_time = (datetime.now() - start_time).total_seconds()
-            
+
             # Check solution status
             if results.solver.termination_condition == pyo.TerminationCondition.optimal:
                 logger.info(f"Optimal solution found in {solve_time:.2f} seconds")
-                status = "optimal"
             elif results.solver.termination_condition == pyo.TerminationCondition.feasible:
                 logger.info(f"Feasible solution found in {solve_time:.2f} seconds")
-                status = "feasible"
             else:
                 logger.error(f"Solver failed: {results.solver.termination_condition}")
-                return {
-                    'status': 'failed',
-                    'termination_condition': str(results.solver.termination_condition),
-                    'solve_time': solve_time
-                }
-            
-            # Extract solution - OPTIMIZED (Addresses Minor Issue #9)
-            solution = {
-                'status': status,
-                'solve_time': solve_time,
-                'objective_value': pyo.value(model.objective),
-                'solver': solver_name,
-                'termination_condition': str(results.solver.termination_condition)
-            }
 
-            def _safe_value(component: Any) -> Optional[float]:
-                try:
-                    return pyo.value(component)
-                except (TypeError, ValueError):
-                    return None
+            # Store metadata in results object for extract_solution
+            results._solve_time = solve_time
+            results._solver_name = solver_name
 
-            # Extract profit components from Pyomo Expressions
-            if hasattr(model, 'profit_da'):
-                solution['profit_da'] = _safe_value(model.profit_da)
-            if hasattr(model, 'profit_afrr_energy'):
-                solution['profit_afrr_energy'] = _safe_value(model.profit_afrr_energy)
-            if hasattr(model, 'profit_as_capacity'):
-                solution['profit_as_capacity'] = _safe_value(model.profit_as_capacity)
+            return model, results
 
-            # Extract aging cost (Model II and III)
-            if hasattr(model, 'cost_cyclic'):
-                solution['cost_cyclic'] = _safe_value(model.cost_cyclic)
-
-            # Extract variable values efficiently
-            # Day-ahead market
-            solution["p_ch"] = {}
-            solution["p_dis"] = {}
-            solution["e_soc"] = {}
-            for t in model.T:
-                val_ch = _safe_value(model.p_ch[t])
-                if val_ch is not None:
-                    solution["p_ch"][t] = val_ch
-
-                val_dis = _safe_value(model.p_dis[t])
-                if val_dis is not None:
-                    solution["p_dis"][t] = val_dis
-
-                val_soc = _safe_value(model.e_soc[t])
-                if val_soc is not None:
-                    solution["e_soc"][t] = val_soc
-
-            # PHASE II Model (i): aFRR energy market (NEW)
-            solution["p_afrr_pos_e"] = {}
-            solution["p_afrr_neg_e"] = {}
-            for t in model.T:
-                val_pos = _safe_value(model.p_afrr_pos_e[t])
-                if val_pos is not None:
-                    solution["p_afrr_pos_e"][t] = val_pos
-
-                val_neg = _safe_value(model.p_afrr_neg_e[t])
-                if val_neg is not None:
-                    solution["p_afrr_neg_e"][t] = val_neg
-
-            # PHASE II Model (i): Total power (NEW)
-            solution["p_total_ch"] = {}
-            solution["p_total_dis"] = {}
-            for t in model.T:
-                total_ch = _safe_value(model.p_total_ch[t])
-                if total_ch is not None:
-                    solution["p_total_ch"][t] = total_ch
-
-                total_dis = _safe_value(model.p_total_dis[t])
-                if total_dis is not None:
-                    solution["p_total_dis"][t] = total_dis
-
-            # Ancillary service capacity
-            solution["c_fcr"] = {}
-            solution["c_afrr_pos"] = {}
-            solution["c_afrr_neg"] = {}
-            for b in model.B:
-                val_fcr = _safe_value(model.c_fcr[b])
-                if val_fcr is not None:
-                    solution["c_fcr"][b] = val_fcr
-
-                val_afrr_pos = _safe_value(model.c_afrr_pos[b])
-                if val_afrr_pos is not None:
-                    solution["c_afrr_pos"][b] = val_afrr_pos
-
-                val_afrr_neg = _safe_value(model.c_afrr_neg[b])
-                if val_afrr_neg is not None:
-                    solution["c_afrr_neg"][b] = val_afrr_neg
-
-            # Binaries - Day-ahead (OPTIONAL - may be commented out for performance)
-            if hasattr(model, 'y_ch'):
-                solution["y_ch"] = {}
-                solution["y_dis"] = {}
-                for t in model.T:
-                    val_y_ch = _safe_value(model.y_ch[t])
-                    if val_y_ch is not None:
-                        solution["y_ch"][t] = val_y_ch
-
-                    val_y_dis = _safe_value(model.y_dis[t])
-                    if val_y_dis is not None:
-                        solution["y_dis"][t] = val_y_dis
-
-            # PHASE II Model (i): aFRR energy binaries (OPTIONAL - may be commented out for performance)
-            if hasattr(model, 'y_afrr_pos_e'):
-                solution["y_afrr_pos_e"] = {}
-                solution["y_afrr_neg_e"] = {}
-                for t in model.T:
-                    val_y_pos = _safe_value(model.y_afrr_pos_e[t])
-                    if val_y_pos is not None:
-                        solution["y_afrr_pos_e"][t] = val_y_pos
-
-                    val_y_neg = _safe_value(model.y_afrr_neg_e[t])
-                    if val_y_neg is not None:
-                        solution["y_afrr_neg_e"][t] = val_y_neg
-
-            # PHASE II Model (i): Total binaries (OPTIONAL - may be commented out for performance)
-            if hasattr(model, 'y_total_ch'):
-                solution["y_total_ch"] = {}
-                solution["y_total_dis"] = {}
-                for t in model.T:
-                    val_y_total_ch = _safe_value(model.y_total_ch[t])
-                    if val_y_total_ch is not None:
-                        solution["y_total_ch"][t] = val_y_total_ch
-
-                    val_y_total_dis = _safe_value(model.y_total_dis[t])
-                    if val_y_total_dis is not None:
-                        solution["y_total_dis"][t] = val_y_total_dis
-
-            # Binaries - Ancillary service capacity
-            solution["y_fcr"] = {}
-            solution["y_afrr_pos"] = {}
-            solution["y_afrr_neg"] = {}
-            for b in model.B:
-                val_y_fcr = _safe_value(model.y_fcr[b])
-                if val_y_fcr is not None:
-                    solution["y_fcr"][b] = val_y_fcr
-
-                val_y_afrr_pos = _safe_value(model.y_afrr_pos[b])
-                if val_y_afrr_pos is not None:
-                    solution["y_afrr_pos"][b] = val_y_afrr_pos
-
-                val_y_afrr_neg = _safe_value(model.y_afrr_neg[b])
-                if val_y_afrr_neg is not None:
-                    solution["y_afrr_neg"][b] = val_y_afrr_neg
-
-            # Extract block mapping (time → block) for visualization
-            # This maps each time step to its corresponding AS capacity block
-            solution["block_map"] = {}
-            for t in model.T:
-                solution["block_map"][t] = int(_safe_value(model.block_map[t]) or 0)
-
-            return solution
-            
         except Exception as e:
             logger.error(f"Error solving model: {str(e)}")
+            # Create a minimal results object for error cases
+            class ErrorResults:
+                def __init__(self, error_msg):
+                    self.error = error_msg
+                    self._solve_time = 0
+                    self._solver_name = solver_name if 'solver_name' in locals() else 'unknown'
+                    class SolverInfo:
+                        termination_condition = pyo.TerminationCondition.error
+                    self.solver = SolverInfo()
+
+            return model, ErrorResults(str(e))
+
+    def extract_solution(self, model: pyo.ConcreteModel, solver_results: Any) -> Dict[str, Any]:
+        """
+        Extract solution data from a solved Pyomo model.
+
+        This method extracts decision variables, profit components, and metadata
+        from the solved model. Subclasses can override to add model-specific results.
+
+        Args:
+            model: Solved Pyomo model
+            solver_results: Results object from solver.solve()
+
+        Returns:
+            Dict containing solution data and performance metrics
+        """
+        # Check for error in solver results
+        if hasattr(solver_results, 'error'):
             return {
                 'status': 'error',
-                'error': str(e),
-                'solve_time': 0
+                'error': solver_results.error,
+                'solve_time': solver_results._solve_time
             }
-    
+
+        # Check solution status
+        if solver_results.solver.termination_condition == pyo.TerminationCondition.optimal:
+            status = "optimal"
+        elif solver_results.solver.termination_condition == pyo.TerminationCondition.feasible:
+            status = "feasible"
+        else:
+            return {
+                'status': 'failed',
+                'termination_condition': str(solver_results.solver.termination_condition),
+                'solve_time': solver_results._solve_time
+            }
+
+        # Extract solution - OPTIMIZED (Addresses Minor Issue #9)
+        solution = {
+            'status': status,
+            'solve_time': solver_results._solve_time,
+            'objective_value': pyo.value(model.objective),
+            'solver': solver_results._solver_name,
+            'termination_condition': str(solver_results.solver.termination_condition)
+        }
+
+        def _safe_value(component: Any) -> Optional[float]:
+            try:
+                return pyo.value(component)
+            except (TypeError, ValueError):
+                return None
+
+        # Extract profit components from Pyomo Expressions
+        if hasattr(model, 'profit_da'):
+            solution['profit_da'] = _safe_value(model.profit_da)
+        if hasattr(model, 'profit_afrr_energy'):
+            solution['profit_afrr_energy'] = _safe_value(model.profit_afrr_energy)
+        if hasattr(model, 'profit_as_capacity'):
+            solution['profit_as_capacity'] = _safe_value(model.profit_as_capacity)
+
+        # Extract aging cost (Model II and III)
+        if hasattr(model, 'cost_cyclic'):
+            solution['cost_cyclic'] = _safe_value(model.cost_cyclic)
+
+        # Extract variable values efficiently
+        # Day-ahead market
+        solution["p_ch"] = {}
+        solution["p_dis"] = {}
+        solution["e_soc"] = {}
+        for t in model.T:
+            val_ch = _safe_value(model.p_ch[t])
+            if val_ch is not None:
+                solution["p_ch"][t] = val_ch
+
+            val_dis = _safe_value(model.p_dis[t])
+            if val_dis is not None:
+                solution["p_dis"][t] = val_dis
+
+            val_soc = _safe_value(model.e_soc[t])
+            if val_soc is not None:
+                solution["e_soc"][t] = val_soc
+
+        # PHASE II Model (i): aFRR energy market (NEW)
+        solution["p_afrr_pos_e"] = {}
+        solution["p_afrr_neg_e"] = {}
+        for t in model.T:
+            val_pos = _safe_value(model.p_afrr_pos_e[t])
+            if val_pos is not None:
+                solution["p_afrr_pos_e"][t] = val_pos
+
+            val_neg = _safe_value(model.p_afrr_neg_e[t])
+            if val_neg is not None:
+                solution["p_afrr_neg_e"][t] = val_neg
+
+        # PHASE II Model (i): Total power (NEW)
+        solution["p_total_ch"] = {}
+        solution["p_total_dis"] = {}
+        for t in model.T:
+            total_ch = _safe_value(model.p_total_ch[t])
+            if total_ch is not None:
+                solution["p_total_ch"][t] = total_ch
+
+            total_dis = _safe_value(model.p_total_dis[t])
+            if total_dis is not None:
+                solution["p_total_dis"][t] = total_dis
+
+        # Ancillary service capacity
+        solution["c_fcr"] = {}
+        solution["c_afrr_pos"] = {}
+        solution["c_afrr_neg"] = {}
+        for b in model.B:
+            val_fcr = _safe_value(model.c_fcr[b])
+            if val_fcr is not None:
+                solution["c_fcr"][b] = val_fcr
+
+            val_afrr_pos = _safe_value(model.c_afrr_pos[b])
+            if val_afrr_pos is not None:
+                solution["c_afrr_pos"][b] = val_afrr_pos
+
+            val_afrr_neg = _safe_value(model.c_afrr_neg[b])
+            if val_afrr_neg is not None:
+                solution["c_afrr_neg"][b] = val_afrr_neg
+
+        # Binaries - Day-ahead (OPTIONAL - may be commented out for performance)
+        if hasattr(model, 'y_ch'):
+            solution["y_ch"] = {}
+            solution["y_dis"] = {}
+            for t in model.T:
+                val_y_ch = _safe_value(model.y_ch[t])
+                if val_y_ch is not None:
+                    solution["y_ch"][t] = val_y_ch
+
+                val_y_dis = _safe_value(model.y_dis[t])
+                if val_y_dis is not None:
+                    solution["y_dis"][t] = val_y_dis
+
+        # PHASE II Model (i): aFRR energy binaries (OPTIONAL - may be commented out for performance)
+        if hasattr(model, 'y_afrr_pos_e'):
+            solution["y_afrr_pos_e"] = {}
+            solution["y_afrr_neg_e"] = {}
+            for t in model.T:
+                val_y_pos = _safe_value(model.y_afrr_pos_e[t])
+                if val_y_pos is not None:
+                    solution["y_afrr_pos_e"][t] = val_y_pos
+
+                val_y_neg = _safe_value(model.y_afrr_neg_e[t])
+                if val_y_neg is not None:
+                    solution["y_afrr_neg_e"][t] = val_y_neg
+
+        # PHASE II Model (i): Total binaries (OPTIONAL - may be commented out for performance)
+        if hasattr(model, 'y_total_ch'):
+            solution["y_total_ch"] = {}
+            solution["y_total_dis"] = {}
+            for t in model.T:
+                val_y_total_ch = _safe_value(model.y_total_ch[t])
+                if val_y_total_ch is not None:
+                    solution["y_total_ch"][t] = val_y_total_ch
+
+                val_y_total_dis = _safe_value(model.y_total_dis[t])
+                if val_y_total_dis is not None:
+                    solution["y_total_dis"][t] = val_y_total_dis
+
+        # Binaries - Ancillary service capacity
+        solution["y_fcr"] = {}
+        solution["y_afrr_pos"] = {}
+        solution["y_afrr_neg"] = {}
+        for b in model.B:
+            val_y_fcr = _safe_value(model.y_fcr[b])
+            if val_y_fcr is not None:
+                solution["y_fcr"][b] = val_y_fcr
+
+            val_y_afrr_pos = _safe_value(model.y_afrr_pos[b])
+            if val_y_afrr_pos is not None:
+                solution["y_afrr_pos"][b] = val_y_afrr_pos
+
+            val_y_afrr_neg = _safe_value(model.y_afrr_neg[b])
+            if val_y_afrr_neg is not None:
+                solution["y_afrr_neg"][b] = val_y_afrr_neg
+
+        # Extract block mapping (time → block) for visualization
+        # This maps each time step to its corresponding AS capacity block
+        solution["block_map"] = {}
+        for t in model.T:
+            solution["block_map"][t] = int(_safe_value(model.block_map[t]) or 0)
+
+        return solution
+
     def extract_country_data(self, data: pd.DataFrame, country: str) -> pd.DataFrame:
         """
         Extract and format data for a specific country with enhanced validation.
@@ -1307,8 +1349,9 @@ class BESSOptimizerModelI:
             
             # Build and solve the optimization model
             model = self.build_optimization_model(country_data, c_rate, daily_cycle_limit)
-            results = self.solve_model(model)
-            
+            solved_model, solver_results = self.solve_model(model)
+            results = self.extract_solution(solved_model, solver_results)
+
             # Return results in expected format
             return {
                 'total_revenue': results.get('objective_value', 0),
@@ -1359,8 +1402,9 @@ class BESSOptimizerModelI:
                         try:
                             # Build and solve model
                             model = self.build_optimization_model(country_data, c_rate, daily_cycle_limit)
-                            solution = self.solve_model(model, 'cplex')
-                            
+                            solved_model, solver_results = self.solve_model(model, 'cplex')
+                            solution = self.extract_solution(solved_model, solver_results)
+
                             if solution['status'] in ['optimal', 'feasible']:
                                 result = {
                                     'scenario': scenario_name,
@@ -1751,14 +1795,29 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
     # Solve & metrics
     # ------------------------------------------------------------------
 
-    def solve_model(self, model: pyo.ConcreteModel, solver_name: Optional[str] = None) -> Dict[str, Any]:
-        results = super().solve_model(model, solver_name)
+    def extract_solution(self, model: pyo.ConcreteModel, solver_results: Any) -> Dict[str, Any]:
+        """
+        Extract solution from Model II (cyclic aging).
 
-        if results.get('status') not in ['optimal', 'feasible']:
-            return results
+        Extends parent extract_solution() to add cyclic aging results.
 
+        Args:
+            model: Solved Model II Pyomo model
+            solver_results: Results object from solver.solve()
+
+        Returns:
+            Dictionary with base solution plus cyclic aging metrics
+        """
+        # Call parent to get base solution
+        solution_dict = super().extract_solution(model, solver_results)
+
+        # If solve failed, return early
+        if solution_dict.get('status') not in ['optimal', 'feasible']:
+            return solution_dict
+
+        # If degradation is not enabled, return base solution
         if not self.degradation_params.get('enabled', False):
-            return results
+            return solution_dict
 
         def _safe_value(component: Any) -> Optional[float]:
             try:
@@ -1766,6 +1825,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             except (TypeError, ValueError):
                 return None
 
+        # Extract segment-specific variables
         p_ch_j = {}
         p_dis_j = {}
         e_soc_j = {}
@@ -1783,12 +1843,13 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
                 if val_soc is not None:
                     e_soc_j[(t, j)] = val_soc
 
-        results['p_ch_j'] = p_ch_j
-        results['p_dis_j'] = p_dis_j
-        results['e_soc_j'] = e_soc_j
-        results['degradation_metrics'] = self._calculate_degradation_metrics(model, p_dis_j)
+        # Add Model II specific results
+        solution_dict['p_ch_j'] = p_ch_j
+        solution_dict['p_dis_j'] = p_dis_j
+        solution_dict['e_soc_j'] = e_soc_j
+        solution_dict['degradation_metrics'] = self._calculate_degradation_metrics(model, p_dis_j)
 
-        return results
+        return solution_dict
 
     def _calculate_degradation_metrics(self, model: pyo.ConcreteModel, p_dis_j: Dict[Tuple[int, int], float]) -> Dict[str, Any]:
         eta_dis = pyo.value(model.eta_dis)
@@ -2181,28 +2242,25 @@ class BESSOptimizerModelIII(BESSOptimizerModelII):
 
         return model
 
-    def solve_model(
-        self,
-        model: pyo.ConcreteModel,
-        solver_name: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Solve Model (iii) and extract calendar aging results.
+    def extract_solution(self, model: pyo.ConcreteModel, solver_results: Any) -> Dict[str, Any]:
+        """
+        Extract solution from Model III (cyclic + calendar aging).
 
-        Extends parent solve_model() to extract calendar aging metrics.
+        Extends parent extract_solution() to add calendar aging results.
 
         Args:
-            model: Model (iii) Pyomo model
-            solver_name: Solver to use (auto-detect if None)
+            model: Solved Model III Pyomo model
+            solver_results: Results object from solver.solve()
 
         Returns:
-            Dictionary with solution and degradation metrics (cyclic + calendar)
+            Dictionary with base solution plus cyclic and calendar aging metrics
         """
-        # Call parent solver
-        results = super().solve_model(model, solver_name)
+        # Call parent (Model II) to get base solution with cyclic aging
+        solution_dict = super().extract_solution(model, solver_results)
 
         # If solve failed, return early
-        if results.get('status') not in ['optimal', 'feasible']:
-            return results
+        if solution_dict.get('status') not in ['optimal', 'feasible']:
+            return solution_dict
 
         # Extract calendar aging results
         def _safe_value(component: Any) -> Optional[float]:
@@ -2229,21 +2287,21 @@ class BESSOptimizerModelIII(BESSOptimizerModelII):
                 total_calendar_cost += val * pyo.value(model.dt)
 
         # Add calendar aging results to solution
-        results['lambda_cal'] = lambda_cal
-        results['c_cal_cost'] = c_cal_cost
+        solution_dict['lambda_cal'] = lambda_cal
+        solution_dict['c_cal_cost'] = c_cal_cost
 
         # Update degradation metrics
-        if 'degradation_metrics' in results:
-            results['degradation_metrics']['total_calendar_cost_eur'] = total_calendar_cost
+        if 'degradation_metrics' in solution_dict:
+            solution_dict['degradation_metrics']['total_calendar_cost_eur'] = total_calendar_cost
 
             # Calculate combined degradation cost
-            cyclic_cost = results['degradation_metrics'].get('total_cyclic_cost_eur', 0.0)
-            results['degradation_metrics']['total_degradation_cost_eur'] = (
+            cyclic_cost = solution_dict['degradation_metrics'].get('total_cyclic_cost_eur', 0.0)
+            solution_dict['degradation_metrics']['total_degradation_cost_eur'] = (
                 cyclic_cost + total_calendar_cost
             )
 
             # Add breakdown
-            results['degradation_metrics']['cost_breakdown'] = {
+            solution_dict['degradation_metrics']['cost_breakdown'] = {
                 'cyclic_eur': cyclic_cost,
                 'calendar_eur': total_calendar_cost,
                 'total_eur': cyclic_cost + total_calendar_cost,
@@ -2254,7 +2312,7 @@ class BESSOptimizerModelIII(BESSOptimizerModelII):
             logger.info("  - Calendar aging: %.2f EUR", total_calendar_cost)
             logger.info("  - Total degradation: %.2f EUR", cyclic_cost + total_calendar_cost)
 
-        return results
+        return solution_dict
 
 
 # ============================================================================
