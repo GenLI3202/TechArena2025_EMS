@@ -28,7 +28,6 @@ doc/*.synctex.gz
 # Large JSON result files (8.5GB+)
 validation_results/**/*.html
 
-
 # Large JSONL data files (200K+ lines)
 **/input/TechArena2025_data_tidy.jsonl
 **/TechArena2025_data_tidy.jsonl
