@@ -1108,6 +1108,341 @@ def plot_revenue_breakdown_v2(df: pd.DataFrame, summary: dict, horizon_hours: in
     return fig
 
 
+def plot_comprehensive_strategy_analysis(
+    df: pd.DataFrame,
+    title_suffix: str = "",
+    use_timestamp: bool = True,
+    battery_capacity_kwh: float = 4472.0
+) -> go.Figure:
+    """
+    Comprehensive 5-panel strategy visualization showing complete optimization behavior.
+    
+    This function creates a detailed multi-panel visualization inspired by the AS revenue fix
+    analysis, showing:
+    1. SOC trajectory with reference lines
+    2. Charge/discharge power decisions
+    3. FCR capacity bids vs prices
+    4. Day-ahead market prices with discharge events
+    5. Cumulative revenue breakdown by market
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Solution DataFrame from extract_detailed_solution()
+        Required columns:
+        - 'timestamp' or 'hour': time axis
+        - 'e_soc', 'soc_pct': state of charge
+        - 'p_ch_kw', 'p_dis_kw': charge/discharge power
+        - 'c_fcr_mw', 'price_fcr_eur_mw': FCR capacity and prices
+        - 'price_da_eur_mwh': day-ahead prices
+        - 'revenue_da_eur', 'revenue_as_capacity_eur': revenue components
+    title_suffix : str, optional
+        Additional text for plot title
+    use_timestamp : bool, optional
+        If True, use timestamp for x-axis; otherwise use hour
+    battery_capacity_kwh : float, optional
+        Battery capacity in kWh for SOC reference lines (default: 4472.0)
+        
+    Returns
+    -------
+    go.Figure
+        Plotly figure with 5 subplots
+        
+    Example
+    -------
+    >>> df = extract_detailed_solution(solution, test_data, 32)
+    >>> fig = plot_comprehensive_strategy_analysis(df, title_suffix="CH, 5-day MPC")
+    >>> fig.show()
+    """
+    from plotly.subplots import make_subplots
+    
+    # Determine x-axis
+    x_col = 'timestamp' if use_timestamp and 'timestamp' in df.columns else 'hour'
+    x_values = df[x_col].values
+    x_title = 'Time' if use_timestamp else 'Hour'
+    
+    # Create subplot structure
+    fig = make_subplots(
+        rows=5, cols=1,
+        subplot_titles=(
+            'SOC Trajectory',
+            'Power Decisions: Charge & Discharge',
+            'FCR Capacity Bids vs Price',
+            'Day-Ahead Market Price',
+            'Revenue Components (Cumulative)'
+        ),
+        vertical_spacing=0.08,
+        row_heights=[0.20, 0.20, 0.20, 0.15, 0.25],
+        specs=[[{"secondary_y": False}],
+               [{"secondary_y": False}],
+               [{"secondary_y": True}],
+               [{"secondary_y": False}],
+               [{"secondary_y": False}]]
+    )
+    
+    # ========================================================================
+    # Panel 1: SOC Trajectory
+    # ========================================================================
+    
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=df['soc_kwh'].values,
+            name='SOC',
+            line=dict(color=MCKINSEY_COLORS['navy'], width=2),
+            fill='tozeroy',
+            fillcolor='rgba(0, 100, 255, 0.2)',
+            hovertemplate='<b>SOC</b><br>%{x}<br>SOC: %{y:.2f} kWh (%{customdata:.1f}%)<extra></extra>',
+            customdata=df['soc_pct'].values,
+            showlegend=True
+        ),
+        row=1, col=1
+    )
+    
+    # Add SOC reference lines
+    fig.add_hline(
+        y=battery_capacity_kwh * 0.5,
+        line_dash="dash",
+        line_color="green",
+        opacity=0.5,
+        row=1, col=1,
+        annotation_text="50% SOC",
+        annotation_position="right"
+    )
+    
+    fig.add_hline(
+        y=battery_capacity_kwh,
+        line_dash="dash",
+        line_color="red",
+        opacity=0.3,
+        row=1, col=1,
+        annotation_text="100% SOC",
+        annotation_position="right"
+    )
+    
+    # ========================================================================
+    # Panel 2: Power Decisions (Charge as negative, Discharge as positive)
+    # ========================================================================
+    
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=-df['p_ch_kw'].values / 1000,  # Convert to MW, negative for charge
+            name='Charge',
+            line=dict(color='green', width=1.5),
+            fill='tozeroy',
+            fillcolor='rgba(0, 200, 0, 0.3)',
+            hovertemplate='<b>Charge</b><br>%{x}<br>Power: %{y:.2f} MW<extra></extra>',
+            showlegend=True
+        ),
+        row=2, col=1
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=df['p_dis_kw'].values / 1000,  # Convert to MW
+            name='Discharge',
+            line=dict(color='red', width=1.5),
+            fill='tozeroy',
+            fillcolor='rgba(200, 0, 0, 0.3)',
+            hovertemplate='<b>Discharge</b><br>%{x}<br>Power: %{y:.2f} MW<extra></extra>',
+            showlegend=True
+        ),
+        row=2, col=1
+    )
+    
+    # Add zero line for clarity
+    fig.add_hline(y=0, line_dash="solid", line_color="gray", line_width=1, opacity=0.5, row=2, col=1)
+    
+    # ========================================================================
+    # Panel 3: FCR Capacity Bids vs Price (dual y-axis)
+    # ========================================================================
+    
+    # FCR Price (line, secondary y-axis)
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=df['price_fcr_eur_mw'].values,
+            name='FCR Price',
+            line=dict(color='purple', width=1, dash='dot'),
+            hovertemplate='<b>FCR Price</b><br>%{x}<br>Price: %{y:.2f} EUR/MW<extra></extra>',
+            showlegend=True
+        ),
+        row=3, col=1,
+        secondary_y=True
+    )
+    
+    # FCR Bid (bar, primary y-axis)
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=df['c_fcr_mw'].values,
+            name='FCR Bid',
+            line=dict(color='orange', width=2),
+            fill='tozeroy',
+            fillcolor='rgba(255, 165, 0, 0.3)',
+            hovertemplate='<b>FCR Bid</b><br>%{x}<br>Capacity: %{y:.2f} MW<extra></extra>',
+            showlegend=True
+        ),
+        row=3, col=1,
+        secondary_y=False
+    )
+    
+    # ========================================================================
+    # Panel 4: Day-Ahead Price with Discharge Highlighting
+    # ========================================================================
+    
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=df['price_da_eur_mwh'].values,
+            name='DA Price',
+            line=dict(color='darkblue', width=1.5),
+            fill='tozeroy',
+            fillcolor='rgba(0, 0, 139, 0.2)',
+            hovertemplate='<b>DA Price</b><br>%{x}<br>Price: %{y:.2f} EUR/MWh<extra></extra>',
+            showlegend=True
+        ),
+        row=4, col=1
+    )
+    
+    # Highlight discharge periods
+    discharge_mask = df['p_dis_kw'] > 100  # Threshold for significant discharge
+    if discharge_mask.any():
+        # Find continuous discharge periods
+        discharge_starts = df[discharge_mask & ~discharge_mask.shift(1, fill_value=False)]
+        discharge_ends = df[discharge_mask & ~discharge_mask.shift(-1, fill_value=False)]
+        
+        for start, end in zip(discharge_starts[x_col], discharge_ends[x_col]):
+            fig.add_vrect(
+                x0=start, x1=end,
+                fillcolor="red", opacity=0.1,
+                layer="below", line_width=0,
+                row=4, col=1
+            )
+    
+    # ========================================================================
+    # Panel 5: Revenue Components (Cumulative)
+    # ========================================================================
+    
+    # Calculate cumulative revenues
+    cumulative_da = df['revenue_da_eur'].cumsum()
+    
+    # Handle different column names for AS capacity revenue
+    if 'revenue_as_capacity_eur' in df.columns:
+        cumulative_as = df['revenue_as_capacity_eur'].cumsum()
+    elif 'revenue_fcr_eur' in df.columns:
+        cumulative_as = df['revenue_fcr_eur'].cumsum()
+    else:
+        cumulative_as = pd.Series([0] * len(df))
+    
+    # Handle aFRR energy revenue
+    if 'revenue_afrr_energy_eur' in df.columns:
+        cumulative_afrr = df['revenue_afrr_energy_eur'].cumsum()
+    else:
+        cumulative_afrr = pd.Series([0] * len(df))
+    
+    cumulative_total = cumulative_da + cumulative_as + cumulative_afrr
+    
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=cumulative_da.values,
+            name='Cumulative DA Revenue',
+            line=dict(color='green', width=2),
+            hovertemplate='<b>DA Revenue</b><br>%{x}<br>Total: %{y:.2f} EUR<extra></extra>',
+            showlegend=True
+        ),
+        row=5, col=1
+    )
+    
+    if cumulative_as.sum() > 0.01:  # Only show if non-zero
+        fig.add_trace(
+            go.Scatter(
+                x=x_values,
+                y=cumulative_as.values,
+                name='Cumulative AS Capacity Revenue',
+                line=dict(color='orange', width=2),
+                hovertemplate='<b>AS Capacity Revenue</b><br>%{x}<br>Total: %{y:.2f} EUR<extra></extra>',
+                showlegend=True
+            ),
+            row=5, col=1
+        )
+    
+    if cumulative_afrr.sum() > 0.01:  # Only show if non-zero
+        fig.add_trace(
+            go.Scatter(
+                x=x_values,
+                y=cumulative_afrr.values,
+                name='Cumulative aFRR Energy Revenue',
+                line=dict(color='teal', width=2),
+                hovertemplate='<b>aFRR Energy Revenue</b><br>%{x}<br>Total: %{y:.2f} EUR<extra></extra>',
+                showlegend=True
+            ),
+            row=5, col=1
+        )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=x_values,
+            y=cumulative_total.values,
+            name='Total Revenue',
+            line=dict(color='purple', width=3, dash='dash'),
+            hovertemplate='<b>Total Revenue</b><br>%{x}<br>Total: %{y:.2f} EUR<extra></extra>',
+            showlegend=True
+        ),
+        row=5, col=1
+    )
+    
+    # ========================================================================
+    # Layout Configuration
+    # ========================================================================
+    
+    # Get financial summary for subtitle
+    total_revenue = cumulative_total.iloc[-1] if len(cumulative_total) > 0 else 0
+    initial_soc = df['soc_kwh'].iloc[0] if len(df) > 0 else 0
+    final_soc = df['soc_kwh'].iloc[-1] if len(df) > 0 else 0
+    
+    fig.update_layout(
+        height=1600,
+        title_text=f"<b>Comprehensive Optimization Strategy Analysis</b> {title_suffix}<br>" +
+                   f"<sub>Total Revenue: {total_revenue:.2f} EUR | " +
+                   f"SOC: {initial_soc:.0f} → {final_soc:.0f} kWh " +
+                   f"({100*initial_soc/battery_capacity_kwh:.1f}% → {100*final_soc/battery_capacity_kwh:.1f}%)</sub>",
+        showlegend=True,
+        hovermode='x unified',
+        template='plotly_white',
+        font=dict(family=MCKINSEY_FONTS['family'], size=MCKINSEY_FONTS['tick_label_size']),
+        legend=dict(
+            orientation='v',
+            yanchor='top',
+            y=0.99,
+            xanchor='right',
+            x=0.99,
+            bgcolor='rgba(255,255,255,0.8)'
+        )
+    )
+    
+    # Y-axis labels
+    fig.update_yaxes(title_text="SOC (kWh)", row=1, col=1)
+    fig.update_yaxes(title_text="Power (MW)", row=2, col=1)
+    fig.update_yaxes(title_text="Capacity (MW)", secondary_y=False, row=3, col=1)
+    fig.update_yaxes(title_text="Price (EUR/MW)", secondary_y=True, row=3, col=1)
+    fig.update_yaxes(title_text="Price (EUR/MWh)", row=4, col=1)
+    fig.update_yaxes(title_text="Revenue (EUR)", row=5, col=1)
+    
+    # X-axis labels (only on bottom plot)
+    fig.update_xaxes(title_text=x_title, row=5, col=1)
+    
+    # Grid styling
+    for i in range(1, 6):
+        fig.update_yaxes(showgrid=True, gridcolor='lightgray', row=i, col=1)
+        fig.update_xaxes(showgrid=True, gridcolor='lightgray', row=i, col=1)
+    
+    return fig
+
+
 
 # =================================================================================
 # ARCHIVED OLD PLOT CODE - Kept for reference
