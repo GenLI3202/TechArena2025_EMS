@@ -27,32 +27,11 @@ The project implements three progressive optimization models:
 
 ### Data Sources
 - **Phase 2 market data**: `data/phase2_processed/{market}.parquet` (aFRR energy prices)
-- **Aging config**: `data/phase2_aging_config/` (degradation parameters, activation rates)
-- **Load and process Market data**: use 
-    ```python
-       try:
-            print(f"\n[OK] Loading data from: {data_file}")
-            full_data = optimizer.load_and_preprocess_data(data_file)
-            print(f"\n[OK] Loading data from: {data_dir}")
-            from py_script.data.market_data import load_market_data
-        
-            print(f"[OK] Extracting data for country: {country}")
-            country_data = optimizer.extract_country_data(full_data, country)
-            # Load Phase 2 parquet data
-            country_data = load_market_data(data_dir, country)
-    ```
-
-       75        try:
-       76 -          print(f"\n[OK] Loading data from: {data_file}")
-       77 -          full_data = optimizer.load_and_preprocess_data(data_file)
-       76 +          print(f"\n[OK] Loading data from: {data_dir}")
-       77 +          from py_script.data.market_data import load_market_data
-       78
-       79 -          print(f"[OK] Extracting data for country: {country}")
-       80 -          country_data = optimizer.extract_country_data(full_data, country)
-       79 +          # Load Phase 2 parquet data
-       80 +          country_data = load_market_data(data_dir, country)
-## Common Development Tasks
+- **Optimizer config**: `data/p2_config/*.json` (aging, investment, solver settings, etc.)
+- **Load and process Market data**: 
+  1. Extract and explore raw data with visualization: `.py_script/data/`
+  2. Optimizer loads preprocessed data for modeling: `.py_script/core/optimizer.py`
+  3. Post-process results for analysis: `.py_script/visualization/optimization_analysis.py`
 
 
 ### Key Parameters
@@ -97,9 +76,11 @@ Refer to `doc\p2_model\p2_bi_model_ggdp.tex`
 
 ## Testing and Validation
 
-### Output Files
-- **Solutions**: `results/model_iii_validation/solution_*.csv`
-- **Visualizations**: `results/model_iii_validation/*/plots/*.html`
+### Output Files saved destinations
+- **Solutions**: 
+   1. `validation_results/{validation_name}/solution_*.csv` (detailed decision variable time series)
+   2. `validation_results/{validation_name}/performance_*.json` (Summary statistics, such as total profit including coponents profits, degradation costs, solver status, runtime, etc.)
+- **Visualizations**: `validation_results/{validation_name}/plots/*.html` (or png)
 - **Metadata**: JSON files with optimization statistics
 
 ### Visualization Outputs
