@@ -1,0 +1,22 @@
+{
+  "default_solver": "cbc",
+  "solver_time_limit_sec": 600,
+  "solver_options": {
+    "cplex": {
+      "timelimit": 600,
+      "mip_tolerances_mipgap": 0.01
+    },
+    "gurobi": {
+      "TimeLimit": 600,
+      "MIPGap": 0.01
+    },
+    "highs": {
+      "time_limit": 600.0,
+      "mip_rel_gap": 0.01
+    },
+    "cbc": {
+      "seconds": 600,
+      "ratio": 0.01
+    }
+  }
+}
