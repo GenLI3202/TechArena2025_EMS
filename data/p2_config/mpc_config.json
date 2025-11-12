@@ -1,0 +1,12 @@
+{
+  "description": "Configuration for MPC-based rolling horizon optimization",
+  "version": "1.0",
+
+  "mpc_parameters": {
+    "horizon_hours": 32,
+    "execution_hours": 24,
+    "initial_soc_fraction": 0.5,
+    "validate_constraints": false,
+    "description": "MPC rolling horizon settings"
+  }
+}
