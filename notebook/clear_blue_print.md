@@ -41,47 +41,6 @@ The goal is to have one `solve_model` method that *only* solves, and a separate,
 
 -----
 
-### 2\. `prompt_2_create_solver_config.md`
-
-(This prompt creates the new config file.)
-
-**Objective:**
-Create a new configuration file, `solver_config.json`, to define default solver parameters for the optimization.
-
-**File to Create:**
-
-  * `./data/p2_config/solver_config.json`
-
-**Content:**
-The JSON file should contain default settings for the solvers, including a default solver choice, a global time limit, and any solver-specific parameters.
-
-**Example Structure:**
-
-```json
-{
-  "default_solver": "cbc",
-  "solver_time_limit_sec": 600,
-  "solver_options": {
-    "cplex": {
-      "timelimit": 600,
-      "mip_tolerances_mipgap": 0.01
-    },
-    "gurobi": {
-      "TimeLimit": 600,
-      "MIPGap": 0.01
-    },
-    "highs": {
-      "time_limit": 600.0,
-      "mip_rel_gap": 0.01
-    },
-    "cbc": {
-      "seconds": 600,
-      "ratio": 0.01
-    }
-  }
-}
-```
-
 -----
 
 ### 3\. `prompt_3_create_results_exporter.md`
@@ -93,7 +52,7 @@ Create a new, reusable utility script, `results_exporter.py`, to handle saving a
 
 **File to Create:**
 
-  * `./py_script/visualization/results_exporter.py`
+  * `./py_script/validation/results_exporter.py`
 
 **Core Requirements:**
 
@@ -158,10 +117,12 @@ This notebook will **consume** the components from the other tasks. It will allo
 
 **Assumptions (Prerequisites):**
 
-  * `optimizer.py` has been refactored with `solve_model()` and `extract_solution()` [from Prompt 1].
-  * `solver_config.json` exists in `./data/p2_config/` [from Prompt 2].
-  * `results_exporter.py` exists in `./py_script/visualization/` [from Prompt 3].
-  * `aging_analysis.py` exists in `./py_script/visualization/` [from Prompt 4].
+  * `optimizer.py` has been refactored with `solve_model()` and `extract_solution()` 
+  * `solver_config.json` exists in `./data/p2_config/` 
+  * `results_exporter.py` exists in `./py_script/validation/` 
+  * `aging_analysis.py` exists in `./py_script/visualization/`
+  * `run_optimization.py` exists in `./py_script/validation/` 
+  * `compare_optimizations.py` exists in `./py_script/validation/`
 
 **Notebook Structure:**
 
@@ -200,3 +161,8 @@ This notebook will **consume** the components from the other tasks. It will allo
       * Call `plot_stacked_cyclic_soc(solution_df, save_path=output_directory / "plots" / "cyclic_soc.html")`.
       * Call `plot_calendar_aging_curve(solution_df, save_path=output_directory / "plots" / "calendar_curve.html")`.
       * Also include existing plots (from `visualize_market_data` or similar) to show the main BESS scheduling (SOC, power bids, etc.).
+
+
+
+
+
