@@ -125,6 +125,23 @@ def extract_detailed_solution(solution: dict, test_data: pd.DataFrame, horizon_h
         for t in range(T)
     ]
 
+    # ========================================================================
+    # Model II/III: Segment SOC data (if available)
+    # ========================================================================
+    e_soc_j = solution.get('e_soc_j', {})
+    if e_soc_j:
+        # Extract segments (j=1 to 10)
+        for j in range(1, 11):
+            segment_col = f'segment_{j}'
+            data[segment_col] = [e_soc_j.get((t, j), 0.0) for t in range(T)]
+
+    # ========================================================================
+    # Model III: Calendar aging data (if available)
+    # ========================================================================
+    c_cal_cost = solution.get('c_cal_cost', {})
+    if c_cal_cost:
+        data['cal_cost_eur_hr'] = [c_cal_cost.get(t, 0.0) for t in range(T)]
+
     df = pd.DataFrame(data)
 
     # Add metadata
