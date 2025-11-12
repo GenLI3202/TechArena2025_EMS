@@ -240,7 +240,7 @@ def load_phase2_market_tables(workbook_path: Path, *, prefer_csv: bool = False) 
     afrr_energy (NEW):
         Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
     """
-    from core.exceptions import DataLoadingError
+    from data.exceptions import DataLoadingError
     import logging
 
     logger = logging.getLogger(__name__)
