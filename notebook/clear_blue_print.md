@@ -1,5 +1,65 @@
 
 
+
+# Task: Creat Optimizer test Notebook 
+
+**Objective:**
+Open the Jupyter Notebook `notebook\p2b_optimizer.ipynb` in the `./notebook/` directory to serve as a testing and validation harness for the BESS optimization framework.
+
+**Context:**
+This notebook will **consume** the components from the previews tasks (descript provided below). It will allow a user to flexibly run single-pass optimization scenarios (no MPC/Meta-Opt) and validate the results.
+
+**Utilities from previous tasks:**
+
+  * `optimizer.py` has been refactored with `solve_model()` and `extract_solution()` 
+  * `solver_config.json` exists in `./data/p2_config/` 
+  * `results_exporter.py` exists in `./py_script/validation/` 
+  * `aging_analysis.py` exists in `./py_script/visualization/`
+  * `run_optimization.py` exists in `./py_script/validation/` 
+  * `compare_optimizations.py` exists in `./py_script/validation/`
+
+**Notebook Structure:**
+
+1.  **📦 1. Setup & Imports:**
+
+      * Import `BESSOptimizerModelI`, `II`, `III`.
+      * Import `load_process_market_data` (or similar).
+      * Import `save_optimization_results` from `results_exporter`.
+      * Import `plot_stacked_cyclic_soc` and `plot_calendar_aging_curve` from `aging_analysis`.
+
+2.  **⚙️ 2. Configuration:** (Can refer to `run_optimization.py` and `compare_optimizations.py` for examples)
+
+      * Load `solver_config.json`, `aging_config.json`, and `afrr_ev_weights_config.json`.
+      * Define scenario parameters (e.g., `TEST_COUNTRY`, `TEST_C_RATE`, `TEST_ALPHA`, `TEST_TIME_HORIZON`).
+      * Provide a helper to flexibly select data by time (e.g., "first 7 days").
+
+3.  **🚀 3. Run Scenario:**
+
+      * Show a complete example of:
+        1.  Loading and slicing the market data for the chosen time horizon.
+        2.  Instantiating `BESSOptimizerModelIII` with the chosen parameters (e.g., `alpha=1.0`).
+        3.  Calling `optimizer.build_optimization_model()`.
+        4.  Calling `model_solved, solver_status = optimizer.solve_model()`.
+        5.  Calling `solution_dict = optimizer.extract_solution()`.
+        6.  Creating `solution_df = optimizer.extract_solution_dataframe()`.
+        7.  Creating a `summary_metrics` dictionary from the `solution_dict`.
+
+4.  **💾 4. Save Results:**
+
+      * Demonstrate calling `save_optimization_results()` with the `solution_df`, `summary_metrics`, and a descriptive `run_name`.
+      * Store the returned `output_directory` path: `validation_results\optimizer_validation`
+
+5.  **📊 5. Validation Plots:**
+
+      * Demonstrate calling the new validation plot functions:
+      * Call `plot_stacked_cyclic_soc(solution_df, save_path=output_directory / "plots" / "cyclic_soc.html")`.
+      * Call `plot_calendar_aging_curve(solution_df, save_path=output_directory / "plots" / "calendar_curve.html")`.
+      * Also include existing plots (from `visualize_market_data` or similar) to show the main BESS scheduling (SOC, power bids, etc.).
+
+
+
+# Description (prompts) of previous tasks (REFERENCE ONLY, Already finished, DO NOT EXECUTE THEM AGAIN):
+
 ### 1\. `prompt_1_refactor_optimizer.md`
 
 (This prompt focuses *only* on fixing the `optimizer.py` script. It's the most critical prerequisite.)
@@ -102,67 +162,3 @@ This script must contain at least two new plotting functions:
           * Y-axis: Calculated Calendar Cost (`c_cal_cost(t)`) [EUR/hr].
       * **Success Criteria:** The plot must visually trace the N-point convex curve defined in the `aging_config.json`.
       * **`save_path`:** Must accept an optional `save_path` argument to save the plot as an HTML file.
-
------
-
-### 5\. `prompt_5_create_notebook_harness.md`
-
-(This is the final prompt, which builds the notebook itself, *assuming* all previous tasks are done.)
-
-**Objective:**
-Write the Jupyter Notebook `p2b_optimizer.ipynb` in the `./notebook/` directory to serve as a testing and validation harness for the BESS optimization framework.
-
-**Context:**
-This notebook will **consume** the components from the other tasks. It will allow a user to flexibly run single-pass optimization scenarios (no MPC/Meta-Opt) and validate the results.
-
-**Assumptions (Prerequisites):**
-
-  * `optimizer.py` has been refactored with `solve_model()` and `extract_solution()` 
-  * `solver_config.json` exists in `./data/p2_config/` 
-  * `results_exporter.py` exists in `./py_script/validation/` 
-  * `aging_analysis.py` exists in `./py_script/visualization/`
-  * `run_optimization.py` exists in `./py_script/validation/` 
-  * `compare_optimizations.py` exists in `./py_script/validation/`
-
-**Notebook Structure:**
-
-1.  **📦 1. Setup & Imports:**
-
-      * Import `BESSOptimizerModelI`, `II`, `III`.
-      * Import `load_process_market_data` (or similar).
-      * Import `save_optimization_results` from `results_exporter`.
-      * Import `plot_stacked_cyclic_soc` and `plot_calendar_aging_curve` from `aging_analysis`.
-
-2.  **⚙️ 2. Configuration:**
-
-      * Load `solver_config.json`, `aging_config.json`, and `afrr_ev_weights_config.json`.
-      * Define scenario parameters (e.g., `TEST_COUNTRY`, `TEST_C_RATE`, `TEST_ALPHA`, `TEST_TIME_HORIZON`).
-      * Provide a helper to flexibly select data by time (e.g., "first 7 days").
-
-3.  **🚀 3. Run Scenario:**
-
-      * Show a complete example of:
-        1.  Loading and slicing the market data for the chosen time horizon.
-        2.  Instantiating `BESSOptimizerModelIII` with the chosen parameters (e.g., `alpha=1.0`).
-        3.  Calling `optimizer.build_optimization_model()`.
-        4.  Calling `model_solved, solver_status = optimizer.solve_model()`.
-        5.  Calling `solution_dict = optimizer.extract_solution()`.
-        6.  Creating `solution_df = optimizer.extract_solution_dataframe()`.
-        7.  Creating a `summary_metrics` dictionary from the `solution_dict`.
-
-4.  **💾 4. Save Results:**
-
-      * Demonstrate calling `save_optimization_results()` with the `solution_df`, `summary_metrics`, and a descriptive `run_name`.
-      * Store the returned `output_directory` path.
-
-5.  **📊 5. Validation Plots:**
-
-      * Demonstrate calling the new validation plot functions:
-      * Call `plot_stacked_cyclic_soc(solution_df, save_path=output_directory / "plots" / "cyclic_soc.html")`.
-      * Call `plot_calendar_aging_curve(solution_df, save_path=output_directory / "plots" / "calendar_curve.html")`.
-      * Also include existing plots (from `visualize_market_data` or similar) to show the main BESS scheduling (SOC, power bids, etc.).
-
-
-
-
-
