@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. To understand the ultimate purpose and structure of the project, please refer to `doc\whole_project_description.md`.
+This file provides guidance to GEMINI CLI when working with code in this repository. To understand the ultimate purpose and structure of the project, please refer to `doc\whole_project_description.md`.
 
 ## Project Context
 
@@ -114,7 +114,6 @@ The project auto-detects available MILP solvers in order: Gurobi > CPLEX > CBC >
 - **SOC range**: 0-100% allowed
 - **Power limits**: Based on C-rate configuration
 - **Daily cycle limits**: Enforced per-day constraint (Cst-3)
-- **LIFO Segment Filling**: CRITICAL - Segment j can only have energy if segment j-1 is FULL (see below)
 
 ## Model Formulation
 

@@ -80,7 +80,7 @@ nul
 validation_*.log
 
 # Result directories (reorganized structure)
-# validation_results
+validation_results/
 
 
 # Script-generated progress files
