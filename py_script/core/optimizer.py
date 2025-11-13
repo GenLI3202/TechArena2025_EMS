@@ -1710,33 +1710,71 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
 
         model.stacked_tank_ordering = pyo.Constraint(model.T, model.J, rule=stacked_tank_rule, doc="Monotonic SOC ordering across segments")
 
+        # CRITICAL FIX: Add LIFO fullness prerequisite constraint (Xu et al. 2017, Theorem 1)
+        # This enforces that segment j can only have energy if segment j-1 is FULL
+        def segment_lifo_fullness_rule(m, t, j):
+            """
+            LIFO Constraint: Segment j can only contain energy if segment j-1 is full.
+
+            This enforces the "stacked tank" behavior where lower segments must be
+            completely filled before upper segments can receive any energy.
+
+            Based on Xu et al. 2017, Theorem 1 & Lemma 1:
+            - For discharge: empty segment 1 before segment 2, etc.
+            - For charge: fill segment 1 before segment 2, etc.
+
+            Without this constraint, energy gets distributed across all segments equally,
+            violating the LIFO principle and producing incorrect degradation costs.
+            """
+            if j == 1:
+                return pyo.Constraint.Skip
+
+            # Tolerance for numerical stability (1 kWh ~ 0.22% of 447.2 kWh segment)
+            epsilon = 1.0  # kWh
+
+            # If segment j is active (has ANY energy), segment j-1 must be full
+            # Using existing z_segment_active binary (defined below):
+            # z_segment_active[t,j] = 1 if e_soc_j[t,j] > 0
+            # Therefore: e_soc_j[t, j-1] >= (E_seg[j-1] - epsilon) * z_segment_active[t,j]
+            #
+            # This is a big-M constraint where:
+            # - If z_segment_active[t,j] = 1 (segment j has energy), then e_soc_j[t,j-1] >= E_seg[j-1] - epsilon (j-1 is full)
+            # - If z_segment_active[t,j] = 0 (segment j is empty), constraint is trivially satisfied
+            return m.e_soc_j[t, j-1] >= (m.E_seg[j-1] - epsilon) * m.z_segment_active[t, j]
+
+        model.segment_lifo_fullness = pyo.Constraint(
+            model.T, model.J,
+            rule=segment_lifo_fullness_rule,
+            doc="CRITICAL: LIFO fullness prerequisite - segment j only has energy if j-1 is full (Xu et al. 2017)"
+        )
+        logger.info("Added LIFO fullness prerequisite constraints to enforce stacked tank behavior")
 
         ######### WARNING: THIS SECTION WAS DISABLED BECAUSE IT SLOWS DOWN THE OPTIMIZATION MODEL SIGNIFICANTLY #########
         ######### IT CAN BE RE-ENABLED IF STRICT SEGMENT ORDERING IS REQUIRED, BUT STRONGLY DISCOURAGED #########
-        # model.z_segment_active = pyo.Var(model.T, model.J, domain=pyo.Binary, doc="Segment activation binary")
+        model.z_segment_active = pyo.Var(model.T, model.J, domain=pyo.Binary, doc="Segment activation binary")
 
-        # def segment_activation_upper_rule(m, t, j):
-        #     return m.e_soc_j[t, j] <= m.E_seg[j] * m.z_segment_active[t, j]
+        def segment_activation_upper_rule(m, t, j):
+            return m.e_soc_j[t, j] <= m.E_seg[j] * m.z_segment_active[t, j]
 
-        # model.segment_activation_upper = pyo.Constraint(model.T, model.J, rule=segment_activation_upper_rule)
+        model.segment_activation_upper = pyo.Constraint(model.T, model.J, rule=segment_activation_upper_rule)
 
-        # def segment_activation_cascade_rule(m, t, j):
-        #     if j == 1:
-        #         return pyo.Constraint.Skip
-        #     return m.z_segment_active[t, j] <= m.z_segment_active[t, j - 1]
+        def segment_activation_cascade_rule(m, t, j):
+            if j == 1:
+                return pyo.Constraint.Skip
+            return m.z_segment_active[t, j] <= m.z_segment_active[t, j - 1]
 
-        # model.segment_activation_cascade = pyo.Constraint(model.T, model.J, rule=segment_activation_cascade_rule, doc="Ensure deeper segments only active when shallower ones are active")
+        model.segment_activation_cascade = pyo.Constraint(model.T, model.J, rule=segment_activation_cascade_rule, doc="Ensure deeper segments only active when shallower ones are active")
 
-        # if self.degradation_params.get('enforce_segment_binary', True):
-        #     def segment_charge_activation_rule(m, t, j):
-        #         return m.p_ch_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
+        if self.degradation_params.get('enforce_segment_binary', True):
+            def segment_charge_activation_rule(m, t, j):
+                return m.p_ch_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
 
-        #     model.segment_charge_activation = pyo.Constraint(model.T, model.J, rule=segment_charge_activation_rule)
+            model.segment_charge_activation = pyo.Constraint(model.T, model.J, rule=segment_charge_activation_rule)
 
-        #     def segment_discharge_activation_rule(m, t, j):
-        #         return m.p_dis_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
+            def segment_discharge_activation_rule(m, t, j):
+                return m.p_dis_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
 
-        #     model.segment_discharge_activation = pyo.Constraint(model.T, model.J, rule=segment_discharge_activation_rule)
+            model.segment_discharge_activation = pyo.Constraint(model.T, model.J, rule=segment_discharge_activation_rule)
         ######### WARNING: THIS SECTION WAS DISABLED BECAUSE IT SLOWS DOWN THE OPTIMIZATION MODEL SIGNIFICANTLY #########
 
         if hasattr(model, 'daily_cycle_limit'):
