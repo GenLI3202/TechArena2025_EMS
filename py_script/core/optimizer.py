@@ -159,7 +159,7 @@ class BESSOptimizerModelI:
         if self._activation_config is not None:
             return self._activation_config
 
-        config_path = Path(__file__).parent.parent.parent / 'data' / 'phase2_aging_config' / 'afrr_activation_config.json'
+        config_path = Path(__file__).parent.parent.parent / 'data' / 'p2_config' / 'afrr_ev_weights_config.json'
 
         if not config_path.exists():
             logger.warning(f"Activation config not found at {config_path}. Using default probabilities.")
@@ -265,7 +265,7 @@ class BESSOptimizerModelI:
         Args:
             data_file: Path to JSONL file with DA, FCR, and aFRR capacity data
             afrr_energy_file: Optional path to parquet file with aFRR energy prices.
-                            If None, will look in data/phase2_processed/parquet/afrr_energy.parquet
+                            If None, will look in data/parquet/afrr_energy.parquet
         """
         logger.info(f"Loading data from {data_file}")
 
@@ -336,7 +336,7 @@ class BESSOptimizerModelI:
         if afrr_energy_file is None:
             # Default path
             base_dir = Path(data_file).parent
-            afrr_energy_file = base_dir / 'phase2_processed' / 'parquet' / 'afrr_energy.parquet'
+            afrr_energy_file = base_dir / 'parquet' / 'afrr_energy.parquet'
 
         if Path(afrr_energy_file).exists():
             logger.info(f"Loading aFRR energy data from {afrr_energy_file}")
@@ -1476,7 +1476,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
 
         if degradation_config_path is None:
             project_root = Path(__file__).resolve().parent.parent.parent
-            degradation_config_path = project_root / 'data' / 'phase2_aging_config' / 'aging_config.json'
+            degradation_config_path = project_root / 'data' / 'p2_config' / 'aging_config.json'
 
         self.degradation_config = self._load_degradation_config(degradation_config_path)
 
@@ -1533,7 +1533,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
         if not config_file.exists():
             raise FileNotFoundError(
                 f"Degradation config file not found: {config_path}\n"
-                "Expected location: data/phase2_aging_config/aging_config.json"
+                "Expected location: data/p2_config/aging_config.json"
             )
 
         try:
@@ -2336,7 +2336,7 @@ if __name__ == "__main__":
     optimizer = BESSOptimizerModelI()
 
     # Run quick test
-    data_file = "../data/TechArena2025_data_tidy.jsonl"
+    data_file = "../data/"
     results = optimizer.run_scenario_analysis(data_file, num_days=3)
     print("\nPhase II Model (i) Results:")
     print(results.to_string())
