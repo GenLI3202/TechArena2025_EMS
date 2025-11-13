@@ -237,37 +237,33 @@ def main():
 
     try:
         # Try to load Phase 2 parquet data if available
-        data_parquet_path = Path(args.data_dir) / f"{args.country.lower()}_market_data.parquet"
+        # Try Phase 2 preprocessed parquet first (fastest)
+        from py_script.data.load_process_market_data import load_preprocessed_country_data
 
-        if data_parquet_path.exists():
-            print(f"  Loading from parquet: {data_parquet_path}")
+        preprocessed_path = Path("data/parquet/preprocessed") / f"{args.country.lower()}.parquet"
+
+        if preprocessed_path.exists():
+            print(f"  Loading from preprocessed parquet: {preprocessed_path}")
             import pandas as pd
-            country_data = pd.read_parquet(data_parquet_path)
+            country_data = load_preprocessed_country_data(args.country)
         else:
-            # Fallback to optimizer's load method (assumes JSONL exists)
-            print(f"  Parquet not found, using optimizer's data loader...")
-            print(f"  NOTE: This requires Phase 1 JSONL data")
+            # Fallback: Try old data_dir location
+            data_parquet_path = Path(args.data_dir) / f"{args.country.lower()}_market_data.parquet"
 
-            # Use a temporary optimizer just for data loading
-            temp_opt = BESSOptimizerModelI()
-
-            # Try common data file locations
-            jsonl_paths = [
-                "data/TechArena2025_data_tidy.jsonl",
-                "data/archive/phase_1_data_TechArena2025_data_tidy.jsonl"
-            ]
-
-            full_data = None
-            for jsonl_path in jsonl_paths:
-                if Path(jsonl_path).exists():
-                    print(f"  Loading from: {jsonl_path}")
-                    full_data = temp_opt.load_and_preprocess_data(jsonl_path)
-                    break
-
-            if full_data is None:
-                raise FileNotFoundError(f"No data found. Tried: {jsonl_paths}")
-
-            country_data = temp_opt.extract_country_data(full_data, args.country)
+            if data_parquet_path.exists():
+                print(f"  Loading from parquet: {data_parquet_path}")
+                import pandas as pd
+                country_data = pd.read_parquet(data_parquet_path)
+            else:
+                # Last resort: Load from Excel (submission path)
+                excel_path = Path("data/TechArena2025_Phase2_data.xlsx")
+                if excel_path.exists():
+                    print(f"  Loading from Excel: {excel_path}")
+                    temp_opt = BESSOptimizerModelI()
+                    full_data = temp_opt.load_and_preprocess_data(str(excel_path))
+                    country_data = temp_opt.extract_country_data(full_data, args.country)
+                else:
+                    raise FileNotFoundError(f"No data found. Please generate preprocessed files or provide Excel workbook.")
 
         print(f"  Loaded {len(country_data)} total time steps for {args.country}")
 
@@ -293,9 +289,10 @@ def main():
 
     except FileNotFoundError as e:
         print(f"  ERROR: Market data not found: {e}")
-        print(f"  Please ensure either:")
-        print(f"    1. Phase 2 parquet files exist: {args.data_dir}/<country>_market_data.parquet")
-        print(f"    2. OR Phase 1 JSONL exists: data/TechArena2025_data_tidy.jsonl")
+        print(f"  Please ensure one of the following:")
+        print(f"    1. Preprocessed parquet files: data/parquet/preprocessed/<country>.parquet")
+        print(f"    2. Excel workbook: data/TechArena2025_Phase2_data.xlsx")
+        print(f"  Generate preprocessed files with: python py_script/data/generate_preprocessed_country_data.py")
         sys.exit(1)
     except Exception as e:
         print(f"  ERROR: Failed to load data: {e}")

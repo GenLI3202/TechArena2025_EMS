@@ -224,7 +224,7 @@ Examples:
 
 def load_market_data_flexible(data_dir: str, country: str) -> pd.DataFrame:
     """
-    Load market data from parquet or JSONL (flexible fallback).
+    Load market data from preprocessed parquet (Phase 2 pipeline).
 
     Args:
         data_dir: Directory containing market data
@@ -233,25 +233,27 @@ def load_market_data_flexible(data_dir: str, country: str) -> pd.DataFrame:
     Returns:
         DataFrame with market data for the country
     """
-    # Try parquet first
-    data_parquet_path = Path(data_dir) / f"{country.lower()}_market_data.parquet"
+    from py_script.data.load_process_market_data import load_preprocessed_country_data
 
+    # Try preprocessed country parquet first (Phase 2 fast path)
+    preprocessed_path = Path("data/parquet/preprocessed") / f"{country.lower()}.parquet"
+
+    if preprocessed_path.exists():
+        return load_preprocessed_country_data(country)
+
+    # Fallback: Try old data_dir location
+    data_parquet_path = Path(data_dir) / f"{country.lower()}_market_data.parquet"
     if data_parquet_path.exists():
         return pd.read_parquet(data_parquet_path)
 
-    # Fallback to JSONL
-    temp_opt = BESSOptimizerModelI()
-    jsonl_paths = [
-        "data/TechArena2025_data_tidy.jsonl",
-        "data/archive/phase_1_data_TechArena2025_data_tidy.jsonl"
-    ]
+    # Last resort: Load from Excel
+    excel_path = Path("data/TechArena2025_Phase2_data.xlsx")
+    if excel_path.exists():
+        temp_opt = BESSOptimizerModelI()
+        full_data = temp_opt.load_and_preprocess_data(str(excel_path))
+        return temp_opt.extract_country_data(full_data, country)
 
-    for jsonl_path in jsonl_paths:
-        if Path(jsonl_path).exists():
-            full_data = temp_opt.load_and_preprocess_data(jsonl_path)
-            return temp_opt.extract_country_data(full_data, country)
-
-    raise FileNotFoundError(f"No market data found for {country} in {data_dir}")
+    raise FileNotFoundError(f"No market data found for {country}. Please generate preprocessed files or provide Excel workbook.")
 
 
 def run_single_optimization(

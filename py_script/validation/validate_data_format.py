@@ -30,7 +30,7 @@ import json
 def get_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Validate Data Formats and Integrity")
-    parser.add_argument("--file", type=str, help="Path to a single data file (Parquet or JSONL) to validate.")
+    parser.add_argument("--file", type=str, help="Path to a single data file (Parquet) to validate.")
     parser.add_argument("--dir", type=str, help="Path to a directory of data files to validate.")
     parser.add_argument("--submission-file", type=str, help="Path to an Excel submission file to validate.")
     parser.add_argument("--aging-config", type=str, help="Path to an aging config JSON to validate.")
@@ -146,11 +146,8 @@ def main():
         if file_path.suffix == '.parquet':
             df = pd.read_parquet(file_path)
             validate_market_data_schema(df, args.file)
-        elif file_path.suffix == '.jsonl':
-            df = pd.read_json(file_path, lines=True)
-            validate_market_data_schema(df, args.file)
         else:
-            print(f"Unsupported file type for --file: {file_path.suffix}")
+            print(f"Unsupported file type for --file: {file_path.suffix}. Only .parquet files are supported.")
 
     if args.dir:
         # Basic implementation: iterate and validate parquet files
