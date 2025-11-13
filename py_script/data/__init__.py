@@ -13,7 +13,7 @@ Main Functions:
 from .load_process_market_data import (
     MarketTables,
     load_market_tables,
-    load_data,
+    # load_data,
     convert_tables_to_tidy,
     wide_to_tidy_day_ahead,
     wide_to_tidy_fcr,
