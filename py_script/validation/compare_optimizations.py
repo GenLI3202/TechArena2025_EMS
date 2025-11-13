@@ -200,8 +200,8 @@ Examples:
     parser.add_argument(
         '--data-dir',
         type=str,
-        default='data/phase2_processed',
-        help='Market data directory (default: data/phase2_processed)'
+        default='data/parquet',
+        help='Market data directory (default: data/parquet)'
     )
     parser.add_argument(
         '--output-dir',

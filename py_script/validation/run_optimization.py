@@ -168,8 +168,8 @@ Examples:
     parser.add_argument(
         '--data-dir',
         type=str,
-        default='data/phase2_processed',
-        help='Directory containing market data parquet files (default: data/phase2_processed)'
+        default='data/parquet',
+        help='Directory containing market data parquet files (default: data/parquet)'
     )
 
     return parser.parse_args()
