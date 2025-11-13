@@ -257,131 +257,110 @@ class BESSOptimizerModelI:
         
         logger.info("Input validation completed")
     
-    def load_and_preprocess_data(self, data_file: str, afrr_energy_file: str = None) -> pd.DataFrame:
+    def load_and_preprocess_data(self, workbook_path: str) -> pd.DataFrame:
         """
-        Load and preprocess the market data from JSONL file and aFRR energy parquet file.
-        Enhanced for Phase II with aFRR energy market integration.
+        Load and preprocess Phase 2 market data from Excel workbook.
+
+        This method is designed for Huawei submission compatibility.
+        It loads the official Phase 2 Excel workbook and converts it to the internal
+        MultiIndex DataFrame format expected by extract_country_data().
 
         Args:
-            data_file: Path to JSONL file with DA, FCR, and aFRR capacity data
-            afrr_energy_file: Optional path to parquet file with aFRR energy prices.
-                            If None, will look in data/parquet/afrr_energy.parquet
+            workbook_path: Path to TechArena2025_Phase2_data.xlsx
+
+        Returns:
+            MultiIndex DataFrame with columns:
+            - Level 0: country (DE_LU, AT, CH, HU, CZ, DE)
+            - Level 1: market type (day_ahead, fcr, afrr, afrr_energy)
+            - Level 2: direction ('' for DA/FCR, 'positive'/'negative' for aFRR)
         """
-        logger.info(f"Loading data from {data_file}")
+        from pathlib import Path
+        from py_script.data.load_process_market_data import load_phase2_market_tables
 
-        # Read JSONL file
-        data_list = []
-        with open(data_file, 'r') as f:
-            for line in f:
-                data_list.append(json.loads(line.strip()))
+        logger.info(f"Loading Phase 2 market data from {workbook_path}")
 
-        df = pd.DataFrame(data_list)
-        logger.info(f"Loaded {len(df)} data points from JSONL")
+        # Load wide-format tables using centralized loader
+        market_tables = load_phase2_market_tables(Path(workbook_path))
+        logger.info(f"Loaded {len(market_tables)} market tables from Excel")
 
-        # Convert timestamp to datetime and round to nearest 15-minute interval
-        df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed')
-        # CRITICAL FIX: Round timestamps to nearest 15-min to avoid misalignment
-        df['timestamp'] = df['timestamp'].dt.round('15min')
+        # Convert wide-format tables to MultiIndex DataFrame
+        # This maintains compatibility with extract_country_data() method
 
-        # Create multi-level structure based on data source
         processed_dfs = []
 
         # Process day-ahead data (15-min intervals)
-        da_data = df[df['source'] == 'day_ahead'].copy()
-        if not da_data.empty:
-            da_pivot = da_data.pivot_table(
-                index='timestamp',
-                columns='country',
-                values='price_eur_mwh',
-                aggfunc='first'
-            )
-            da_pivot.columns = pd.MultiIndex.from_product([da_pivot.columns, ['day_ahead'], ['']])
-            processed_dfs.append(da_pivot)
+        if 'day_ahead' in market_tables:
+            da_df = market_tables['day_ahead'].set_index('timestamp')
+            # Create MultiIndex: (country, 'day_ahead', '')
+            da_multiindex = pd.DataFrame(index=da_df.index)
+            for country in da_df.columns:
+                da_multiindex[(country, 'day_ahead', '')] = da_df[country]
+            da_multiindex.columns = pd.MultiIndex.from_tuples(da_multiindex.columns)
+            processed_dfs.append(da_multiindex)
+            logger.info(f"Processed day-ahead: {len(da_df)} rows, {len(da_df.columns)} countries")
 
-        # Process FCR data (4-hour blocks)
-        fcr_data = df[df['source'] == 'fcr'].copy()
-        if not fcr_data.empty:
-            fcr_pivot = fcr_data.pivot_table(
-                index='timestamp',
-                columns='country',
-                values='price_eur_mw',
-                aggfunc='first'
-            )
-            fcr_pivot.columns = pd.MultiIndex.from_product([fcr_pivot.columns, ['fcr'], ['']])
-            processed_dfs.append(fcr_pivot)
+        # Process FCR data (4-hour blocks -> need to expand to 15-min)
+        if 'fcr' in market_tables:
+            fcr_df = market_tables['fcr'].set_index('timestamp')
+            # Reindex to 15-min and forward fill
+            full_index = market_tables['day_ahead'].set_index('timestamp').index
+            fcr_expanded = fcr_df.reindex(full_index).ffill()
+            # Create MultiIndex: (country, 'fcr', '')
+            fcr_multiindex = pd.DataFrame(index=fcr_expanded.index)
+            for country in fcr_expanded.columns:
+                fcr_multiindex[(country, 'fcr', '')] = fcr_expanded[country]
+            fcr_multiindex.columns = pd.MultiIndex.from_tuples(fcr_multiindex.columns)
+            processed_dfs.append(fcr_multiindex)
+            logger.info(f"Processed FCR: {len(fcr_expanded)} rows, {len(fcr_expanded.columns)} countries")
 
-        # Process aFRR capacity data (4-hour blocks)
-        afrr_data = df[df['source'] == 'afrr'].copy()
-        if not afrr_data.empty:
-            # Pivot for both positive and negative
-            afrr_pos = afrr_data[afrr_data['direction'] == 'positive'].pivot_table(
-                index='timestamp',
-                columns='country',
-                values='price_eur_mw',
-                aggfunc='first'
-            )
-            afrr_neg = afrr_data[afrr_data['direction'] == 'negative'].pivot_table(
-                index='timestamp',
-                columns='country',
-                values='price_eur_mw',
-                aggfunc='first'
-            )
+        # Process aFRR capacity data (4-hour blocks -> need to expand to 15-min)
+        if 'afrr_capacity' in market_tables:
+            afrr_cap_df = market_tables['afrr_capacity'].set_index('timestamp')
+            # Reindex to 15-min and forward fill
+            full_index = market_tables['day_ahead'].set_index('timestamp').index
+            afrr_cap_expanded = afrr_cap_df.reindex(full_index).ffill()
+            # Create MultiIndex: (country, 'afrr', 'positive'/'negative')
+            afrr_cap_multiindex = pd.DataFrame(index=afrr_cap_expanded.index)
+            for col in afrr_cap_expanded.columns:
+                if '_Pos' in col:
+                    country = col.replace('_Pos', '')
+                    afrr_cap_multiindex[(country, 'afrr', 'positive')] = afrr_cap_expanded[col]
+                elif '_Neg' in col:
+                    country = col.replace('_Neg', '')
+                    afrr_cap_multiindex[(country, 'afrr', 'negative')] = afrr_cap_expanded[col]
+            afrr_cap_multiindex.columns = pd.MultiIndex.from_tuples(afrr_cap_multiindex.columns)
+            processed_dfs.append(afrr_cap_multiindex)
+            logger.info(f"Processed aFRR capacity: {len(afrr_cap_expanded)} rows, {len(afrr_cap_multiindex.columns)} price series")
 
-            afrr_pos.columns = pd.MultiIndex.from_product([afrr_pos.columns, ['afrr'], ['positive']])
-            afrr_neg.columns = pd.MultiIndex.from_product([afrr_neg.columns, ['afrr'], ['negative']])
-
-            processed_dfs.extend([afrr_pos, afrr_neg])
-
-        # PHASE II: Load aFRR energy data (15-min intervals)
-        if afrr_energy_file is None:
-            # Default path
-            base_dir = Path(data_file).parent
-            afrr_energy_file = base_dir / 'parquet' / 'afrr_energy.parquet'
-
-        if Path(afrr_energy_file).exists():
-            logger.info(f"Loading aFRR energy data from {afrr_energy_file}")
-            afrr_energy_df = pd.read_parquet(afrr_energy_file)
-            afrr_energy_df['timestamp'] = pd.to_datetime(afrr_energy_df['timestamp'])
-            afrr_energy_df['timestamp'] = afrr_energy_df['timestamp'].dt.round('15min')
-            afrr_energy_df = afrr_energy_df.set_index('timestamp')
-
-            # Restructure to multi-index format
-            # Columns: DE_Pos, DE_Neg, AT_Pos, AT_Neg, CH_Pos, CH_Neg, HU_Pos, HU_Neg, CZ_Pos, CZ_Neg
-            afrr_energy_processed = pd.DataFrame(index=afrr_energy_df.index)
-
+        # Process aFRR energy data (15-min intervals)
+        if 'afrr_energy' in market_tables:
+            afrr_energy_df = market_tables['afrr_energy'].set_index('timestamp')
+            # Create MultiIndex: (country, 'afrr_energy', 'positive'/'negative')
+            afrr_energy_multiindex = pd.DataFrame(index=afrr_energy_df.index)
             for col in afrr_energy_df.columns:
                 if '_Pos' in col:
                     country = col.replace('_Pos', '')
-                    afrr_energy_processed[(country, 'afrr_energy', 'positive')] = afrr_energy_df[col]
+                    afrr_energy_multiindex[(country, 'afrr_energy', 'positive')] = afrr_energy_df[col]
                 elif '_Neg' in col:
                     country = col.replace('_Neg', '')
-                    afrr_energy_processed[(country, 'afrr_energy', 'negative')] = afrr_energy_df[col]
-
-            afrr_energy_processed.columns = pd.MultiIndex.from_tuples(afrr_energy_processed.columns)
-            processed_dfs.append(afrr_energy_processed)
-            logger.info(f"Loaded {len(afrr_energy_df)} aFRR energy price points")
+                    afrr_energy_multiindex[(country, 'afrr_energy', 'negative')] = afrr_energy_df[col]
+            afrr_energy_multiindex.columns = pd.MultiIndex.from_tuples(afrr_energy_multiindex.columns)
+            processed_dfs.append(afrr_energy_multiindex)
+            logger.info(f"Processed aFRR energy: {len(afrr_energy_df)} rows, {len(afrr_energy_multiindex.columns)} price series")
         else:
-            logger.warning(f"aFRR energy file not found at {afrr_energy_file}. Model (i) requires this data!")
+            logger.warning("aFRR energy data not found. Model (i) requires this data!")
 
         # Combine all data
-        if processed_dfs:
-            combined_df = pd.concat(processed_dfs, axis=1)
-        else:
-            raise ValueError("No valid data found in input file")
+        if not processed_dfs:
+            raise ValueError("No valid market data found in workbook")
 
-        # FIXED: Since timestamps are already rounded to 15-min, just ensure complete timeline
-        # Get the full time range from the data
+        combined_df = pd.concat(processed_dfs, axis=1)
+
+        # Verify completeness
         start_time = combined_df.index.min()
         end_time = combined_df.index.max()
-
-        # Create a complete 15-minute frequency index
-        full_index = pd.date_range(start=start_time, end=end_time, freq='15min')
-
-        # Reindex to ensure all 15-min slots are present and forward fill
-        combined_df = combined_df.reindex(full_index).ffill()
-
-        # Verify the fix: ensure timestamps are aligned
-        logger.info(f"Time range: {combined_df.index.min()} to {combined_df.index.max()}")
+        logger.info(f"Time range: {start_time} to {end_time}")
+        logger.info(f"Data points: {len(combined_df)}")
         logger.info(f"Index frequency: {pd.infer_freq(combined_df.index)}")
 
         # Sort by timestamp
@@ -1261,12 +1240,12 @@ class BESSOptimizerModelI:
                 country_df['price_afrr_energy_neg'] = data[(as_country, 'afrr_energy', 'negative')]
                 logger.info(f"aFRR energy market data extracted for {country}")
 
-                # CRITICAL: Preprocess aFRR energy prices (convert 0 → NaN)
+                # CRITICAL: Preprocess aFRR energy prices (convert 0 -> NaN)
                 # Price = 0 means "market not activated", NOT "free energy"
                 # This prevents false arbitrage opportunities
                 country_df['price_afrr_energy_pos'] = country_df['price_afrr_energy_pos'].replace(0, np.nan)
                 country_df['price_afrr_energy_neg'] = country_df['price_afrr_energy_neg'].replace(0, np.nan)
-                logger.info(f"Preprocessed aFRR energy prices: 0 → NaN (prevents false arbitrage)")
+                logger.info(f"Preprocessed aFRR energy prices: 0 -> NaN (prevents false arbitrage)")
 
             except KeyError:
                 logger.warning(f"aFRR energy market data not available for {country}. Setting to NaN (Model (i) will be limited).")
