@@ -54,9 +54,9 @@ def main():
     optimizer = BESSOptimizerModelIII(alpha=config['alpha'])
 
     # Load data
-    print("[2/5] Loading Phase 1 data (CH)...")
-    full_data = optimizer.load_and_preprocess_data('data/archive/phase_1_data_TechArena2025_data_tidy.jsonl')
-    country_data = optimizer.extract_country_data(full_data, config['country'])
+    print(f"[2/5] Loading Phase 2 data ({config['country']})...")
+    from py_script.data.load_process_market_data import load_preprocessed_country_data
+    country_data = load_preprocessed_country_data(config['country'])
 
     # Take 5 days
     num_steps = config['num_days'] * 96  # 96 timesteps per day

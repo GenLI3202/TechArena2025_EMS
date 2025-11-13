@@ -37,8 +37,8 @@ def main():
     horizon_hours = 36
     horizon_steps = horizon_hours * 4  # 15-min intervals
 
-    # Use archived Phase 1 JSONL (optimizer will auto-load Phase 2 parquet for aFRR energy)
-    data_file = "data/archive/phase_1_data_TechArena2025_data_tidy.jsonl"
+    # Use Phase 2 preprocessed data (fast path)
+    from py_script.data.load_process_market_data import load_preprocessed_country_data
 
     # Winter period: Use January data (week 1-2)
     start_step = 0
@@ -73,11 +73,8 @@ def main():
 
     # Load data
     try:
-        print(f"\n[OK] Loading data from: {data_file}")
-        full_data = optimizer.load_and_preprocess_data(data_file)
-
-        print(f"[OK] Extracting data for country: {country}")
-        country_data = optimizer.extract_country_data(full_data, country)
+        print(f"\n[OK] Loading preprocessed data for: {country}")
+        country_data = load_preprocessed_country_data(country)
 
         # Extract winter period (36 hours)
         data_slice = country_data.iloc[start_step:end_step].copy()

@@ -36,8 +36,8 @@ def main():
     optimizer = BESSOptimizerModelIII(alpha=1.0)
 
     # Load same data as MPC
-    full_data = optimizer.load_and_preprocess_data('data/archive/phase_1_data_TechArena2025_data_tidy.jsonl')
-    country_data = optimizer.extract_country_data(full_data, 'CH')
+    from py_script.data.load_process_market_data import load_preprocessed_country_data
+    country_data = load_preprocessed_country_data('CH')
 
     # Take first 32 hours (128 timesteps) - same as MPC first horizon
     horizon_steps = 32 * 4  # 32 hours * 4 intervals/hour

@@ -70,9 +70,8 @@ def main():
     optimizer.max_as_ratio = 0.8
 
     # Load data
-    data_file = "data/archive_p1_3markets/phase_1_data_TechArena2025_data_tidy.jsonl"
-    full_data = optimizer.load_and_preprocess_data(data_file)
-    country_data = optimizer.extract_country_data(full_data, country)
+    from py_script.data.load_process_market_data import load_preprocessed_country_data
+    country_data = load_preprocessed_country_data(country)
     test_data = country_data.iloc[:horizon_steps].copy().reset_index(drop=True)
 
     print(f"  Data loaded: {len(test_data)} timesteps")
