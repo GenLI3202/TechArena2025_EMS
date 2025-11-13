@@ -3,28 +3,174 @@
 **Document Purpose:** Complete reference for understanding how the BESS optimizer processes market data and constructs the optimization model.
 
 **Date:** 2025-11-13
+**Pipeline Version:** Phase 2 Excel-based (Updated)
 **Context:** TechArena 2025 Phase II - BESS Optimization
+
+---
+
+## ⚠️ Important Update
+
+**The data pipeline has been modernized for Phase 2:**
+
+- **✅ NEW (Phase 2)**: Excel-based pipeline with preprocessed fast path
+  - Primary: `data/TechArena2025_Phase2_data.xlsx` (submission path)
+  - Fast path: `data/parquet/preprocessed/{country}.parquet` (validation)
+
+- **❌ DEPRECATED (Phase 1)**: JSONL-based pipeline
+  - Still documented below for reference
+  - Will be removed in future cleanup
+
+**For current Phase 2 implementation, see the [Phase 2 Data Pipeline](#phase-2-data-pipeline-current) section.**
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Data Processing Pipeline](#data-processing-pipeline)
-3. [Current Data Structure](#current-data-structure)
-4. [Complete Model Building Flow](#complete-model-building-flow)
-5. [Key Takeaways](#key-takeaways)
-6. [Common Issues and Solutions](#common-issues-and-solutions)
+1. [Phase 2 Data Pipeline (Current)](#phase-2-data-pipeline-current)
+2. [Phase 1 Pipeline (Legacy - For Reference)](#phase-1-pipeline-legacy)
+3. [Model Building Flow](#model-building-flow)
+4. [Key Takeaways](#key-takeaways)
+5. [Common Issues and Solutions](#common-issues-and-solutions)
 
 ---
 
-## Overview
+## Phase 2 Data Pipeline (Current)
 
-The optimizer (`py_script/core/optimizer.py`) uses a **hybrid legacy architecture** that combines:
-- **Phase 1 data**: JSONL files (DA, FCR, aFRR capacity) in long format
-- **Phase 2 data**: Parquet files (aFRR energy) in wide format
+### Architecture Overview
 
-This document explains the complete data flow from raw files to a solved optimization model.
+The Phase 2 pipeline implements a **dual-path system**:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    PHASE 2 DATA SOURCES                             │
+├────────────────────────────────────────────────────────────────────┤
+│  Primary (Submission):                                             │
+│    data/TechArena2025_Phase2_data.xlsx                            │
+│    └─ All 4 markets in wide format                                │
+│                                                                     │
+│  Preprocessed (Validation Fast Path):                             │
+│    data/parquet/preprocessed/{country}.parquet                    │
+│    └─ Country-specific, all markets combined                      │
+└────────────────────────────────────────────────────────────────────┘
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+         ┌───────▼──────┐         ┌───────▼──────┐
+         │ SUBMISSION   │         │  VALIDATION  │
+         │    PATH      │         │  FAST PATH   │
+         └──────┬───────┘         └───────┬──────┘
+                │                         │
+                │ load_and_                │ load_preprocessed_
+                │ preprocess_data()        │ country_data()
+                │ (~6 seconds)             │ (~0.1 seconds)
+                │                          │
+                └──────────┬───────────────┘
+                           │
+                  ┌────────▼────────┐
+                  │ COUNTRY DATA    │
+                  │ (Ready for      │
+                  │  optimization)  │
+                  └─────────────────┘
+```
+
+### Path 1: Submission Path (Excel → Optimizer)
+
+**Purpose**: Matches Huawei submission requirements
+
+**Code Example**:
+```python
+from py_script.core.optimizer import BESSOptimizerModelIII
+
+optimizer = BESSOptimizerModelIII()
+
+# Load from Excel
+full_data = optimizer.load_and_preprocess_data('data/TechArena2025_Phase2_data.xlsx')
+
+# Extract country-specific data
+country_data = optimizer.extract_country_data(full_data, 'DE_LU')
+```
+
+**Steps**:
+1. **Load Excel** using `load_phase2_market_tables()`:
+   - Parses 4 sheets: Day-ahead, FCR, aFRR capacity, aFRR energy
+   - Returns wide-format DataFrames
+
+2. **Convert to MultiIndex**:
+   - Day-ahead: `(country, 'day_ahead', '')`
+   - FCR: `(country, 'fcr', '')`
+   - aFRR capacity: `(country, 'afrr', 'positive'/'negative')`
+   - aFRR energy: `(country, 'afrr_energy', 'positive'/'negative')`
+
+3. **Extract country data** using `extract_country_data()`:
+   - Handles DE/DE_LU naming (DA uses DE_LU, others use DE)
+   - Forward-fills 4-hour blocks to 15-min intervals
+   - Applies 0→NaN preprocessing for aFRR energy
+   - Adds aFRR activation weights from config
+
+**Performance**: ~6 seconds for full-year data
+
+### Path 2: Validation Fast Path (Preprocessed → Optimizer)
+
+**Purpose**: Rapid validation and testing (10-100x faster)
+
+**Code Example**:
+```python
+from py_script.data.load_process_market_data import load_preprocessed_country_data
+
+# Load preprocessed country data directly
+country_data = load_preprocessed_country_data('DE_LU')
+
+# Use with optimizer
+optimizer = BESSOptimizerModelIII()
+model = optimizer.build_optimization_model(country_data, c_rate=0.5)
+```
+
+**Steps**:
+1. **Direct load** from preprocessed parquet
+2. **No processing needed** - data is ready for optimization
+
+**Performance**: ~0.1 seconds for full-year data
+
+**Preprocessing Script**: `py_script/data/generate_preprocessed_country_data.py`
+
+### Data Processing Details
+
+#### Critical Timestamp Handling
+
+**Issue**: Excel timestamps have fractional seconds (e.g., `2024-01-01 08:00:00.001`)
+**Solution**: Round all timestamps to nearest second before reindexing
+
+```python
+# In _extract_country_from_wide_tables()
+timestamps = pd.to_datetime(market_tables['day_ahead']['timestamp']).dt.round('s')
+fcr_df['timestamp'] = pd.to_datetime(fcr_df['timestamp']).dt.round('s')
+```
+
+This ensures proper alignment when forward-filling 4-hour block prices to 15-min intervals.
+
+#### Germany Country Code Mapping
+
+```python
+if country == 'DE_LU':
+    day_ahead_country = 'DE_LU'  # Coupled German-Luxembourg market
+    as_country = 'DE'            # Ancillary services (German TSO)
+else:
+    day_ahead_country = country
+    as_country = country
+```
+
+#### aFRR Energy Preprocessing
+
+**Critical**: Convert price=0 to NaN (0 means "not activated", not "free energy")
+
+```python
+country_df['price_afrr_energy_pos'] = country_df['price_afrr_energy_pos'].replace(0, np.nan)
+country_df['price_afrr_energy_neg'] = country_df['price_afrr_energy_neg'].replace(0, np.nan)
+```
+
+---
+
+## Phase 1 Pipeline (Legacy)
 
 ---
 

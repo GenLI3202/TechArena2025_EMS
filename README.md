@@ -212,10 +212,13 @@ TechArena2025_EMS/
 - **Clean architecture:** Decoupled solving and result extraction
 
 ### Data Processing
-- Automated loading from Excel/JSONL formats
-- Wide-to-tidy data transformation
-- Comprehensive data validation
-- Missing data detection and handling
+- **Dual-path data loading** for Phase 2:
+  - **Submission path**: Excel workbook (`TechArena2025_Phase2_data.xlsx`)
+  - **Validation fast path**: Preprocessed country parquets (10-100x faster)
+- Automated timestamp alignment and forward-filling
+- Critical aFRR energy preprocessing (0→NaN conversion)
+- Germany DE/DE_LU market naming handled automatically
+- Comprehensive data validation and missing data detection
 
 ### Investment Analysis
 - 10-year DCF modeling with **battery capacity degradation effects**
