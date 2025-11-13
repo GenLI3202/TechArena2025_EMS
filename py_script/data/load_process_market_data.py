@@ -168,29 +168,6 @@ def _load_csv(csv_path: Path, *, value_name: str) -> pd.DataFrame:
     return df
 
 
-def load_data(jsonl_path: str) -> list:
-    """Load market data from JSONL file.
-    
-    Args:
-        jsonl_path: Path to the JSONL file containing market data
-        
-    Returns:
-        List of dictionaries containing market data records
-    """
-    import json
-    
-    data = []
-    with open(jsonl_path, 'r') as f:
-        for line in f:
-            try:
-                record = json.loads(line.strip())
-                data.append(record)
-            except json.JSONDecodeError:
-                continue  # Skip malformed lines
-    
-    return data
-
-
 
 # ===========================================================================
 # PHASE 2 EXTENSIONS
@@ -240,7 +217,7 @@ def load_phase2_market_tables(workbook_path: Path, *, prefer_csv: bool = False) 
     afrr_energy (NEW):
         Columns: [timestamp, DE_Pos, DE_Neg, AT_Pos, AT_Neg, ...]
     """
-    from data.exceptions import DataLoadingError
+    from py_script.data.exceptions import DataLoadingError
     import logging
 
     logger = logging.getLogger(__name__)
@@ -702,6 +679,247 @@ def convert_afrr_energy_zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
         
     return df_processed
 
+
+# ===========================================================================
+# COUNTRY DATA PREPROCESSING (Phase 2 Pipeline Enhancement)
+# ===========================================================================
+
+def _extract_country_from_wide_tables(
+    market_tables: Dict[str, pd.DataFrame],
+    country: str,
+    afrr_ev_weights_config: Optional[Dict] = None
+) -> pd.DataFrame:
+    """Extract country-specific data from wide-format market tables.
+
+    This function mimics optimizer.extract_country_data() but works directly
+    with wide-format tables without requiring MultiIndex conversion.
+
+    Args:
+        market_tables: Dict from load_phase2_market_tables() with keys:
+                      'day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy'
+        country: Country code (DE_LU, AT, CH, HU, CZ)
+        afrr_ev_weights_config: Optional config dict for aFRR activation weights
+
+    Returns:
+        DataFrame with columns matching optimizer.extract_country_data() output:
+        - price_day_ahead, price_fcr, price_afrr_pos, price_afrr_neg
+        - price_afrr_energy_pos, price_afrr_energy_neg (with 0→NaN preprocessing)
+        - w_afrr_pos, w_afrr_neg (activation weights)
+        - hour, day_of_year, month, year, block_of_day, block_id, day_id, timestamp
+    """
+    import numpy as np
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"Extracting data for country: {country}")
+
+    # Handle Germany special case
+    if country == 'DE_LU':
+        day_ahead_country = 'DE_LU'  # Coupled market
+        as_country = 'DE'  # Ancillary services
+    else:
+        day_ahead_country = country
+        as_country = country
+
+    # Get timestamps from day-ahead (15-min intervals)
+    if 'day_ahead' not in market_tables:
+        raise ValueError("day_ahead market data not found")
+
+    # Round timestamps to nearest second to avoid floating-point alignment issues
+    timestamps = pd.to_datetime(market_tables['day_ahead'][TIMESTAMP_COL]).dt.round('s')
+
+    # Initialize output DataFrame
+    country_df = pd.DataFrame()
+
+    # Extract day-ahead prices
+    try:
+        country_df['price_day_ahead'] = market_tables['day_ahead'][day_ahead_country].values
+    except KeyError:
+        raise ValueError(f"Day-ahead data not found for {day_ahead_country}")
+
+    # Extract FCR prices (need to forward-fill from 4-hour blocks to 15-min)
+    try:
+        fcr_df = market_tables['fcr'].copy()
+        # Round timestamps for alignment
+        fcr_df[TIMESTAMP_COL] = pd.to_datetime(fcr_df[TIMESTAMP_COL]).dt.round('s')
+        fcr_df = fcr_df.set_index(TIMESTAMP_COL)
+        # Reindex to 15-min and forward fill
+        fcr_reindexed = fcr_df.reindex(timestamps).ffill()
+        country_df['price_fcr'] = fcr_reindexed[as_country].values
+    except KeyError:
+        raise ValueError(f"FCR data not found for {as_country}")
+
+    # Extract aFRR capacity prices (need to forward-fill from 4-hour blocks to 15-min)
+    try:
+        afrr_cap_df = market_tables['afrr_capacity'].copy()
+        # Round timestamps for alignment
+        afrr_cap_df[TIMESTAMP_COL] = pd.to_datetime(afrr_cap_df[TIMESTAMP_COL]).dt.round('s')
+        afrr_cap_df = afrr_cap_df.set_index(TIMESTAMP_COL)
+        afrr_cap_reindexed = afrr_cap_df.reindex(timestamps).ffill()
+        country_df['price_afrr_pos'] = afrr_cap_reindexed[f'{as_country}_Pos'].values
+        country_df['price_afrr_neg'] = afrr_cap_reindexed[f'{as_country}_Neg'].values
+    except KeyError as e:
+        raise ValueError(f"aFRR capacity data not found for {as_country}: {e}")
+
+    # Extract aFRR energy prices (15-min intervals) with CRITICAL 0→NaN preprocessing
+    try:
+        afrr_energy_df = market_tables['afrr_energy']
+        country_df['price_afrr_energy_pos'] = afrr_energy_df[f'{as_country}_Pos'].values
+        country_df['price_afrr_energy_neg'] = afrr_energy_df[f'{as_country}_Neg'].values
+
+        # CRITICAL: Convert 0 -> NaN (0 means "not activated", not "free energy")
+        country_df['price_afrr_energy_pos'] = country_df['price_afrr_energy_pos'].replace(0, np.nan)
+        country_df['price_afrr_energy_neg'] = country_df['price_afrr_energy_neg'].replace(0, np.nan)
+        logger.info(f"Preprocessed aFRR energy prices: 0 -> NaN (prevents false arbitrage)")
+
+    except KeyError:
+        logger.warning(f"aFRR energy data not available for {as_country}. Setting to NaN.")
+        country_df['price_afrr_energy_pos'] = np.nan
+        country_df['price_afrr_energy_neg'] = np.nan
+
+    # Add aFRR activation weights
+    if afrr_ev_weights_config:
+        # Use historical_activation by default (matches optimizer.py behavior)
+        config_section = afrr_ev_weights_config.get('historical_activation', afrr_ev_weights_config)
+
+        # Check for country-specific values
+        if 'country_specific' in config_section and as_country in config_section['country_specific']:
+            w_pos = config_section['country_specific'][as_country]['positive']
+            w_neg = config_section['country_specific'][as_country]['negative']
+            logger.info(f"Using country-specific activation rates for {as_country}: pos={w_pos:.2f}, neg={w_neg:.2f}")
+        else:
+            # Use default values if available
+            default_section = config_section.get('default_values', {'positive': 1.0, 'negative': 1.0})
+            w_pos = default_section['positive']
+            w_neg = default_section['negative']
+            logger.info(f"Using default activation rates for {as_country}: pos={w_pos:.2f}, neg={w_neg:.2f}")
+
+        country_df['w_afrr_pos'] = w_pos
+        country_df['w_afrr_neg'] = w_neg
+    else:
+        # No EV weighting: set weights to 1.0
+        country_df['w_afrr_pos'] = 1.0
+        country_df['w_afrr_neg'] = 1.0
+        logger.info(f"EV weighting not configured: using w=1.0 (deterministic)")
+
+    # Create time-based identifiers
+    country_df['hour'] = timestamps.dt.hour
+    country_df['day_of_year'] = timestamps.dt.dayofyear
+    country_df['month'] = timestamps.dt.month
+    country_df['year'] = timestamps.dt.year
+
+    # Create block IDs (4-hour blocks starting at midnight)
+    country_df['block_of_day'] = country_df['hour'] // 4
+    country_df['block_id'] = (country_df['day_of_year'] - 1) * 6 + country_df['block_of_day']
+
+    # Create day IDs
+    country_df['day_id'] = country_df['day_of_year']
+
+    # Keep timestamp as a column
+    country_df['timestamp'] = timestamps.values
+
+    # Reset index
+    country_df = country_df.reset_index(drop=True)
+
+    logger.info(f"Extracted {len(country_df)} data points for {country}")
+    return country_df
+
+
+def save_preprocessed_country_data(
+    market_tables: Dict[str, pd.DataFrame],
+    output_dir: Path = Path("data/parquet/preprocessed"),
+    afrr_ev_weights_config_path: Optional[Path] = None
+) -> None:
+    """Extract and save each country's preprocessed data.
+
+    This generates validation-ready country-specific parquet files that can be
+    loaded directly without Excel parsing or MultiIndex conversion.
+
+    Args:
+        market_tables: Dict from load_phase2_market_tables()
+        output_dir: Output directory for preprocessed files
+        afrr_ev_weights_config_path: Optional path to aFRR EV weights config JSON
+    """
+    import logging
+    import json
+
+    logger = logging.getLogger(__name__)
+
+    # Load aFRR EV weights config if provided
+    afrr_ev_config = None
+    if afrr_ev_weights_config_path and afrr_ev_weights_config_path.exists():
+        with open(afrr_ev_weights_config_path, 'r') as f:
+            afrr_ev_config = json.load(f)
+        logger.info(f"Loaded aFRR EV weights from {afrr_ev_weights_config_path}")
+
+    # Create output directory
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Output directory: {output_dir}")
+
+    # Process each country
+    countries = ['DE_LU', 'AT', 'CH', 'HU', 'CZ']
+    for country in countries:
+        logger.info(f"\nProcessing {country}...")
+
+        try:
+            # Extract country data
+            country_df = _extract_country_from_wide_tables(
+                market_tables,
+                country,
+                afrr_ev_config
+            )
+
+            # Save to parquet
+            output_path = output_dir / f"{country.lower()}.parquet"
+            country_df.to_parquet(output_path, index=False)
+            logger.info(f"[OK] Saved {country}: {output_path} ({len(country_df)} rows)")
+
+        except Exception as e:
+            logger.error(f"[FAIL] Failed to process {country}: {e}")
+            continue
+
+    logger.info(f"\n[OK] Preprocessing complete. Files saved to {output_dir}")
+
+
+def load_preprocessed_country_data(
+    country: str,
+    data_dir: Path = Path("data/parquet/preprocessed")
+) -> pd.DataFrame:
+    """Load pre-processed country data for validation testing.
+
+    This is a fast path that bypasses:
+    - Excel workbook loading
+    - Wide-format to MultiIndex conversion
+    - Country-specific extraction
+
+    Use this for rapid validation testing only.
+    For submission, use optimizer.load_and_preprocess_data().
+
+    Args:
+        country: Country code (DE_LU, AT, CH, HU, CZ)
+        data_dir: Directory containing preprocessed parquet files
+
+    Returns:
+        DataFrame ready for optimizer.build_optimization_model()
+
+    Raises:
+        FileNotFoundError: If preprocessed file doesn't exist
+    """
+    country_file = Path(data_dir) / f"{country.lower()}.parquet"
+
+    if not country_file.exists():
+        raise FileNotFoundError(
+            f"Preprocessed data not found: {country_file}\n"
+            f"Run save_preprocessed_country_data() first to generate preprocessed files."
+        )
+
+    return pd.read_parquet(country_file)
+
+
+# ===========================================================================
+# DATA VALIDATION
+# ===========================================================================
 
 def validate_phase2_data(tables: Dict[str, pd.DataFrame]) -> Dict[str, any]:
     """Comprehensive Phase 2 data quality validation.
