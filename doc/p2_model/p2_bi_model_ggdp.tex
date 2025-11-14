@@ -101,6 +101,7 @@ $c^{\mathrm{cost}}_{j}$ & \textbf{(New)} Marginal cyclic degradation cost for se
 $SOC^{\mathrm{point}}_i$ & \textbf{(New)} SOC breakpoint $i$ for calendar cost & kWh \\
 $Cost^{\mathrm{point}}_i$ & \textbf{(New)} Calendar degradation cost at breakpoint $i$ & EUR/hr \\
 $\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
+$\epsilon$ & \textbf{(New)} LIFO tolerance parameter (1-5 kWh typical) & kWh \\
 \bottomrule
 \end{tabular}
 
@@ -125,6 +126,7 @@ $y_{\mathrm{ch}}(t), y_{\mathrm{dis}}(t)$ & DA bid binaries & Binary \\
 $y_{fcr}(b), y^{\mathrm{pos}}_{aFRR}(b), ...$ & Ancillary service bid binaries & Binary \\
 $y^{\mathrm{pos}}_{aFRR,E}(t), ...$ & \textbf{(New)} aFRR-E bid binaries & Binary \\
 $y^{\mathrm{total}}_{\mathrm{ch}}(t), y^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total operation binaries & Binary \\
+$z^{\text{active}}_{j}(t)$ & \textbf{(New)} Segment activation binary (1 if segment $j$ has energy) & Binary \\
 \bottomrule
 \end{tabular}
 
@@ -333,10 +335,19 @@ Based on the methodology from Xu et al. (2017), we model cyclic aging as a \text
     \item \textbf{Logic:} The marginal cost $c^{\mathrm{cost}}_{j}$ increases as $j$ increases (deeper discharge), e.g., $c_1 < c_2 < ... < c_J$. The optimizer will naturally prefer to discharge from the "cheapest" (shallowest) available segment first, perfectly modeling the non-linear cost of deep discharges in a linear framework.
 \end{itemize}
 
-Additionally, to enforce the physical stack-like behavior of the segments, a simple monotonic ordering constraint is added. This ensures that a deeper segment (e.g., $j+1$) can only hold energy if the shallower segment above it ($j$) is full. This is a linear, non-binary alternative to the complex cascading constraints discussed in Section 4.8.
+Additionally, to enforce a strict 'Last-In, First-Out' (LIFO) behavior, a \textbf{fullness prerequisite constraint} is implemented using binary variables. This is a critical component that ensures the segments operate like a physical stack of tanks. The simple monotonic ordering ($e_{\mathrm{soc},j} \ge e_{\mathrm{soc},j+1}$) is insufficient as it allows segments to fill or empty simultaneously.
+
+The implemented constraint uses a binary variable $z^{\text{active}}_j(t) \in \{0,1\}$ to indicate whether segment $j$ is active (can hold energy). The constraint enforces that segment $j$ can only be active if segment $j-1$ is completely full (within tolerance $\epsilon$):
+
 \begin{align}
-    e_{\mathrm{soc},j}(t) &\ge e_{\mathrm{soc},j+1}(t) & \forall t, \forall j \in \{1, ..., J-1\}
+    e_{\mathrm{soc},j}(t) &\le E^{\mathrm{seg}}_{j} \cdot z^{\text{active}}_j(t) && \forall t, \forall j \label{eq:seg_activation} \\
+    e_{\mathrm{soc},j-1}(t) &\ge (E^{\mathrm{seg}}_{j-1} - \epsilon) \cdot z^{\text{active}}_j(t) && \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness}
 \end{align}
+
+Equation \eqref{eq:seg_activation} links the binary variable to the segment's SOC: if $z^{\text{active}}_j = 0$, then $e_{\mathrm{soc},j} = 0$.
+Equation \eqref{eq:lifo_fullness} is the core LIFO constraint: if segment $j$ is active ($z^{\text{active}}_j = 1$), then segment $j-1$ must be full ($e_{\mathrm{soc},j-1} \ge E^{\mathrm{seg}}_{j-1} - \epsilon$).
+
+The tolerance $\epsilon$ (typically 1-5 kWh, $\approx$ 0.2-1\% of segment capacity) provides numerical stability while maintaining LIFO behavior. This effectively creates the cascading behavior where segment $j$ begins to fill only after $j-1$ is full, and segment $j-1$ begins to empty only after $j$ is empty. This is crucial for the accuracy of the cyclic degradation cost, which depends on which segment is being cycled.
 
 \subsubsection{Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
 The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
@@ -486,13 +497,14 @@ C^{\mathrm{cal}} &= \sum_{t \in T} c^{\mathrm{cal}}_{\mathrm{cost}}(t) \cdot \De
 \subsection{Constraints}
 
 \subsubsection{Degradation-Aware SOC Dynamics (Replaces Cst-1)}
+The single SOC variable is replaced by segment-level variables. The total power and energy are now aggregations of their segment-level counterparts, enforced via explicit equality constraints.
 \begin{align}
-e_{\mathrm{soc},j}(t) &= e_{\mathrm{soc},j}(t-1) + \left( p^{\mathrm{ch}}_{j}(t) \eta_{\mathrm{ch}} - \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \right) \Delta t & \forall t, \forall j \\
-e_{\mathrm{soc}}(t) &= \sum_{j \in J} e_{\mathrm{soc},j}(t) & \forall t \\
-p^{\mathrm{total}}_{\mathrm{ch}}(t) &= \sum_{j \in J} p^{\mathrm{ch}}_{j}(t) & \forall t \\
-p^{\mathrm{total}}_{\mathrm{dis}}(t) &= \sum_{j \in J} p^{\mathrm{dis}}_{j}(t) & \forall t \\
-p^{\mathrm{total}}_{\mathrm{ch}}(t) &= p_{\mathrm{ch}}(t) + p^{\mathrm{neg}}_{aFRR,E}(t) & \forall t \\
-p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{aFRR,E}(t) & \forall t
+e_{\mathrm{soc},j}(t) &= e_{\mathrm{soc},j}(t-1) + \left( p^{\mathrm{ch}}_{j}(t) \eta_{\mathrm{ch}} - \frac{p^{\mathrm{dis}}_{j}(t)}{\eta_{\mathrm{dis}}} \right) \Delta t & \forall t, \forall j \label{eq:seg_soc_balance}\\
+e_{\mathrm{soc}}(t) &= \sum_{j \in J} e_{\mathrm{soc},j}(t) & \forall t \label{eq:total_soc_agg}\\
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &= \sum_{j \in J} p^{\mathrm{ch}}_{j}(t) & \forall t \label{eq:total_ch_agg_seg}\\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &= \sum_{j \in J} p^{\mathrm{dis}}_{j}(t) & \forall t \label{eq:total_dis_agg_seg}\\
+p^{\mathrm{total}}_{\mathrm{ch}}(t) &= p_{\mathrm{ch}}(t) + p^{\mathrm{neg}}_{aFRR,E}(t) & \forall t \label{eq:total_ch_agg_market}\\
+p^{\mathrm{total}}_{\mathrm{dis}}(t) &= p_{\mathrm{dis}}(t) + p^{\mathrm{pos}}_{aFRR,E}(t) & \forall t \label{eq:total_dis_agg_market}
 \end{align}
 
 \subsubsection{SOC \& Segment Limits (Replaces Cst-2)}
@@ -560,59 +572,45 @@ To prevent the model from reserving 100\% of its power rating for ancillary serv
 \end{align}
 
 
-\subsection{Validation Needed: Explicit Cascading Constraints (Physical Rule)}
-\textbf{NOTICE: THIS SECTION IS CURRENTLY STRONGLY DIS-ENCOURAGED FOR IMPLEMENTATION DUE TO INCREASED MODEL COMPLEXITY. IT IS PROVIDED HERE FOR COMPLETENESS AND FUTURE REFERENCE.}
-To eliminate any ambiguity from the economic incentive model, we can introduce a set of explicit physical constraints to strictly enforce the 'Last-In, First-Out' (LIFO) behavior of the battery segments. While this approach increases model complexity, it ensures that the model's behavior aligns perfectly with physical reality under all conditions. This requires introducing two new sets of binary decision variables.
+\subsection{Implemented LIFO Logic: Binary Segment Activation}
+To guarantee strict LIFO behavior and prevent solver numerical issues with the purely economic-driven model, a set of binary activation constraints are implemented. This approach is more robust than relying solely on cost incentives. It explicitly controls which segment is active for charging or discharging.
 
-\subsubsection{New Binary Variables for Cascading Logic}
+\subsubsection{Binary Variables for Segment Activation}
 \begin{tabular}{@{}lll}
 \toprule
 Symbol & Description & Type \\
 \midrule
-$u^{\text{empty}}_{j}(t)$ & \textbf{(New)} 1 if segment $j$ is empty 
-   at time $t$, 0 otherwise & Binary \\
-$u^{\text{full}}_{j}(t)$  & \textbf{(New)} 1 if segment $j$ is full at
-   time $t$, 0 otherwise & Binary \\
+$z^{\text{active}}_{j}(t)$ & 1 if segment $j$ is active (can hold energy) at time $t$ & Binary \\
 \bottomrule
 \end{tabular}
 
-\vspace{1em} % Add some vertical space
-We also introduce a new parameter $M$, which is a sufficiently large constant (typically set to $P^{\mathrm{config}}_{\max}$), for use in the "Big-M" constraints.
+\subsubsection{Core LIFO Constraints}
 
-\subsubsection{New Constraints}
-
-\paragraph{1. Linking Constraints for Binary Variables}
-First, we must link the new binary variables to the segment's state f
-   charge, $e_{\mathrm{soc},j}(t)$.
-
-If a segment's energy $e_{\mathrm{soc},j}(t)$ is 0, then $u^{\text{empty}}_{j}(t)$ must be 1:
+\paragraph{1. Segment Activation and SOC (Always Enforced)}
+This constraint links the binary variable to the segment's state of charge. If a segment $j$ has any energy, its corresponding binary $z^{\text{active}}_{j}(t)$ must be 1.
 \begin{equation}
-    e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} \cdot (1 - u^{\text{empty}}_j(t)) \qquad \forall t, \forall j
+    e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \label{eq:seg_activation_impl}
 \end{equation}
-\textit{(If $u^{\text{empty}}$ is 1, the right-hand side becomes 0, forcing $e_{\mathrm{soc},j}$ to be 0.)}
 
-\vspace{1em}
-If a segment's energy $e_{\mathrm{soc},j}(t)$ reaches its capacity $E^{\mathrm{seg}}_{j}$, then $u^{\text{full}}_{j}(t)$ must be 1:
+\paragraph{2. LIFO Fullness Prerequisite (Always Enforced)}
+The core of the LIFO logic. It enforces that a segment $j$ can only hold energy if the segment above it, $j-1$, is completely full (within a small tolerance $\epsilon$).
 \begin{equation}
-    e_{\mathrm{soc},j}(t) \ge E^{\mathrm{seg}}_{j} \cdot u^{\text{full}}_j(t) \qquad \forall t, \forall j
+    e_{\mathrm{soc},j-1}(t) \ge (E^{\mathrm{seg}}_{j-1} - \epsilon) \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness_impl}
 \end{equation}
-\textit{(Only when $e_{\mathrm{soc},j}$ is full (equal to $E^{\mathrm{seg}}_{j}$) can $u^{\text{full}}_j$ be 1.)}
+This constraint links the activation of segment $j$ to the fullness of segment $j-1$. Combined with Equation \eqref{eq:seg_activation_impl}, this ensures proper LIFO stacking behavior.
 
-\paragraph{2. Cascading Discharge Constraint}
-This constraint dictates that: \textit{discharging from segment $j$ is only permitted if the adjacent shallower segment $j-1$ is empty.}
+\subsubsection{Optional Power Flow Constraints (Performance Tuning)}
 
-\begin{equation}
-p^{\mathrm{dis}}_{j}(t) \le M \cdot u^{\text{empty}}_{j-1}(t)    \qquad \forall t, \forall j > 1
-\end{equation}
-\textit{(This means: power $p^{\mathrm{dis}}_{j}$ can only be drawn  
-      from segment $j$ if segment $j-1$ is empty ($u^{\text{empty}}_{j-1}=1$).)}
+The following constraints can be optionally enabled via the \texttt{enforce\_segment\_binary} parameter. They provide stricter enforcement but add $2 \times T \times J$ constraints, which can slow solve time by 5-10x. In practice, Equations \eqref{eq:seg_activation_impl} and \eqref{eq:lifo_fullness_impl} are sufficient to enforce LIFO behavior.
 
-\paragraph{3. Cascading Charge Constraint}
-This constraint dictates that: \textit{charging into segment $j$ is only permitted if the adjacent deeper segment $j+1$ is full.}
-\begin{equation}
-p^{\mathrm{ch}}_{j}(t) \le M \cdot u^{\text{full}}_{j+1}(t) \qquad \forall t, \forall j < J
-\end{equation}
-\textit{(This means: power $p^{\mathrm{ch}}_{j}$ can only be sent to segment $j$ if segment $j+1$ is full ($u^{\text{full}}_{j+1}=1$).)}
+\paragraph{3. Segment Charge/Discharge Activation (Optional)}
+These constraints ensure that power can only flow into or out of a segment if it is active:
+\begin{align}
+    p^{\mathrm{ch}}_{j}(t) &\le P^{\mathrm{config}}_{\max} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \label{eq:seg_ch_act}\\
+    p^{\mathrm{dis}}_{j}(t) &\le P^{\mathrm{config}}_{\max} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \label{eq:seg_dis_act}
+\end{align}
+
+\textbf{Implementation Note:} Set \texttt{enforce\_segment\_binary = False} (default) to disable Equations \eqref{eq:seg_ch_act} and \eqref{eq:seg_dis_act} for faster solve times. The LIFO behavior is maintained through Equations \eqref{eq:seg_activation_impl} and \eqref{eq:lifo_fullness_impl}.
 
 
 

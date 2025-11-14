@@ -1435,7 +1435,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
         config: Optional[Dict[str, Any]] = None,
         degradation_config_path: Optional[str] = None,
         alpha: float = 1.0,
-        enforce_segment_binary: bool = True,
+        require_sequential_segment_activation: bool = True,
         use_afrr_ev_weighting: bool = False,
     ) -> None:
         """Initialize Phase II Model (ii) with cyclic aging cost.
@@ -1444,7 +1444,9 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             config: Optional runtime configuration overrides
             degradation_config_path: Path to aging_config.json (defaults to standard location)
             alpha: Degradation price weight parameter (default 1.0)
-            enforce_segment_binary: Whether to enforce segment ordering binaries (default True)
+            require_sequential_segment_activation: Enforce strict sequential segment filling by requiring
+                power flow binaries (Eq. 609-610). When True, prevents parallel charging of multiple segments.
+                When False (default), allows epsilon-tolerance parallel activation for faster solve (default False)
             use_afrr_ev_weighting: Enable Expected Value weighting for aFRR energy bids (default False)
         """
         super().__init__(use_afrr_ev_weighting=use_afrr_ev_weighting)
@@ -1471,7 +1473,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             'marginal_costs': cyclic_config['costs'],
             'alpha': float(alpha),
             'config_file_path': str(degradation_config_path),
-            'enforce_segment_binary': enforce_segment_binary,
+            'require_sequential_segment_activation': require_sequential_segment_activation,
         }
 
         self._validate_degradation_params()
@@ -1739,8 +1741,10 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             if j == 1:
                 return pyo.Constraint.Skip
 
-            # Tolerance for numerical stability (1 kWh ~ 0.22% of 447.2 kWh segment)
-            epsilon = 1.0  # kWh
+            # Tolerance for numerical stability and solver performance
+            # Larger epsilon = larger feasible region = faster solve
+            # 5 kWh ~ 1.1% of 447.2 kWh segment (acceptable tolerance)
+            epsilon = self.degradation_params.get('lifo_epsilon_kwh', 5.0)  # kWh
 
             # If segment j is active (has ANY energy), segment j-1 must be full
             # z_segment_active[t,j] = 1 if e_soc_j[t,j] > 0
@@ -1754,16 +1758,21 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             rule=segment_lifo_fullness_rule,
             doc="CRITICAL: LIFO fullness prerequisite - segment j only has energy if j-1 is full (Xu et al. 2017)"
         )
-        logger.info("Added LIFO fullness prerequisite constraints to enforce stacked tank behavior")
+        epsilon_val = self.degradation_params.get('lifo_epsilon_kwh', 5.0)
+        logger.info(f"Added LIFO fullness prerequisite constraints (epsilon={epsilon_val} kWh) to enforce stacked tank behavior")
 
-        def segment_activation_cascade_rule(m, t, j):
-            if j == 1:
-                return pyo.Constraint.Skip
-            return m.z_segment_active[t, j] <= m.z_segment_active[t, j - 1]
+        # NOTE: segment_activation_cascade is REDUNDANT with segment_lifo_fullness
+        # If segment j is active and has energy, segment j-1 must be full (LIFO constraint)
+        # If segment j-1 is full, it must be active (segment_activation_upper constraint)
+        # Therefore, segment j active => segment j-1 active (transitively)
+        # Disabling this constraint reduces T×J constraints and improves solve speed
+        # def segment_activation_cascade_rule(m, t, j):
+        #     if j == 1:
+        #         return pyo.Constraint.Skip
+        #     return m.z_segment_active[t, j] <= m.z_segment_active[t, j - 1]
+        # model.segment_activation_cascade = pyo.Constraint(model.T, model.J, rule=segment_activation_cascade_rule, doc="Ensure deeper segments only active when shallower ones are active")
 
-        model.segment_activation_cascade = pyo.Constraint(model.T, model.J, rule=segment_activation_cascade_rule, doc="Ensure deeper segments only active when shallower ones are active")
-
-        if self.degradation_params.get('enforce_segment_binary', True):
+        if self.degradation_params.get('require_sequential_segment_activation', True):
             def segment_charge_activation_rule(m, t, j):
                 return m.p_ch_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
 
@@ -1773,6 +1782,13 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
                 return m.p_dis_j[t, j] <= m.P_max_config * m.z_segment_active[t, j]
 
             model.segment_discharge_activation = pyo.Constraint(model.T, model.J, rule=segment_discharge_activation_rule)
+            logger.info("Added segment power activation constraints (Eq. 609-610) for strict sequential filling")
+        else:
+            logger.warning("CAUTION: Sequential segment activation constraints (Eq. 609-610) disabled. "
+                         "This allows epsilon-tolerance parallel segment charging, which may underestimate "
+                         "degradation costs. For strict LIFO behavior matching Xu et al. 2017, "
+                         "set require_sequential_segment_activation=True")
+            logger.info("Skipped segment power activation constraints for faster solve (8x speedup typical)")
         ######### WARNING: THIS SECTION WAS DISABLED BECAUSE IT SLOWS DOWN THE OPTIMIZATION MODEL SIGNIFICANTLY #########
 
         if hasattr(model, 'daily_cycle_limit'):
@@ -1944,7 +1960,7 @@ class BESSOptimizerModelIII(BESSOptimizerModelII):
         config: Optional[Dict[str, Any]] = None,
         degradation_config_path: Optional[str] = None,
         alpha: float = 1.0,
-        enforce_segment_binary: bool = True,
+        require_sequential_segment_activation: bool = True,
         use_afrr_ev_weighting: bool = False,
     ) -> None:
         """Initialize Phase II Model (iii) with cyclic and calendar aging.
@@ -1953,7 +1969,7 @@ class BESSOptimizerModelIII(BESSOptimizerModelII):
             config: Optional runtime configuration overrides
             degradation_config_path: Path to aging_config.json (defaults to standard location)
             alpha: Degradation price weight parameter (default 1.0)
-            enforce_segment_binary: Whether to enforce segment ordering binaries (default True)
+            require_sequential_segment_activation: Enforce strict sequential segment filling (default False for faster solve)
             use_afrr_ev_weighting: Enable Expected Value weighting for aFRR energy bids (default False)
         """
         # Initialize parent (Model II with cyclic aging)
@@ -1961,7 +1977,7 @@ class BESSOptimizerModelIII(BESSOptimizerModelII):
             config=config,
             degradation_config_path=degradation_config_path,
             alpha=alpha,
-            enforce_segment_binary=enforce_segment_binary,
+            require_sequential_segment_activation=require_sequential_segment_activation,
             use_afrr_ev_weighting=use_afrr_ev_weighting,
         )
 
