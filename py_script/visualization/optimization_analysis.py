@@ -2079,3 +2079,242 @@ def plot_comprehensive_strategy_analysis(
     
 #     return fig
 
+
+# ---------------------------------------------------------------------------
+# Segment LIFO Analysis and Visualization
+# ---------------------------------------------------------------------------
+
+
+def detect_parallel_segment_operations(
+    solution_df: pd.DataFrame,
+    epsilon: float = 0.1
+) -> tuple[list[dict], list[dict]]:
+    """
+    Detect parallel charging and discharging violations in segmented SOC model.
+
+    In a proper LIFO (Last-In-First-Out) battery model, only one segment should
+    be actively charging or discharging at any given time. This function detects
+    violations where multiple segments change energy simultaneously.
+
+    Parameters
+    ----------
+    solution_df : pd.DataFrame
+        Solution DataFrame with segment_1...segment_10 columns
+    epsilon : float, default=0.1
+        Tolerance for detecting energy changes (kWh). Changes smaller than
+        this are ignored to avoid numerical noise.
+
+    Returns
+    -------
+    tuple[list[dict], list[dict]]
+        - parallel_charging_events: List of dictionaries with violation details
+        - parallel_discharging_events: List of dictionaries with violation details
+
+    Examples
+    --------
+    >>> parallel_ch, parallel_dis = detect_parallel_segment_operations(df)
+    >>> print(f"Found {len(parallel_ch)} parallel charging violations")
+    >>> for event in parallel_ch:
+    ...     print(f"Hour {event['hour']}: Segments {event['segments']}")
+
+    See Also
+    --------
+    plot_segment_lifo_analysis : Main visualization function
+    """
+    segment_cols = [f'segment_{i}' for i in range(1, 11)]
+
+    parallel_charging = []
+    parallel_discharging = []
+
+    for t in range(1, len(solution_df)):
+        # Calculate deltas
+        deltas = {}
+        for i, col in enumerate(segment_cols):
+            delta = solution_df[col].iloc[t] - solution_df[col].iloc[t-1]
+            if abs(delta) > epsilon:
+                deltas[i+1] = delta  # 1-indexed segment number
+
+        # Find charging segments
+        charging = {seg: d for seg, d in deltas.items() if d > epsilon}
+        if len(charging) > 1:
+            parallel_charging.append({
+                'timestep': t,
+                'hour': solution_df['hour'].iloc[t],
+                'segments': list(charging.keys()),
+                'deltas': list(charging.values()),
+                'soc': solution_df['soc_kwh'].iloc[t]
+            })
+
+        # Find discharging segments
+        discharging = {seg: abs(d) for seg, d in deltas.items() if d < -epsilon}
+        if len(discharging) > 1:
+            parallel_discharging.append({
+                'timestep': t,
+                'hour': solution_df['hour'].iloc[t],
+                'segments': list(discharging.keys()),
+                'deltas': list(discharging.values()),
+                'soc': solution_df['soc_kwh'].iloc[t]
+            })
+
+    return parallel_charging, parallel_discharging
+
+
+def plot_segment_lifo_analysis(
+    solution_df: pd.DataFrame,
+    show_violations: bool = True,
+    plot_style: str = 'stacked',
+    epsilon: float = 0.1,
+    width: int = 1400,
+    height: int = 1200,
+    title_suffix: str = ''
+) -> go.Figure:
+    """
+    Create comprehensive LIFO (Last-In-First-Out) analysis visualization for battery segments.
+
+    This function generates a 4-panel visualization to analyze and validate LIFO behavior
+    in segmented battery SOC models. The visualization is critical for detecting violations
+    of the LIFO constraint, where multiple segments receive/release energy simultaneously.
+
+    Parameters
+    ----------
+    solution_df : pd.DataFrame
+        Solution DataFrame with segment_1...segment_10 columns
+    show_violations : bool, default=True
+        Highlight parallel charging/discharging events
+    plot_style : {'stacked', 'individual'}, default='stacked'
+        Plot style for segment energy
+    epsilon : float, default=0.1
+        Tolerance for violation detection (kWh)
+    width : int, default=1400
+        Plot width in pixels
+    height : int, default=1200
+        Plot height in pixels
+    title_suffix : str, default=''
+        Additional text for plot title
+
+    Returns
+    -------
+    go.Figure
+        Plotly Figure with 4 subplots
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> df = pd.read_csv("solution_timeseries.csv")
+    >>> fig = plot_segment_lifo_analysis(df, title_suffix="CH 24h")
+    >>> fig.write_html("segment_analysis.html")
+    """
+    from plotly.subplots import make_subplots
+
+    segment_cols = [f'segment_{i}' for i in range(1, 11)]
+    E_seg = 447.2  # Segment capacity in kWh
+
+    # Detect violations
+    if show_violations:
+        parallel_ch, parallel_dis = detect_parallel_segment_operations(solution_df, epsilon)
+    else:
+        parallel_ch, parallel_dis = [], []
+
+    # Create subplots
+    fig = make_subplots(
+        rows=4, cols=1,
+        subplot_titles=(
+            f'Segment Energy ({plot_style.capitalize()})',
+            'Energy Deltas (Δ per timestep)',
+            'Total SOC',
+            'Power Flows'
+        ),
+        specs=[[{}], [{}], [{}], [{}]],
+        vertical_spacing=0.08,
+        row_heights=[0.35, 0.25, 0.2, 0.2]
+    )
+
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+              '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+
+    # Panel 1: Segment Energy
+    if plot_style == 'stacked':
+        for i, col in enumerate(segment_cols):
+            fig.add_trace(
+                go.Scatter(x=solution_df['hour'], y=solution_df[col],
+                          name=f'Seg {i+1}', mode='lines', stackgroup='segments',
+                          fillcolor=colors[i], line=dict(width=0.5, color=colors[i])),
+                row=1, col=1
+            )
+    else:
+        for i, col in enumerate(segment_cols):
+            fig.add_trace(
+                go.Scatter(x=solution_df['hour'], y=solution_df[col],
+                          name=f'Seg {i+1}', mode='lines',
+                          line=dict(width=2, color=colors[i])),
+                row=1, col=1
+            )
+        fig.add_hline(y=E_seg, line_dash="dash", line_color="gray", opacity=0.5, row=1, col=1)
+
+    # Panel 2: Deltas
+    for i, col in enumerate(segment_cols):
+        delta = solution_df[col].diff().fillna(0)
+        fig.add_trace(
+            go.Scatter(x=solution_df['hour'], y=delta, name=f'Δ{i+1}',
+                      mode='markers', marker=dict(size=4, color=colors[i]),
+                      showlegend=False),
+            row=2, col=1
+        )
+
+    fig.add_hline(y=0, line_color="black", opacity=0.3, row=2, col=1)
+
+    if show_violations and parallel_ch:
+        fig.add_trace(
+            go.Scatter(x=[v['hour'] for v in parallel_ch], y=[0]*len(parallel_ch),
+                      mode='markers', marker=dict(symbol='x', size=12, color='red'),
+                      name='Parallel Ch', showlegend=True),
+            row=2, col=1
+        )
+
+    # Panel 3: SOC
+    fig.add_trace(
+        go.Scatter(x=solution_df['hour'], y=solution_df['soc_kwh'],
+                  name='SOC', mode='lines', line=dict(width=3, color='black'),
+                  fill='tozeroy'),
+        row=3, col=1
+    )
+    fig.add_hline(y=4472, line_dash="dash", line_color="gray", opacity=0.5, row=3, col=1)
+
+    # Panel 4: Power
+    fig.add_trace(
+        go.Scatter(x=solution_df['hour'], y=solution_df['p_total_ch_kw'],
+                  name='Charge', mode='lines', line=dict(width=2, color='green'),
+                  fill='tozeroy'),
+        row=4, col=1
+    )
+    fig.add_trace(
+        go.Scatter(x=solution_df['hour'], y=-solution_df['p_total_dis_kw'],
+                  name='Discharge', mode='lines', line=dict(width=2, color='red'),
+                  fill='tozeroy'),
+        row=4, col=1
+    )
+    fig.add_hline(y=0, line_color="black", opacity=0.3, row=4, col=1)
+
+    # Layout
+    title_text = "Segment LIFO Analysis"
+    if title_suffix:
+        title_text += f" - {title_suffix}"
+    if show_violations:
+        if parallel_ch or parallel_dis:
+            title_text += f" [{len(parallel_ch)} Violations]"
+        else:
+            title_text += " [OK]"
+
+    fig.update_layout(
+        height=height, width=width, title_text=title_text,
+        showlegend=True, hovermode='x unified',
+        legend=dict(x=1.05, y=0.99, xanchor='left', yanchor='top')
+    )
+
+    fig.update_xaxes(title_text="Hour", row=4, col=1)
+    fig.update_yaxes(title_text="Energy (kWh)", row=1, col=1)
+    fig.update_yaxes(title_text="ΔE (kWh)", row=2, col=1)
+    fig.update_yaxes(title_text="SOC (kWh)", row=3, col=1)
+    fig.update_yaxes(title_text="Power (kW)", row=4, col=1)
+
+    return fig

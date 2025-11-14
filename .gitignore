@@ -82,6 +82,8 @@ validation_*.log
 # Result directories (reorganized structure)
 validation_results/
 
+# Coding Agents' config
+.claude\settings.local.json
 
 # Script-generated progress files
 **/progress.json

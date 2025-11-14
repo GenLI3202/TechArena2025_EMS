@@ -101,7 +101,6 @@ $c^{\mathrm{cost}}_{j}$ & \textbf{(New)} Marginal cyclic degradation cost for se
 $SOC^{\mathrm{point}}_i$ & \textbf{(New)} SOC breakpoint $i$ for calendar cost & kWh \\
 $Cost^{\mathrm{point}}_i$ & \textbf{(New)} Calendar degradation cost at breakpoint $i$ & EUR/hr \\
 $\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
-$\epsilon$ & \textbf{(New)} LIFO tolerance parameter (1-5 kWh typical) & kWh \\
 \bottomrule
 \end{tabular}
 
@@ -337,17 +336,17 @@ Based on the methodology from Xu et al. (2017), we model cyclic aging as a \text
 
 Additionally, to enforce a strict 'Last-In, First-Out' (LIFO) behavior, a \textbf{fullness prerequisite constraint} is implemented using binary variables. This is a critical component that ensures the segments operate like a physical stack of tanks. The simple monotonic ordering ($e_{\mathrm{soc},j} \ge e_{\mathrm{soc},j+1}$) is insufficient as it allows segments to fill or empty simultaneously.
 
-The implemented constraint uses a binary variable $z^{\text{active}}_j(t) \in \{0,1\}$ to indicate whether segment $j$ is active (can hold energy). The constraint enforces that segment $j$ can only be active if segment $j-1$ is completely full (within tolerance $\epsilon$):
+The implemented constraint uses a binary variable $z^{\text{active}}_j(t) \in \{0,1\}$ to indicate whether segment $j$ is active (can hold energy). The constraint enforces that segment $j$ can only be active if segment $j-1$ is completely full:
 
 \begin{align}
     e_{\mathrm{soc},j}(t) &\le E^{\mathrm{seg}}_{j} \cdot z^{\text{active}}_j(t) && \forall t, \forall j \label{eq:seg_activation} \\
-    e_{\mathrm{soc},j-1}(t) &\ge (E^{\mathrm{seg}}_{j-1} - \epsilon) \cdot z^{\text{active}}_j(t) && \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness}
+    e_{\mathrm{soc},j-1}(t) &\ge E^{\mathrm{seg}}_{j-1} \cdot z^{\text{active}}_j(t) && \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness}
 \end{align}
 
 Equation \eqref{eq:seg_activation} links the binary variable to the segment's SOC: if $z^{\text{active}}_j = 0$, then $e_{\mathrm{soc},j} = 0$.
-Equation \eqref{eq:lifo_fullness} is the core LIFO constraint: if segment $j$ is active ($z^{\text{active}}_j = 1$), then segment $j-1$ must be full ($e_{\mathrm{soc},j-1} \ge E^{\mathrm{seg}}_{j-1} - \epsilon$).
+Equation \eqref{eq:lifo_fullness} is the core LIFO constraint: if segment $j$ is active ($z^{\text{active}}_j = 1$), then segment $j-1$ must be exactly full ($e_{\mathrm{soc},j-1} \ge E^{\mathrm{seg}}_{j-1}$).
 
-The tolerance $\epsilon$ (typically 1-5 kWh, $\approx$ 0.2-1\% of segment capacity) provides numerical stability while maintaining LIFO behavior. This effectively creates the cascading behavior where segment $j$ begins to fill only after $j-1$ is full, and segment $j-1$ begins to empty only after $j$ is empty. This is crucial for the accuracy of the cyclic degradation cost, which depends on which segment is being cycled.
+This effectively creates the cascading behavior where segment $j$ begins to fill only after $j-1$ is full, and segment $j-1$ begins to empty only after $j$ is empty. This is crucial for the accuracy of the cyclic degradation cost, which depends on which segment is being cycled.
 
 \subsubsection{Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
 The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
@@ -593,9 +592,9 @@ This constraint links the binary variable to the segment's state of charge. If a
 \end{equation}
 
 \paragraph{2. LIFO Fullness Prerequisite (Always Enforced)}
-The core of the LIFO logic. It enforces that a segment $j$ can only hold energy if the segment above it, $j-1$, is completely full (within a small tolerance $\epsilon$).
+The core of the LIFO logic. It enforces that a segment $j$ can only hold energy if the segment above it, $j-1$, is completely full.
 \begin{equation}
-    e_{\mathrm{soc},j-1}(t) \ge (E^{\mathrm{seg}}_{j-1} - \epsilon) \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness_impl}
+    e_{\mathrm{soc},j-1}(t) \ge E^{\mathrm{seg}}_{j-1} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness_impl}
 \end{equation}
 This constraint links the activation of segment $j$ to the fullness of segment $j-1$. Combined with Equation \eqref{eq:seg_activation_impl}, this ensures proper LIFO stacking behavior.
 

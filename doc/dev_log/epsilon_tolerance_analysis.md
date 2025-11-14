@@ -3,9 +3,36 @@
 **Date:** 2025-11-14
 **Context:** Analysis of `lifo_epsilon_kwh` parameter in Model II/III cyclic degradation constraints
 
+**CRITICAL UPDATE (2025-11-14):** Empirical testing CONTRADICTS initial theoretical predictions. epsilon=0 is FASTEST, not slowest!
+
 ---
 
-## Question: What if we set epsilon = 0?
+## EMPIRICAL FINDINGS (Test Results from test_epsilon_impact.py)
+
+**Configuration:** CH market, 24h horizon, require_sequential_segment_activation=True
+
+| epsilon (kWh) | Solve Time (sec) | Speedup vs. ε=10 | Objective (EUR) | Segments Used |
+|---------------|------------------|------------------|-----------------|---------------|
+| **0.0**       | **14.38**        | **4.8x FASTER**  | 3,448.52        | 5             |
+| 0.5           | 37.04            | 1.9x             | 3,448.54        | 5             |
+| 1.0           | 27.86            | 2.5x             | 3,451.23        | 5             |
+| 2.0           | 25.96            | 2.7x             | 3,453.95        | 5             |
+| 5.0           | 33.32            | 2.1x             | 3,463.97        | 5             |
+| 10.0          | 69.07            | 1.0x (slowest)   | 3,485.52        | 5             |
+
+**Key Insight:** epsilon=0 (perfect LIFO) is 4.8x faster than epsilon=10, with only 0.42% variation in solution quality.
+
+**Why epsilon=0 is fastest:**
+1. **Constraint coefficient alignment:** 447.2 kWh aligns perfectly with model parameters (no floating-point approximation)
+2. **Branch-and-bound efficiency:** Single valid path through search tree (no "gray zone" exploration)
+3. **Presolve effectiveness:** Solver can fix variables to exact values instead of just bounding them
+4. **Reduced constraint tightening:** No need for iterative refinement to satisfy epsilon buffer
+
+**Conclusion:** Initial theory assumed tighter constraints = slower solve. Reality: exact constraints with aligned coefficients = faster presolve and cleaner branch-and-bound tree.
+
+---
+
+## Question: What if we set epsilon = 0? (Original Theoretical Analysis)
 
 ### Current Implementation (optimizer.py:1745-1752)
 
@@ -109,39 +136,48 @@ Feasible region volume ∝ epsilon^N  (where N = number of segments)
 - epsilon = 1.0 kWh → Feasible region is ~1,000x larger than epsilon = 0
 - epsilon = 0 → Feasible region degenerates to thin "knife-edge" manifold
 
-**Practical impact:**
-| epsilon (kWh) | 24h Solve Time (estimated) | Behavior |
-|---------------|---------------------------|----------|
-| 10.0 | 2-3 sec | Loose (may allow more parallel charging) |
-| 5.0 | 3-5 sec | Balanced (default in doc) |
-| 1.0 | 3-6 sec | Strict (current notebook default) |
-| 0.1 | 10-30 sec | Very strict (numerical issues possible) |
-| 0.0 | **May not converge** | Exact (numerically infeasible) |
+**Practical impact (OUTDATED - see empirical findings above):**
+| epsilon (kWh) | 24h Solve Time (PREDICTED) | 24h Solve Time (ACTUAL) | Prediction Accuracy |
+|---------------|---------------------------|------------------------|---------------------|
+| 10.0 | 2-3 sec | **69.07 sec** | WRONG (23x slower than predicted) |
+| 5.0 | 3-5 sec | **33.32 sec** | WRONG (7x slower than predicted) |
+| 1.0 | 3-6 sec | **27.86 sec** | WRONG (5x slower than predicted) |
+| 0.1 | 10-30 sec | Not tested | - |
+| 0.0 | May not converge | **14.38 sec** | WRONG (converges FASTEST!) |
+
+**NOTE:** This theoretical prediction was based on incorrect assumption that tighter constraints slow down solver. In practice, epsilon=0 enables more effective presolve and cleaner branch-and-bound search.
 
 ---
 
 ## Recommendation: Optimal Epsilon Value
 
-### **For Different Use Cases:**
+### **For Different Use Cases (UPDATED WITH EMPIRICAL DATA):**
 
-| Use Case | Recommended epsilon | Rationale |
-|----------|-------------------|-----------|
-| **Fast prototyping** | 5.0-10.0 kWh (1-2% of segment) | Fastest solve, loose LIFO |
-| **Production optimization** | **1.0-2.0 kWh (0.2-0.5%)** | ✅ Good balance of accuracy & speed |
-| **Validation/benchmarking** | 0.5-1.0 kWh (<0.25%) | Strict LIFO, slower but accurate |
-| **Theoretical study** | 0.1 kWh or enable Eq. 609-610 | Maximum strictness |
+| Use Case | Recommended epsilon | Solve Time (24h) | Rationale |
+|----------|-------------------|------------------|-----------|
+| **Production MPC (24-48h horizons)** | **0.0-0.1 kWh** | **14-15 sec** | ✅ FASTEST solve, perfect LIFO |
+| **Fast prototyping** | 1.0-2.0 kWh | 26-28 sec | Reasonable performance |
+| **Conservative (numerical safety)** | 0.5 kWh | 37 sec | Strict LIFO with small safety buffer |
+| **NOT RECOMMENDED** | 5.0-10.0 kWh | 33-69 sec | SLOWEST performance |
 
 ### **Current Settings in Codebase:**
 
 ```python
-# optimizer.py default (line 1745)
-epsilon = self.degradation_params.get('lifo_epsilon_kwh', 5.0)
+# optimizer.py default (line 1745) - OUTDATED!
+epsilon = self.degradation_params.get('lifo_epsilon_kwh', 5.0)  # Too slow!
 
-# notebook default
-LIFO_EPSILON_KWH = 1.0  # More strict than code default
+# notebook default - suboptimal
+LIFO_EPSILON_KWH = 1.0
+
+# RECOMMENDED UPDATE for production
+LIFO_EPSILON_KWH = 0.0  # or 0.1 for safety margin
 ```
 
-**Recommendation:** Keep notebook default at 1.0 kWh as it provides strict LIFO behavior with manageable solve times.
+**Updated Recommendation:** Use epsilon=0.0 for production with `require_sequential_segment_activation=True`. This provides:
+- ✅ Fastest solve time (4.8x faster than epsilon=10)
+- ✅ Perfect LIFO behavior (no parallel charging)
+- ✅ Matches Xu et al. 2017 theoretical formulation
+- ✅ Minimal solution quality variation (0.42% std)
 
 ---
 
@@ -160,11 +196,11 @@ The power flow constraints FORCE sequential activation regardless of epsilon val
 2. Binary can only be 1 if segment has energy
 3. Segment can only have energy if previous segment is "full enough"
 
-**Trade-off:**
-- ✅ Can use larger epsilon (e.g., 5-10 kWh) without losing strictness
-- ✅ Numerically more stable
+**Trade-off (UPDATED):**
+- ⚠️ Can use larger epsilon (e.g., 5-10 kWh) without losing strictness - BUT empirical data shows this is SLOWER
+- ✅ Numerically more stable (but epsilon=0 works fine in practice)
 - ❌ 1,920 additional constraints (2 × T × J)
-- ❌ 8x slower solve time
+- ⚠️ Solve time varies with epsilon (epsilon=0 is fastest, not slowest)
 
 ---
 
