@@ -1710,6 +1710,16 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
 
         model.stacked_tank_ordering = pyo.Constraint(model.T, model.J, rule=stacked_tank_rule, doc="Monotonic SOC ordering across segments")
 
+        ######### CRITICAL: Binary variables must be defined BEFORE constraints that reference them #########
+        # Define segment activation binary variable (required for LIFO constraint below)
+        model.z_segment_active = pyo.Var(model.T, model.J, domain=pyo.Binary, doc="Segment activation binary: 1 if segment j has energy, 0 otherwise")
+
+        # Link binary variable to segment SOC (z=1 if segment has energy, z=0 if empty)
+        def segment_activation_upper_rule(m, t, j):
+            return m.e_soc_j[t, j] <= m.E_seg[j] * m.z_segment_active[t, j]
+
+        model.segment_activation_upper = pyo.Constraint(model.T, model.J, rule=segment_activation_upper_rule, doc="Binary activation: segment j can only have energy if z=1")
+
         # CRITICAL FIX: Add LIFO fullness prerequisite constraint (Xu et al. 2017, Theorem 1)
         # This enforces that segment j can only have energy if segment j-1 is FULL
         def segment_lifo_fullness_rule(m, t, j):
@@ -1733,13 +1743,10 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             epsilon = 1.0  # kWh
 
             # If segment j is active (has ANY energy), segment j-1 must be full
-            # Using existing z_segment_active binary (defined below):
             # z_segment_active[t,j] = 1 if e_soc_j[t,j] > 0
-            # Therefore: e_soc_j[t, j-1] >= (E_seg[j-1] - epsilon) * z_segment_active[t,j]
-            #
             # This is a big-M constraint where:
             # - If z_segment_active[t,j] = 1 (segment j has energy), then e_soc_j[t,j-1] >= E_seg[j-1] - epsilon (j-1 is full)
-            # - If z_segment_active[t,j] = 0 (segment j is empty), constraint is trivially satisfied
+            # - If z_segment_active[t,j] = 0 (segment j is empty), constraint is trivially satisfied (RHS = 0)
             return m.e_soc_j[t, j-1] >= (m.E_seg[j-1] - epsilon) * m.z_segment_active[t, j]
 
         model.segment_lifo_fullness = pyo.Constraint(
@@ -1748,15 +1755,6 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             doc="CRITICAL: LIFO fullness prerequisite - segment j only has energy if j-1 is full (Xu et al. 2017)"
         )
         logger.info("Added LIFO fullness prerequisite constraints to enforce stacked tank behavior")
-
-        ######### WARNING: THIS SECTION WAS DISABLED BECAUSE IT SLOWS DOWN THE OPTIMIZATION MODEL SIGNIFICANTLY #########
-        ######### IT CAN BE RE-ENABLED IF STRICT SEGMENT ORDERING IS REQUIRED, BUT STRONGLY DISCOURAGED #########
-        model.z_segment_active = pyo.Var(model.T, model.J, domain=pyo.Binary, doc="Segment activation binary")
-
-        def segment_activation_upper_rule(m, t, j):
-            return m.e_soc_j[t, j] <= m.E_seg[j] * m.z_segment_active[t, j]
-
-        model.segment_activation_upper = pyo.Constraint(model.T, model.J, rule=segment_activation_upper_rule)
 
         def segment_activation_cascade_rule(m, t, j):
             if j == 1:
