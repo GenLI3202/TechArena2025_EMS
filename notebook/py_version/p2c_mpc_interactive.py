@@ -159,6 +159,10 @@ MAX_ITERATIONS = mpc_test_config['mpc_execution']['max_iterations']
 # Optimizer configuration (applies to single-alpha mode only)
 ENABLE_CROSS_MARKET_EXCLUSIVITY = True  # Set to False to disable Cst-8 (reduces constraints)
 MAX_AS_RATIO = 0.8                      # Max ancillary service ratio (80%)
+
+# Checkpoint configuration (for long-running simulations)
+ENABLE_CHECKPOINTING = True             # Enable automatic checkpoint saving
+CHECKPOINT_INTERVAL_MINUTES = 30        # Save checkpoint every N minutes
 # Note: For meta-optimizer mode, modify MetaOptimizer class to accept these parameters
 
 # Visualization settings
@@ -189,9 +193,12 @@ print(f"  Initial SOC:        {INITIAL_SOC_FRACTION * 100:.0f}%")
 print(f"  Max Iterations:     {MAX_ITERATIONS if MAX_ITERATIONS else 'Full duration'}")
 print()
 print("Optimizer Settings:")
-print(f"  Solver:             {DEFAULT_SOLVER.upper()}")
+print(f"  Solver:             {DEFAULT_SOLVER.UPPER()}")
 print(f"  Max AS Ratio:       {MAX_AS_RATIO * 100:.0f}%")
 print(f"  Cross-Market Exclusivity (Cst-8): {ENABLE_CROSS_MARKET_EXCLUSIVITY}")
+print(f"  Checkpointing:      {'Enabled' if ENABLE_CHECKPOINTING else 'Disabled'}")
+if ENABLE_CHECKPOINTING:
+    print(f"    Interval:         {CHECKPOINT_INTERVAL_MINUTES} minutes")
 print()
 print("Alpha Settings:")
 if ALPHA_MODE == 'single':
@@ -446,11 +453,23 @@ else:
             solver_name=DEFAULT_SOLVER
         )
 
-        # Run simulation
-        mpc_results = simulator.run_full_simulation(
-            initial_soc_fraction=INITIAL_SOC_FRACTION,
-            max_iterations=MAX_ITERATIONS
-        )
+        # Run simulation with optional checkpoint saving
+        if ENABLE_CHECKPOINTING:
+            checkpoint_path = project_root / "mpc_checkpoint_backup.pkl"
+            print(f"   Checkpointing enabled: every {CHECKPOINT_INTERVAL_MINUTES} minutes")
+            print(f"   Checkpoint file: {checkpoint_path}")
+            mpc_results = simulator.run_full_simulation(
+                initial_soc_fraction=INITIAL_SOC_FRACTION,
+                max_iterations=MAX_ITERATIONS,
+                checkpoint_interval_minutes=CHECKPOINT_INTERVAL_MINUTES,
+                checkpoint_path=str(checkpoint_path)
+            )
+        else:
+            print("   Checkpointing disabled")
+            mpc_results = simulator.run_full_simulation(
+                initial_soc_fraction=INITIAL_SOC_FRACTION,
+                max_iterations=MAX_ITERATIONS
+            )
 
         print(f"\n[OK] MPC Simulation Complete!")
 

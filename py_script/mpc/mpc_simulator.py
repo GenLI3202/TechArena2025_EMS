@@ -269,7 +269,9 @@ class MPCSimulator:
     def run_full_simulation(
         self,
         initial_soc_fraction: float = 0.5,
-        max_iterations: Optional[int] = None
+        max_iterations: Optional[int] = None,
+        checkpoint_interval_minutes: Optional[float] = None,
+        checkpoint_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """Execute full-year rolling horizon simulation.
 
@@ -278,6 +280,8 @@ class MPCSimulator:
         Args:
             initial_soc_fraction: Initial state of charge (fraction of capacity, default 0.5)
             max_iterations: Maximum iterations (for testing, None = full year)
+            checkpoint_interval_minutes: Save checkpoint every N minutes (None = no checkpointing)
+            checkpoint_path: Path to save checkpoint file (default: './mpc_checkpoint.pkl')
 
         Returns:
             Dictionary with annual results:
@@ -313,6 +317,18 @@ class MPCSimulator:
         # CRITICAL: Bid aggregation for annual DataFrame (for submission)
         all_bids_list = []  # List of dicts for each timestep
         all_soc_15min = []  # SOC at every 15-min interval
+
+        # Checkpoint settings
+        if checkpoint_interval_minutes is not None:
+            import pickle
+            checkpoint_path = checkpoint_path or './mpc_checkpoint.pkl'
+            last_checkpoint_time = datetime.now()
+            checkpoint_interval_seconds = checkpoint_interval_minutes * 60
+            logger.info("Checkpointing enabled: every %.1f minutes to %s",
+                       checkpoint_interval_minutes, checkpoint_path)
+        else:
+            checkpoint_path = None
+            logger.info("Checkpointing disabled")
 
         # MPC loop
         iteration = 0
@@ -512,6 +528,39 @@ class MPCSimulator:
             logger.info("  Final SOC: %.2f kWh (%.1f%%)",
                        current_total_soc,
                        100 * current_total_soc / self.battery_params['capacity_kwh'])
+
+            # Checkpoint saving (if enabled)
+            if checkpoint_interval_minutes is not None:
+                current_time = datetime.now()
+                elapsed_since_checkpoint = (current_time - last_checkpoint_time).total_seconds()
+
+                if elapsed_since_checkpoint >= checkpoint_interval_seconds:
+                    logger.info("  [CHECKPOINT] Saving intermediate results (%.1f min since last save)...",
+                               elapsed_since_checkpoint / 60)
+
+                    # Build checkpoint data
+                    checkpoint_data = {
+                        'iteration': iteration,
+                        'current_total_soc': current_total_soc,
+                        'iteration_results': iteration_results.copy(),
+                        'all_soc_trajectory': all_soc_trajectory.copy(),
+                        'all_bids_list': all_bids_list.copy(),
+                        'all_soc_15min': all_soc_15min.copy(),
+                        'total_da_revenue': total_da_revenue,
+                        'total_afrr_e_revenue': total_afrr_e_revenue,
+                        'total_as_revenue': total_as_revenue,
+                        'total_cyclic_cost': total_cyclic_cost,
+                        'total_calendar_cost': total_calendar_cost,
+                        'timestamp': current_time.isoformat(),
+                    }
+
+                    # Save checkpoint
+                    import pickle
+                    with open(checkpoint_path, 'wb') as f:
+                        pickle.dump(checkpoint_data, f)
+
+                    last_checkpoint_time = current_time
+                    logger.info("  [CHECKPOINT] Saved at iteration %d", iteration)
 
         # Calculate final results
         total_revenue = total_da_revenue + total_afrr_e_revenue + total_as_revenue
