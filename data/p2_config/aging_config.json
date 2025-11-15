@@ -39,7 +39,7 @@
     "description": "Alpha parameter sweep configuration for meta-optimization"
   },
   "REQUIRE_SEQUENTIAL_SEGMENT_ACTIVATION": false,
-  "lifo_epsilon_kwh": 5.0,
+  "lifo_epsilon_kwh": 0.0,
   "optimization_notes": {
     "require_sequential_segment_activation": "Setting to false disables charge/discharge activation binaries to improve solve speed",
     "lifo_epsilon_kwh": "Tolerance for LIFO fullness constraint. Larger value = faster solve (larger feasible region). 5 kWh = ~1.1% of segment capacity",
