@@ -131,22 +131,23 @@ CONFIGURATION NOTES:
 """
 
 # Test scenario configuration
-TEST_COUNTRY = "CH"                 # Options: DE_LU, AT, CH, HU, CZ
+TEST_COUNTRY = "DE_LU"                 # Options: DE_LU, AT, CH, HU, CZ
 TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
 TEST_TIME_HORIZON_HOURS = 24        # Time horizon in hours (24h feasible with 6-segment config)
-TEST_START_STEP = int(96*1)         # Starting time step (96 = 1 day in 15-min intervals)
+TEST_START_STEP = int(96*15)         # Starting time step (96 = 1 day in 15-min intervals)
 TEST_MODEL = "III"                  # Options: "I", "II", "III"
-USE_EV_WEIGHTING = False            # Enable aFRR EV weighting
+USE_EV_WEIGHTING = True            # Enable aFRR EV weighting
 MAX_AS_RATIO = 0.8                  # Max ancillary service ratio (80%)
+ENABLE_CROSS_MARKET_EXCLUSIVITY = True # Disable to reduce complexity (Cst-8)
 
 # Use defaults from aging_config.json (can override below if needed)
-LIFO_EPSILON_KWH = DEFAULT_LIFO_EPSILON          # From config (current: 0.5 kWh)
-REQUIRE_SEQUENTIAL = DEFAULT_REQUIRE_SEQUENTIAL  # From config (current: True)
+# LIFO_EPSILON_KWH = DEFAULT_LIFO_EPSILON          # From config (current: 0.5 kWh)
+# REQUIRE_SEQUENTIAL = DEFAULT_REQUIRE_SEQUENTIAL  # From config (current: True)
 
 # To override config defaults, uncomment and modify:
-# LIFO_EPSILON_KWH = 1.0              # Override: more relaxed LIFO (faster solve)
-# REQUIRE_SEQUENTIAL = False          # Override: disable sequential activation (much faster, but less accurate)
+LIFO_EPSILON_KWH = 0              # Override: more relaxed LIFO (faster solve)
+REQUIRE_SEQUENTIAL = False          # Override: disable sequential activation (much faster, but less accurate)
 
 # Battery SOC limits
 MAX_SOC = 0.9                       # Max state of charge
@@ -176,7 +177,7 @@ print("=" * 80)
 # ============================================================================
 # LOAD MARKET DATA
 # ============================================================================
-
+ 
 print("\n[DATA] Loading market data...")
 
 preprocessed_dir = project_root / "data" / "parquet" / "preprocessed"
@@ -194,6 +195,30 @@ print(f"[OK] Extracted {len(data_slice)} time steps ({TEST_TIME_HORIZON_HOURS} h
 print(f"\nData shape: {data_slice.shape}")
 print(f"Columns: {list(data_slice.columns)}")
 
+# Verify/Add aFRR EV weights
+if USE_EV_WEIGHTING:
+    if 'w_afrr_pos' not in data_slice.columns or 'w_afrr_neg' not in data_slice.columns:
+        print(f"\n[WARNING] EV weights not in data. Adding from config...")
+        # Get weights from config (use historical_activation section)
+        ev_config_section = afrr_ev_config.get('historical_activation', afrr_ev_config)
+
+        # Country-specific or default weights
+        country_key = TEST_COUNTRY.replace('_', '-').upper()
+        w_pos = ev_config_section.get(f'{country_key}_pos', ev_config_section.get('default_pos', 0.15))
+        w_neg = ev_config_section.get(f'{country_key}_neg', ev_config_section.get('default_neg', 0.08))
+  
+        data_slice['w_afrr_pos'] = w_pos
+        data_slice['w_afrr_neg'] = w_neg
+        print(f"[OK] Added EV weights: w_pos={w_pos:.3f}, w_neg={w_neg:.3f}")
+    else:
+        print(f"[OK] EV weights found: w_pos={data_slice['w_afrr_pos'].iloc[0]:.3f}, w_neg={data_slice['w_afrr_neg'].iloc[0]:.3f}")
+else:
+    # Ensure weights are 1.0 for deterministic mode
+    data_slice['w_afrr_pos'] = 1.0
+    data_slice['w_afrr_neg'] = 1.0
+    print(f"[INFO] EV weighting disabled: using w=1.0 (deterministic)")
+    
+
 # %%
 # ============================================================================
 # INITIALIZE OPTIMIZER
@@ -210,6 +235,8 @@ elif TEST_MODEL == "II":
         use_afrr_ev_weighting=USE_EV_WEIGHTING
     )
     optimizer.degradation_params['lifo_epsilon_kwh'] = LIFO_EPSILON_KWH
+    # CRITICAL: Explicitly set sequential activation parameter
+    optimizer.degradation_params['require_sequential_segment_activation'] = REQUIRE_SEQUENTIAL
 elif TEST_MODEL == "III":
     optimizer = BESSOptimizerModelIII(
         alpha=TEST_ALPHA,
@@ -217,15 +244,29 @@ elif TEST_MODEL == "III":
         use_afrr_ev_weighting=USE_EV_WEIGHTING
     )
     optimizer.degradation_params['lifo_epsilon_kwh'] = LIFO_EPSILON_KWH
+    # CRITICAL: Explicitly set sequential activation parameter
+    optimizer.degradation_params['require_sequential_segment_activation'] = REQUIRE_SEQUENTIAL
 
 # Configure optimizer
 optimizer.max_as_ratio = MAX_AS_RATIO
 optimizer.battery_params['soc_min'] = MIN_SOC
 optimizer.battery_params['soc_max'] = MAX_SOC
 
+# Configure cross-market exclusivity (Cst-8)
+if hasattr(optimizer, 'market_params'):
+    optimizer.market_params['enable_cross_market_exclusivity'] = ENABLE_CROSS_MARKET_EXCLUSIVITY
+else:
+    # Fallback: set as attribute directly
+    optimizer.enable_cross_market_exclusivity = ENABLE_CROSS_MARKET_EXCLUSIVITY
+
 print(f"[OK] Initialized Model {TEST_MODEL}")
 print(f"Battery Capacity: {optimizer.battery_params['capacity_kwh']} kWh")
 print(f"Max AS Ratio: {MAX_AS_RATIO * 100:.0f}%")
+print(f"Cross-Market Exclusivity (Cst-8): {ENABLE_CROSS_MARKET_EXCLUSIVITY}")
+print(f"\n[DEGRADATION] Model Configuration:")
+print(f"  Segments: {len(optimizer.degradation_params.get('marginal_costs', []))}")
+print(f"  LIFO Epsilon: {optimizer.degradation_params.get('lifo_epsilon_kwh', 'N/A')} kWh")
+print(f"  Sequential Activation: {optimizer.degradation_params.get('require_sequential_segment_activation', 'N/A')}")
 
 # %%
 # ============================================================================
@@ -247,11 +288,11 @@ print(f"Constraints: {model.nconstraints()}")
 # SOLVE OPTIMIZATION MODEL
 # ============================================================================
 
-print("\n[SOLVE] Solving optimization model...")
+print(f"\n[SOLVE] Solving optimization model with {DEFAULT_SOLVER.upper()}...")
 print("This may take a few minutes...")
 
 solve_start = time.time()
-solved_model, solver_results = optimizer.solve_model(model)
+solved_model, solver_results = optimizer.solve_model(model, solver_name=DEFAULT_SOLVER)
 solve_time = time.time() - solve_start
 
 print(f"[OK] Model solved in {solve_time:.2f} seconds")

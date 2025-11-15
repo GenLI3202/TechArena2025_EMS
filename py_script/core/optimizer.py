@@ -765,6 +765,17 @@ class BESSOptimizerModelI:
         model.cross_market_exclusivity2 = pyo.Constraint(model.T, rule=cross_market_exclusivity_rule_2,
                                                          doc="Cst-8b: Prevent charge + discharging AS reserves")
 
+        # Check if cross-market exclusivity should be disabled (default: enabled)
+        enable_cross_market = self.market_params.get('enable_cross_market_exclusivity',
+                                                      getattr(self, 'enable_cross_market_exclusivity', True))
+
+        if not enable_cross_market:
+            model.cross_market_exclusivity1.deactivate()
+            model.cross_market_exclusivity2.deactivate()
+            logger.info("Cst-8: Cross-Market Mutual Exclusivity constraints DEACTIVATED (disabled for reduced complexity)")
+        else:
+            logger.info("Added Cst-8: Cross-Market Mutual Exclusivity constraints")
+
         # --- COMMENTED OUT Cst-9: DA Energy MinBid Constraints (REQUIRES y_ch/y_dis binaries) ---
         # REASON: These 4 constraints require y_ch/y_dis binaries which are commented out (lines 586-588).
         # DEPENDENCY ISSUE: Cannot enforce MinBid for DA energy without separate DA binaries.
@@ -989,9 +1000,11 @@ class BESSOptimizerModelI:
                 solver.options['mip_tolerances_mipgap'] = self.solver_config.get('solver_options', {}).get('cplex', {}).get('mip_tolerances_mipgap', 0.01)
                 solver.options['emphasis_mip'] = 1
             elif solver_name.lower() == 'gurobi':
+                gurobi_options = self.solver_config.get('solver_options', {}).get('gurobi', {})
                 solver.options['TimeLimit'] = self.market_params['solver_time_limit']
-                solver.options['MIPGap'] = self.solver_config.get('solver_options', {}).get('gurobi', {}).get('MIPGap', 0.01)
-                solver.options['Threads'] = 4
+                solver.options['MIPGap'] = gurobi_options.get('MIPGap', 0.03)
+                # solver.options['Threads'] = gurobi_options.get('Threads', 4)
+                # solver.options['MIPFocus'] = gurobi_options.get('MIPFocus', 0)
             elif solver_name.lower() == 'highs':
                 solver.options['time_limit'] = self.market_params['solver_time_limit']
                 solver.options['mip_rel_gap'] = self.solver_config.get('solver_options', {}).get('highs', {}).get('mip_rel_gap', 0.01)

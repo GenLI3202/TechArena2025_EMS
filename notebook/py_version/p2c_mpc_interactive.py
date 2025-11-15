@@ -118,6 +118,12 @@ with open(afrr_ev_config_path, 'r') as f:
 
 print("\nConfiguration files loaded successfully!")
 
+# Extract solver settings
+DEFAULT_SOLVER = solver_config.get('default_solver', 'cbc')
+DEFAULT_SOLVER_TIME_LIMIT = solver_config.get('solver_time_limit_sec', 900)
+
+print(f"\n[SOLVER] Default solver: {DEFAULT_SOLVER}")
+print(f"[SOLVER] Time limit: {DEFAULT_SOLVER_TIME_LIMIT}s")
 
 # ============================================================================
 # Extract Scenario Parameters from Config
@@ -150,6 +156,11 @@ VALIDATE_CONSTRAINTS = mpc_config['mpc_parameters']['validate_constraints']
 # Max iterations (from mpc_test_config.json)
 MAX_ITERATIONS = mpc_test_config['mpc_execution']['max_iterations']
 
+# Optimizer configuration (applies to single-alpha mode only)
+ENABLE_CROSS_MARKET_EXCLUSIVITY = True  # Set to False to disable Cst-8 (reduces constraints)
+MAX_AS_RATIO = 0.8                      # Max ancillary service ratio (80%)
+# Note: For meta-optimizer mode, modify MetaOptimizer class to accept these parameters
+
 # Visualization settings
 ENABLE_STANDARD_PLOTS = mpc_test_config['visualization']['enable_standard_plots']
 ENABLE_MPC_PLOTS = mpc_test_config['visualization']['enable_mpc_plots']
@@ -176,6 +187,11 @@ print(f"  Horizon:            {HORIZON_HOURS} hours")
 print(f"  Execution:          {EXECUTION_HOURS} hours")
 print(f"  Initial SOC:        {INITIAL_SOC_FRACTION * 100:.0f}%")
 print(f"  Max Iterations:     {MAX_ITERATIONS if MAX_ITERATIONS else 'Full duration'}")
+print()
+print("Optimizer Settings:")
+print(f"  Solver:             {DEFAULT_SOLVER.upper()}")
+print(f"  Max AS Ratio:       {MAX_AS_RATIO * 100:.0f}%")
+print(f"  Cross-Market Exclusivity (Cst-8): {ENABLE_CROSS_MARKET_EXCLUSIVITY}")
 print()
 print("Alpha Settings:")
 if ALPHA_MODE == 'single':
@@ -355,6 +371,13 @@ else:
     simulation_start = time.time()
 
     if ENABLE_META_OPTIMIZER and ALPHA_MODE == 'sweep':
+        # WARNING: MetaOptimizer API is outdated and needs updating
+        # For now, use single-alpha mode instead
+        raise NotImplementedError(
+            "MetaOptimizer mode is currently disabled due to API mismatch. "
+            "Please use single-alpha mode (set ENABLE_META_OPTIMIZER=False in mpc_test_config.json)"
+        )
+
         # Use Meta-Optimizer for alpha sweep
         print(f"\n[MODE] Meta-Optimizer (Alpha Sweep)")
         print(f"   Alpha range: {ALPHA_SWEEP_RANGE['min']} - {ALPHA_SWEEP_RANGE['max']} (step {ALPHA_SWEEP_RANGE['step']})")
@@ -408,6 +431,10 @@ else:
         # Initialize optimizer
         optimizer = BESSOptimizerModelIII(alpha=used_alpha)
 
+        # Configure optimizer settings
+        optimizer.max_as_ratio = MAX_AS_RATIO
+        optimizer.market_params['enable_cross_market_exclusivity'] = ENABLE_CROSS_MARKET_EXCLUSIVITY
+
         # Initialize MPC simulator
         simulator = MPCSimulator(
             optimizer_model=optimizer,
@@ -415,7 +442,8 @@ else:
             horizon_hours=HORIZON_HOURS,
             execution_hours=EXECUTION_HOURS,
             c_rate=TEST_C_RATE,
-            validate_constraints=VALIDATE_CONSTRAINTS
+            validate_constraints=VALIDATE_CONSTRAINTS,
+            solver_name=DEFAULT_SOLVER
         )
 
         # Run simulation
@@ -516,6 +544,10 @@ if not LOAD_FROM_SAVED:
 
         # Timing
         'simulation_time_sec': simulation_time,
+
+        # Solver settings
+        'solver': DEFAULT_SOLVER,
+        'solver_time_limit_sec': DEFAULT_SOLVER_TIME_LIMIT,
 
         # Data source
         'data_source': DATA_SOURCE

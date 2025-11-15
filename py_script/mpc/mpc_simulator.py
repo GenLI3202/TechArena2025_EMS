@@ -80,6 +80,7 @@ class MPCSimulator:
         execution_hours: int = 24,
         c_rate: float = 0.5,
         validate_constraints: bool = True,
+        solver_name: str = None,
     ) -> None:
         """Initialize MPC simulator.
 
@@ -90,6 +91,7 @@ class MPCSimulator:
             execution_hours: Execution window (default 24h for 1-day commitment)
             c_rate: C-rate configuration (default 0.5)
             validate_constraints: Whether to run post-solve validation (default True)
+            solver_name: Solver to use ('gurobi', 'cplex', 'cbc', etc.). If None, auto-detect.
         """
         self.optimizer = optimizer_model
         self.full_data = full_data
@@ -97,6 +99,7 @@ class MPCSimulator:
         self.execution_hours = execution_hours
         self.c_rate = c_rate
         self.validate_constraints = validate_constraints
+        self.solver_name = solver_name
 
         # Get parameters from optimizer
         self.time_step_hours = self.optimizer.market_params['time_step_hours']
@@ -385,7 +388,7 @@ class MPCSimulator:
                                 logger.debug("    Fixed z_segment_active[0,%d] = 0 (empty)", j)
 
                 # Solve
-                solved_model, solver_results = self.optimizer.solve_model(model)
+                solved_model, solver_results = self.optimizer.solve_model(model, solver_name=self.solver_name)
                 solution = self.optimizer.extract_solution(solved_model, solver_results)
 
                 if solution['status'] not in ['optimal', 'feasible']:

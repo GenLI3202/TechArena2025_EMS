@@ -12,6 +12,8 @@ An advanced Energy Management System (EMS) that optimizes battery storage operat
 - **Quick Start Guide:** `py_script/README.md`
 - **Model Formulation Details:** `doc\p2_model\p2_bi_model_ggdp.tex`
 - **Project Overview:** `doc/whole_project_description.md`
+- **Pyomo Optimization Guide:** `py_script\modeling_guide_pyomo.md`
+- 
 ---
 
 ## Project Overview

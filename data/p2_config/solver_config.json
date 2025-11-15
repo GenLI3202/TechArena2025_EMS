@@ -1,5 +1,5 @@
 {
-  "default_solver": "cbc",
+  "default_solver": "gurobi",
   "solver_time_limit_sec": 900,
   "solver_options": {
     "cplex": {
@@ -7,8 +7,11 @@
       "mip_tolerances_mipgap": 0.03
     },
     "gurobi": {
-      "TimeLimit": 900,
-      "MIPGap": 0.03
+    "TimeLimit": 900,
+    "MIPGap": 0.03,
+    "Threads": 0,            
+    "MIPFocus": 2,          
+    "description": "Threads: 0 = use all available cores; MIPFocus: 1=feasibility, 2=optimality, 3=bound;  solver options for balancing speed and solution quality"
     },
     "highs": {
       "time_limit": 900.0,
