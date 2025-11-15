@@ -75,7 +75,7 @@ with open(afrr_ev_config_path, 'r') as f:
     afrr_ev_config = json.load(f)
 
 # Extract default values
-DEFAULT_REQUIRE_SEQUENTIAL = aging_config.get('REQUIRE_SEQUENTIAL_SEGMENT_ACTIVATION', False)
+DEFAULT_REQUIRE_SEQUENTIAL = aging_config.get('require_sequential_segment_activation', False)
 DEFAULT_LIFO_EPSILON = aging_config.get('lifo_epsilon_kwh', 5.0)
 DEFAULT_SOLVER = solver_config.get('default_solver', 'cbc')
 DEFAULT_SOLVER_TIME_LIMIT = solver_config.get('solver_time_limit_sec', 600)
@@ -98,12 +98,18 @@ print(f"   REQUIRE_SEQUENTIAL_SEGMENT_ACTIVATION: {DEFAULT_REQUIRE_SEQUENTIAL}")
 print(f"   lifo_epsilon_kwh: {DEFAULT_LIFO_EPSILON} kWh")
 
 print(f"\n[DEGRADATION] Cyclic Aging Parameters:")
-print(f"   Num segments: {len(cyclic_costs)}")
-print(f"   Segment capacity: {4472 / len(cyclic_costs):.2f} kWh")
+num_segments = len(cyclic_costs)
+print(f"   Num segments: {num_segments}")
+print(f"   Segment capacity: {4472 / num_segments:.2f} kWh ({100/num_segments:.2f}% DOD per segment)")
 print(f"   Marginal costs (EUR/kWh):")
-print(f"      Segment 1-5:  {cyclic_costs[:5]}")
-print(f"      Segment 6-10: {cyclic_costs[5:]}")
+if num_segments <= 6:
+    print(f"      All segments: {cyclic_costs}")
+else:
+    mid_point = num_segments // 2
+    print(f"      Segment 1-{mid_point}:  {cyclic_costs[:mid_point]}")
+    print(f"      Segment {mid_point+1}-{num_segments}: {cyclic_costs[mid_point:]}")
 print(f"   Cost range: {min(cyclic_costs):.4f} - {max(cyclic_costs):.4f} EUR/kWh")
+print(f"   Configuration: {'6-segment (fast MPC)' if num_segments == 6 else '10-segment (high accuracy)' if num_segments == 10 else f'{num_segments}-segment (custom)'}")
 
 print(f"\n[DEGRADATION] Calendar Aging Parameters:")
 print(f"   Num breakpoints: {len(calendar_breakpoints)}")
@@ -114,28 +120,37 @@ print(f"   Cost range: {calendar_breakpoints[0]['cost_eur_hr']:.2f} - {calendar_
 # ============================================================================
 # CONFIGURATION - MODIFY THESE VALUES
 # ============================================================================
+"""
+CONFIGURATION NOTES:
+- The number of SOC segments is determined by the length of the 'costs' array
+  in aging_config.json
+- Current config: 6 segments (40% fewer binary variables, 2-3x faster solve)
+- Alternative: 10 segments (higher degradation accuracy, slower solve)
+- To switch: edit aging_config.json and swap the 'costs' arrays
+- 24-hour horizons are feasible with 6-segment config and modern solvers
+"""
 
 # Test scenario configuration
-TEST_COUNTRY = "DE_LU"              # Options: DE_LU, AT, CH, HU, CZ
+TEST_COUNTRY = "CH"                 # Options: DE_LU, AT, CH, HU, CZ
 TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
-TEST_TIME_HORIZON_HOURS = 24        # Time horizon in hours
-TEST_START_STEP = 0                 # Starting time step
+TEST_TIME_HORIZON_HOURS = 24        # Time horizon in hours (24h feasible with 6-segment config)
+TEST_START_STEP = int(96*1)         # Starting time step (96 = 1 day in 15-min intervals)
 TEST_MODEL = "III"                  # Options: "I", "II", "III"
 USE_EV_WEIGHTING = False            # Enable aFRR EV weighting
-MAX_AS_RATIO = 0.8                  # Max ancillary service ratio
+MAX_AS_RATIO = 0.8                  # Max ancillary service ratio (80%)
 
 # Use defaults from aging_config.json (can override below if needed)
-LIFO_EPSILON_KWH = DEFAULT_LIFO_EPSILON          # From config (default: 5.0 kWh)
-REQUIRE_SEQUENTIAL = DEFAULT_REQUIRE_SEQUENTIAL  # From config (default: False)
+LIFO_EPSILON_KWH = DEFAULT_LIFO_EPSILON          # From config (current: 0.5 kWh)
+REQUIRE_SEQUENTIAL = DEFAULT_REQUIRE_SEQUENTIAL  # From config (current: True)
 
 # To override config defaults, uncomment and modify:
-# LIFO_EPSILON_KWH = 0.0              # Override: perfect LIFO (no tolerance)
-# REQUIRE_SEQUENTIAL = True           # Override: strict sequential activation
+# LIFO_EPSILON_KWH = 1.0              # Override: more relaxed LIFO (faster solve)
+# REQUIRE_SEQUENTIAL = False          # Override: disable sequential activation (much faster, but less accurate)
 
 # Battery SOC limits
-MAX_SOC = 1.0                       # Max state of charge
-MIN_SOC = 0.0                       # Min state of charge
+MAX_SOC = 0.9                       # Max state of charge
+MIN_SOC = 0.1                       # Min state of charge
 
 # Output options
 SAVE_RESULTS = False                # Save results to disk
@@ -148,8 +163,13 @@ print(f"Model:              {TEST_MODEL}")
 print(f"Country:            {TEST_COUNTRY}")
 print(f"Time Horizon:       {TEST_TIME_HORIZON_HOURS} hours")
 print(f"C-Rate:             {TEST_C_RATE}")
-print(f"LIFO Epsilon:       {LIFO_EPSILON_KWH} kWh (from aging_config.json)")
-print(f"Sequential:         {REQUIRE_SEQUENTIAL} (from aging_config.json)")
+print(f"Alpha:              {TEST_ALPHA}")
+print(f"")
+print(f"Degradation Model:")
+print(f"  Segments:         {num_segments} ({'fast MPC' if num_segments == 6 else 'high accuracy' if num_segments == 10 else 'custom'})")
+print(f"  LIFO Epsilon:     {LIFO_EPSILON_KWH} kWh")
+print(f"  Sequential Act.:  {REQUIRE_SEQUENTIAL}")
+print(f"  Max AS Ratio:     {MAX_AS_RATIO * 100:.0f}%")
 print("=" * 80)
 
 # %%

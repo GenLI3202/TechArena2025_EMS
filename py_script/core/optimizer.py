@@ -115,6 +115,19 @@ class BESSOptimizerModelI:
             'daily_cycle_limit': 1.0  # Default, will be overridden
         }
 
+        # Load solver configuration
+        project_root = Path(__file__).resolve().parent.parent.parent
+        solver_config_path = project_root / 'data' / 'p2_config' / 'solver_config.json'
+        try:
+            with open(solver_config_path, 'r') as f:
+                solver_config = json.load(f)
+            solver_time_limit = solver_config.get('solver_time_limit_sec', 600)
+            self.solver_config = solver_config
+        except Exception as e:
+            logger.warning(f"Failed to load solver config: {e}. Using default timeout 600s")
+            solver_time_limit = 600
+            self.solver_config = {}
+
         # Market parameters
         self.market_params = {
             'min_bid_da': 0.1,    # MW
@@ -124,7 +137,7 @@ class BESSOptimizerModelI:
             'time_step_hours': 0.25,  # 15 minutes
             'block_duration_hours': 4.0,  # AS market blocks
             'reserve_duration_hours': 0.25, # Assumed activation duration for reserve calculation
-            'solver_time_limit': 600  # seconds - consistent across all solvers
+            'solver_time_limit': solver_time_limit  # seconds - loaded from solver_config.json
         }
 
         # Configuration scenarios
@@ -973,15 +986,15 @@ class BESSOptimizerModelI:
             # CONSISTENT SOLVER TIME LIMITS (Addresses Critical Issue #6)
             if solver_name.lower() == 'cplex':
                 solver.options['timelimit'] = self.market_params['solver_time_limit']
-                solver.options['mip_tolerances_mipgap'] = 0.01
+                solver.options['mip_tolerances_mipgap'] = self.solver_config.get('solver_options', {}).get('cplex', {}).get('mip_tolerances_mipgap', 0.01)
                 solver.options['emphasis_mip'] = 1
             elif solver_name.lower() == 'gurobi':
                 solver.options['TimeLimit'] = self.market_params['solver_time_limit']
-                solver.options['MIPGap'] = 0.01
+                solver.options['MIPGap'] = self.solver_config.get('solver_options', {}).get('gurobi', {}).get('MIPGap', 0.01)
                 solver.options['Threads'] = 4
             elif solver_name.lower() == 'highs':
                 solver.options['time_limit'] = self.market_params['solver_time_limit']
-                solver.options['mip_rel_gap'] = 0.01
+                solver.options['mip_rel_gap'] = self.solver_config.get('solver_options', {}).get('highs', {}).get('mip_rel_gap', 0.01)
             elif solver_name.lower() == 'scip':
                 solver.options['limits/time'] = self.market_params['solver_time_limit']
                 solver.options['limits/gap'] = 0.01
@@ -1473,7 +1486,8 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             'marginal_costs': cyclic_config['costs'],
             'alpha': float(alpha),
             'config_file_path': str(degradation_config_path),
-            'require_sequential_segment_activation': require_sequential_segment_activation,
+            'require_sequential_segment_activation': self.degradation_config.get('require_sequential_segment_activation', require_sequential_segment_activation),
+            'lifo_epsilon_kwh': self.degradation_config.get('lifo_epsilon_kwh', 5.0),
         }
 
         self._validate_degradation_params()

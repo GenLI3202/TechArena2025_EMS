@@ -1,22 +1,22 @@
 {
   "default_solver": "cbc",
-  "solver_time_limit_sec": 600,
+  "solver_time_limit_sec": 900,
   "solver_options": {
     "cplex": {
-      "timelimit": 600,
-      "mip_tolerances_mipgap": 0.01
+      "timelimit": 900,
+      "mip_tolerances_mipgap": 0.03
     },
     "gurobi": {
-      "TimeLimit": 600,
-      "MIPGap": 0.01
+      "TimeLimit": 900,
+      "MIPGap": 0.03
     },
     "highs": {
-      "time_limit": 600.0,
-      "mip_rel_gap": 0.01
+      "time_limit": 900.0,
+      "mip_rel_gap": 0.03
     },
     "cbc": {
-      "seconds": 600,
-      "ratio": 0.01
+      "seconds": 900,
+      "ratio": 0.03
     }
   }
 }

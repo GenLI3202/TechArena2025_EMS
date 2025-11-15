@@ -49,9 +49,8 @@ import multiprocessing
 
 # Import required modules
 import sys
-sys.path.append(str(Path(__file__).parent.parent))
-from core.optimizer import BESSOptimizerModelIII
-from rolling_horizon.mpc_simulator import MPCSimulator
+from ..core.optimizer import BESSOptimizerModelIII
+from .mpc_simulator import MPCSimulator
 
 logger = logging.getLogger(__name__)
 

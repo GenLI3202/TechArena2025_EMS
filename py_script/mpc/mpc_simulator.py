@@ -43,10 +43,8 @@ from pathlib import Path
 import json
 
 # Import the optimizer (Model III)
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-from core.optimizer import BESSOptimizerModelIII
-from validation import validate_solution
+from ..core.optimizer import BESSOptimizerModelIII
+from ..validation import validate_solution
 
 logger = logging.getLogger(__name__)
 
@@ -210,12 +208,15 @@ class MPCSimulator:
             da_revenue += (p_dis.get(t, 0) - p_ch.get(t, 0)) * price_da / 1000 * dt
 
             # aFRR energy market revenue
+            # NOTE: Handle NaN prices from preprocessing (0 price = market not activated)
             price_afrr_pos = country_data_window['price_afrr_energy_pos'].iloc[t]
             price_afrr_neg = country_data_window['price_afrr_energy_neg'].iloc[t]
-            afrr_e_revenue += (
-                p_afrr_pos_e.get(t, 0) * price_afrr_pos / 1000 * dt -
-                p_afrr_neg_e.get(t, 0) * price_afrr_neg / 1000 * dt
-            )
+
+            # Only add revenue if price is not NaN (market was activated)
+            if pd.notna(price_afrr_pos):
+                afrr_e_revenue += p_afrr_pos_e.get(t, 0) * price_afrr_pos / 1000 * dt
+            if pd.notna(price_afrr_neg):
+                afrr_e_revenue -= p_afrr_neg_e.get(t, 0) * price_afrr_neg / 1000 * dt
 
         # Calculate AS capacity revenue for execution window
         # Note: AS prices are block-based, need to map time to blocks
@@ -351,9 +352,11 @@ class MPCSimulator:
             try:
                 # CRITICAL FIX: Set initial SOC in battery_params BEFORE building model
                 # This ensures E_soc_init reads the updated value
-                self.optimizer.battery_params['initial_soc_kwh'] = current_total_soc
-                logger.info("  Set battery_params['initial_soc_kwh'] = %.2f kWh for this iteration",
-                           current_total_soc)
+                # NOTE: optimizer expects FRACTION (0-1), not absolute kWh!
+                initial_soc_fraction = current_total_soc / self.battery_params['capacity_kwh']
+                self.optimizer.battery_params['initial_soc'] = initial_soc_fraction
+                logger.info("  Set battery_params['initial_soc'] = %.4f (%.2f kWh) for this iteration",
+                           initial_soc_fraction, current_total_soc)
 
                 # Build model
                 model = self.optimizer.build_optimization_model(
@@ -368,6 +371,18 @@ class MPCSimulator:
                         # Fix initial value for each segment
                         model.e_soc_j[0, j].setlb(initial_segment_soc[j])
                         model.e_soc_j[0, j].setub(initial_segment_soc[j])
+
+                    # CRITICAL FIX: Initialize binary variables at t=0 to match segment SOC
+                    # This prevents conflicts with LIFO constraints
+                    if hasattr(model, 'z_segment_active'):
+                        for j in model.J:
+                            if initial_segment_soc[j] > 1e-6:  # Segment has energy (tolerance: 1 Wh)
+                                model.z_segment_active[0, j].fix(1)
+                                logger.debug("    Fixed z_segment_active[0,%d] = 1 (SOC=%.2f kWh)",
+                                           j, initial_segment_soc[j])
+                            else:  # Segment is empty
+                                model.z_segment_active[0, j].fix(0)
+                                logger.debug("    Fixed z_segment_active[0,%d] = 0 (empty)", j)
 
                 # Solve
                 solved_model, solver_results = self.optimizer.solve_model(model)

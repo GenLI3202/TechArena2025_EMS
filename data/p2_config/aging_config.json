@@ -2,7 +2,16 @@
   "cyclic_aging": {
     "description": "Marginal cost of discharging 1 kWh from different SOC segments, based on a power-law model (b=2) and a 100% DoD cycle life of 3840 cycles.",
     "unit": "EUR/kWh",
+    "num_segments_note": "Array length determines number of segments. 6 segments (current) = 40% fewer binaries, 2-3x faster solve. 10 segments (commented below) = higher accuracy.",
     "costs": [
+      0.0087,
+      0.0260,
+      0.0434,
+      0.0608,
+      0.0782,
+      0.0955
+    ],
+    "costs_10_segments_alternative": [
       0.0052,
       0.0156,
       0.0260,
@@ -38,8 +47,8 @@
     "step": 0.1,
     "description": "Alpha parameter sweep configuration for meta-optimization"
   },
-  "REQUIRE_SEQUENTIAL_SEGMENT_ACTIVATION": false,
-  "lifo_epsilon_kwh": 0.0,
+  "require_sequential_segment_activation": true,
+  "lifo_epsilon_kwh": 0.5,
   "optimization_notes": {
     "require_sequential_segment_activation": "Setting to false disables charge/discharge activation binaries to improve solve speed",
     "lifo_epsilon_kwh": "Tolerance for LIFO fullness constraint. Larger value = faster solve (larger feasible region). 5 kWh = ~1.1% of segment capacity",

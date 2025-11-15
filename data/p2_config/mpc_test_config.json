@@ -4,7 +4,7 @@
 
   "test_scenario": {
     "country": "CH",
-    "duration_days": 7,
+    "duration_days": 2,
     "c_rate": 0.5,
     "data_source": "preprocessed",
     "description": "Basic test scenario settings. Options: data_source='preprocessed' (fast) or 'excel' (submission)"
@@ -36,8 +36,8 @@
   },
 
   "visualization": {
-    "enable_standard_plots": true,
-    "enable_mpc_plots": true,
+    "enable_standard_plots": false,
+    "enable_mpc_plots": false,
     "mpc_plot_options": {
       "iteration_boundaries": true,
       "iteration_performance": true,
