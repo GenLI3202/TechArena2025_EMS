@@ -61,6 +61,47 @@ COUNTRY_COLORS = {
 }
 
 # ============================================================================
+# Waterfall Chart Color Scheme (Financial Breakdown)
+# ============================================================================
+# Inspired by McKinsey Global Energy Perspective visualizations
+# Reference: https://www.mckinsey.com/industries/energy-and-materials/our-insights/global-energy-perspective#/
+#
+# Design principles:
+# - Blue gradient for positive revenue components (85% opacity for elegance)
+# - Grayscale for cost components (100% opacity for clarity)
+# - Navy line for cumulative metrics
+# - Professional appearance suitable for executive presentations
+
+WATERFALL_COLORS = {
+    # Positive Revenue Components (stacked above zero) - Blue gradient @ 85% opacity
+    'revenue_primary': 'rgba(32, 233, 217, 0.85)',    # #20e9d9 Teal - DA Discharge, primary revenue
+    'revenue_secondary': 'rgba(5, 121, 194, 0.85)',  # #0579c2 Blue - FCR Capacity
+    'revenue_tertiary': 'rgba(34, 81, 255, 0.85)',  # #2251ff Bright Blue - aFRR Energy, accent
+
+    # Negative Cost Components (stacked below zero) - Dark blues & grays @ 100% opacity
+    'cost_primary': 'rgba(6, 31, 121, 1.0)',         # #061f79 Dark Blue - DA Charge Cost
+    'cost_secondary': 'rgba(232, 232, 232, 1.0)',        # #e8e8e8 Light Gray - Cyclic Aging
+    'cost_tertiary': 'rgba(5, 28, 44, 1.0)',     # #051c2c Very Dark Blue - Calendar Aging
+
+    # Cumulative Metrics
+    'cumulative_line': '#061f79',                    # #061f79 Dark Blue - Cumulative Profit line
+    'cumulative_marker': '#061f79',                  # #061f79 Dark Blue - Profit markers (5.6px, 70% standard)
+
+    # Fallback colors (for aggregated view)
+    'total_revenue': 'rgba(0, 169, 244, 0.85)',      # #00a9f4 Cyan Blue
+    'total_cost': 'rgba(5, 28, 44, 1.0)',            # #051c2c Very Dark Blue
+}
+
+# Waterfall styling parameters
+WATERFALL_STYLE = {
+    'revenue_opacity': 0.85,          # 15% transparency for revenue bars
+    'cost_opacity': 1.0,              # Full opacity for cost bars
+    'line_width': 3,                  # Cumulative profit line thickness
+    'marker_size': 5.6,               # Cumulative profit markers (70% of 8px)
+    'bar_gap': 0.1,                   # Gap between bars (10%)
+}
+
+# ============================================================================
 # Typography
 # ============================================================================
 

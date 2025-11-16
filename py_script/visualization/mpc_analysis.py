@@ -47,7 +47,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from ..visualization.config import MCKINSEY_COLORS, MCKINSEY_FONTS
+from ..visualization.config import MCKINSEY_COLORS, MCKINSEY_FONTS, WATERFALL_COLORS, WATERFALL_STYLE
 
 
 def plot_iteration_boundaries(
@@ -238,41 +238,128 @@ def plot_iteration_performance(
     else:
         fig = go.Figure()
 
-    # Add revenue bars
-    fig.add_trace(
-        go.Bar(
-            x=iter_df['iteration'],
-            y=iter_df['revenue'],
-            name='Revenue',
-            marker_color=MCKINSEY_COLORS['positive'],
-            hovertemplate='Iteration %{x}<br>Revenue: €%{y:,.0f}<extra></extra>'
-        ),
-        secondary_y=False if show_cumulative else None
+    # Waterfall-style stacking: Revenue components (positive) + Cost components (negative)
+    # This creates an intuitive visualization where net = revenue stacks - cost stacks
+
+    # Check if detailed breakdown is available AND has non-zero values
+    # (extract_iteration_summary always adds these columns with 0.0 defaults)
+    has_detailed_breakdown = (
+        all(col in iter_df.columns for col in [
+            'da_discharge_revenue', 'da_charge_cost', 'cyclic_cost', 'calendar_cost'
+        ]) and
+        # Check if ANY of the detailed columns have non-zero values
+        (iter_df['da_discharge_revenue'].abs().sum() > 0.01 or
+         iter_df['da_charge_cost'].abs().sum() > 0.01 or
+         iter_df['cyclic_cost'].abs().sum() > 0.01 or
+         iter_df['calendar_cost'].abs().sum() > 0.01)
     )
 
-    # Add degradation cost bars (negative)
-    fig.add_trace(
-        go.Bar(
-            x=iter_df['iteration'],
-            y=-iter_df['degradation_cost'],
-            name='Degradation Cost',
-            marker_color=MCKINSEY_COLORS['negative'],
-            hovertemplate='Iteration %{x}<br>Degradation: -€%{y:,.0f}<extra></extra>'
-        ),
-        secondary_y=False if show_cumulative else None
-    )
+    if has_detailed_breakdown:
+        # DETAILED BREAKDOWN (NEW FORMAT) - McKinsey Blue Gradient Theme
+        # Reference: https://www.mckinsey.com/industries/energy-and-materials/our-insights/global-energy-perspective#/
+        # POSITIVE REVENUE COMPONENTS (stacked above zero) - Blues with 85% opacity
+        # 1. DA Discharge Revenue
+        fig.add_trace(
+            go.Bar(
+                x=iter_df['iteration'],
+                y=iter_df['da_discharge_revenue'],
+                name='DA Discharge',
+                marker_color=WATERFALL_COLORS['revenue_primary'],
+                hovertemplate='Iteration %{x}<br>DA Discharge: €%{y:,.0f}<extra></extra>'
+            ),
+            secondary_y=False if show_cumulative else None
+        )
 
-    # Add profit bars
-    fig.add_trace(
-        go.Bar(
-            x=iter_df['iteration'],
-            y=iter_df['profit'],
-            name='Net Profit',
-            marker_color=MCKINSEY_COLORS['navy'],
-            hovertemplate='Iteration %{x}<br>Profit: €%{y:,.0f}<extra></extra>'
-        ),
-        secondary_y=False if show_cumulative else None
-    )
+        # 2. FCR Capacity Revenue
+        if 'fcr_revenue' in iter_df.columns:
+            fig.add_trace(
+                go.Bar(
+                    x=iter_df['iteration'],
+                    y=iter_df['fcr_revenue'],
+                    name='FCR Capacity',
+                    marker_color=WATERFALL_COLORS['revenue_secondary'],
+                    hovertemplate='Iteration %{x}<br>FCR: €%{y:,.0f}<extra></extra>'
+                ),
+                secondary_y=False if show_cumulative else None
+            )
+
+        # 3. aFRR Energy Revenue
+        if 'afrr_e_revenue' in iter_df.columns:
+            fig.add_trace(
+                go.Bar(
+                    x=iter_df['iteration'],
+                    y=iter_df['afrr_e_revenue'],
+                    name='aFRR Energy',
+                    marker_color=WATERFALL_COLORS['revenue_tertiary'],
+                    hovertemplate='Iteration %{x}<br>aFRR Energy: €%{y:,.0f}<extra></extra>'
+                ),
+                secondary_y=False if show_cumulative else None
+            )
+
+        # NEGATIVE COST COMPONENTS (stacked below zero) - Full opacity for costs
+        # 4. DA Charge Cost (negative)
+        fig.add_trace(
+            go.Bar(
+                x=iter_df['iteration'],
+                y=-iter_df['da_charge_cost'],
+                name='DA Charge Cost',
+                marker_color=WATERFALL_COLORS['cost_primary'],
+                hovertemplate='Iteration %{x}<br>DA Charge: -€%{y:,.0f}<extra></extra>'
+            ),
+            secondary_y=False if show_cumulative else None
+        )
+
+        # 5. Cyclic Aging Cost (negative)
+        fig.add_trace(
+            go.Bar(
+                x=iter_df['iteration'],
+                y=-iter_df['cyclic_cost'],
+                name='Cyclic Aging',
+                marker_color=WATERFALL_COLORS['cost_secondary'],
+                hovertemplate='Iteration %{x}<br>Cyclic Aging: -€%{y:,.0f}<extra></extra>'
+            ),
+            secondary_y=False if show_cumulative else None
+        )
+
+        # 6. Calendar Aging Cost (negative)
+        fig.add_trace(
+            go.Bar(
+                x=iter_df['iteration'],
+                y=-iter_df['calendar_cost'],
+                name='Calendar Aging',
+                marker_color=WATERFALL_COLORS['cost_tertiary'],
+                hovertemplate='Iteration %{x}<br>Calendar Aging: -€%{y:,.0f}<extra></extra>'
+            ),
+            secondary_y=False if show_cumulative else None
+        )
+
+    else:
+        # FALLBACK: AGGREGATED FORMAT (OLD DATA - for backward compatibility)
+        # Show aggregated revenue and degradation cost bars
+        fig.add_trace(
+            go.Bar(
+                x=iter_df['iteration'],
+                y=iter_df['revenue'],
+                name='Revenue (Total)',
+                marker_color=WATERFALL_COLORS['total_revenue'],
+                hovertemplate='Iteration %{x}<br>Revenue: €%{y:,.0f}<extra></extra>'
+            ),
+            secondary_y=False if show_cumulative else None
+        )
+
+        fig.add_trace(
+            go.Bar(
+                x=iter_df['iteration'],
+                y=-iter_df['degradation_cost'],
+                name='Degradation Cost',
+                marker_color=WATERFALL_COLORS['total_cost'],
+                hovertemplate='Iteration %{x}<br>Degradation: -€%{y:,.0f}<extra></extra>'
+            ),
+            secondary_y=False if show_cumulative else None
+        )
+
+    # NOTE: Net profit is NOT stacked (shown as cumulative line only)
+    # Total height of positive stack - total height of negative stack = profit
 
     # Add cumulative profit line
     if show_cumulative:
@@ -283,8 +370,8 @@ def plot_iteration_performance(
                 y=cumulative_profit,
                 mode='lines+markers',
                 name='Cumulative Profit',
-                line=dict(color=MCKINSEY_COLORS['dark_blue'], width=3),
-                marker=dict(size=8),
+                line=dict(color=WATERFALL_COLORS['cumulative_line'], width=WATERFALL_STYLE['line_width']),
+                marker=dict(size=WATERFALL_STYLE['marker_size'], color=WATERFALL_COLORS['cumulative_marker']),
                 hovertemplate='Iteration %{x}<br>Cumulative: €%{y:,.0f}<extra></extra>'
             ),
             secondary_y=True

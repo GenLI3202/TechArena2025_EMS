@@ -193,9 +193,14 @@ class MPCSimulator:
         # Time step duration
         dt = self.time_step_hours
 
-        # Initialize accumulators
-        da_revenue = 0.0
+        # Initialize accumulators (detailed breakdown for waterfall visualization)
+        da_discharge_revenue = 0.0  # Positive: discharge revenue
+        da_charge_cost = 0.0        # Negative/cost: charge cost
+        da_revenue = 0.0            # Net: discharge - charge
         afrr_e_revenue = 0.0
+        fcr_revenue = 0.0
+        afrr_pos_cap_revenue = 0.0
+        afrr_neg_cap_revenue = 0.0
         as_revenue = 0.0
         total_revenue = 0.0
 
@@ -207,7 +212,9 @@ class MPCSimulator:
 
             price_da = country_data_window['price_day_ahead'].iloc[t]
 
-            # DA market revenue
+            # DA market revenue (separate discharge and charge for waterfall visualization)
+            da_discharge_revenue += p_dis.get(t, 0) * price_da / 1000 * dt
+            da_charge_cost += p_ch.get(t, 0) * price_da / 1000 * dt
             da_revenue += (p_dis.get(t, 0) - p_ch.get(t, 0)) * price_da / 1000 * dt
 
             # aFRR energy market revenue
@@ -221,7 +228,7 @@ class MPCSimulator:
             if pd.notna(price_afrr_neg):
                 afrr_e_revenue -= p_afrr_neg_e.get(t, 0) * price_afrr_neg / 1000 * dt
 
-        # Calculate AS capacity revenue for execution window
+        # Calculate AS capacity revenue for execution window (separate by market for waterfall viz)
         # Note: AS prices are block-based, need to map time to blocks
         block_duration_hours = self.optimizer.market_params['block_duration_hours']
         for t in range(execution_length):
@@ -237,11 +244,16 @@ class MPCSimulator:
                 price_afrr_pos = country_data_window['price_afrr_pos'].iloc[t]
                 price_afrr_neg = country_data_window['price_afrr_neg'].iloc[t]
 
-                as_revenue += (
-                    c_fcr.get(block_id, 0) * price_fcr * block_duration_hours +
-                    c_afrr_pos.get(block_id, 0) * price_afrr_pos * block_duration_hours +
-                    c_afrr_neg.get(block_id, 0) * price_afrr_neg * block_duration_hours
-                )
+                # Separate revenue by capacity market
+                fcr_block_revenue = c_fcr.get(block_id, 0) * price_fcr * block_duration_hours
+                afrr_pos_block_revenue = c_afrr_pos.get(block_id, 0) * price_afrr_pos * block_duration_hours
+                afrr_neg_block_revenue = c_afrr_neg.get(block_id, 0) * price_afrr_neg * block_duration_hours
+
+                fcr_revenue += fcr_block_revenue
+                afrr_pos_cap_revenue += afrr_pos_block_revenue
+                afrr_neg_cap_revenue += afrr_neg_block_revenue
+
+                as_revenue += fcr_block_revenue + afrr_pos_block_revenue + afrr_neg_block_revenue
 
         total_revenue = da_revenue + afrr_e_revenue + as_revenue
 
@@ -257,6 +269,7 @@ class MPCSimulator:
         calendar_cost_window = calendar_cost * scale_factor
 
         return {
+            # Aggregated (backward compatibility)
             'da_revenue': da_revenue,
             'afrr_e_revenue': afrr_e_revenue,
             'as_revenue': as_revenue,
@@ -264,6 +277,12 @@ class MPCSimulator:
             'cyclic_cost': cyclic_cost_window,
             'calendar_cost': calendar_cost_window,
             'total_degradation_cost': cyclic_cost_window + calendar_cost_window,
+            # Detailed breakdown for waterfall visualization
+            'da_discharge_revenue': da_discharge_revenue,
+            'da_charge_cost': da_charge_cost,
+            'fcr_revenue': fcr_revenue,
+            'afrr_pos_cap_revenue': afrr_pos_cap_revenue,
+            'afrr_neg_cap_revenue': afrr_neg_cap_revenue,
         }
 
     def run_full_simulation(

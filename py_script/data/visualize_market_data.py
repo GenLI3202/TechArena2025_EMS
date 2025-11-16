@@ -533,7 +533,7 @@ def plot_price_time_series_mckinsey(
     >>> fig = plot_price_time_series_mckinsey(tables, country='DE', time_range='Q1')
     >>> fig.show()
     """
-    from visualization.config import MCKINSEY_COLORS, get_country_color, apply_mckinsey_style
+    from py_script.visualization.config import MCKINSEY_COLORS, get_country_color, apply_mckinsey_style
 
     if markets is None:
         markets = ['day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy']
@@ -686,7 +686,7 @@ def plot_all_markets_distribution(
     >>> fig.show()
     """
     from plotly.subplots import make_subplots
-    from visualization.config import COUNTRY_COLORS, get_country_color
+    from py_script.visualization.config import COUNTRY_COLORS, get_country_color
 
     if countries is None:
         countries = ['DE', 'AT', 'CH', 'HU', 'CZ']
@@ -847,7 +847,7 @@ def plot_country_market_comparison(
     >>> fig = plot_country_market_comparison(tables, country='DE')
     >>> fig.show()
     """
-    from visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
+    from py_script.visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
 
     if market_types is None:
         market_types = ['day_ahead', 'fcr', 'afrr_capacity', 'afrr_energy']
@@ -956,7 +956,7 @@ def plot_da_price_distribution_mckinsey(
     >>> fig = plot_da_price_distribution_mckinsey(tables['day_ahead'], country='DE')
     >>> fig.show()
     """
-    from visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
+    from py_script.visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
     import numpy as np
     from scipy import stats
 
@@ -1075,7 +1075,7 @@ def plot_da_price_distribution_multi_country_mckinsey(
     >>> fig = plot_da_price_distribution_multi_country_mckinsey(tables['day_ahead'])
     >>> fig.show()
     """
-    from visualization.config import COUNTRY_COLORS, apply_mckinsey_style, get_country_color
+    from py_script.visualization.config import COUNTRY_COLORS, apply_mckinsey_style, get_country_color
     import numpy as np
     from scipy import stats
 
@@ -1185,7 +1185,7 @@ def plot_da_price_ridgeline_mckinsey(
     """
     import matplotlib.pyplot as plt
     import matplotlib.colors as mcolors
-    from visualization.config import COUNTRY_COLORS, get_country_color
+    from py_script.visualization.config import COUNTRY_COLORS, get_country_color
     import numpy as np
     from scipy import stats
 
@@ -1351,7 +1351,7 @@ def plot_da_price_heatmap_mckinsey(
     >>> fig = plot_da_price_heatmap_mckinsey(tables['day_ahead'], country='DE')
     >>> fig.show()
     """
-    from visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
+    from py_script.visualization.config import MCKINSEY_COLORS, apply_mckinsey_style
 
     # Get data for country
     country_col = 'DE_LU' if country == 'DE' else country
@@ -1518,7 +1518,7 @@ def plot_price_statistics_mckinsey(
     >>> fig = plot_price_statistics_mckinsey(stats, 'DE', 'day_ahead')
     >>> fig.show()
     """
-    from visualization.config import MCKINSEY_COLORS, MCKINSEY_FONTS
+    from py_script.visualization.config import MCKINSEY_COLORS, MCKINSEY_FONTS
 
     fig = go.Figure(data=[go.Table(
         header=dict(

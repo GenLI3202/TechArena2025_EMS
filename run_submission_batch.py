@@ -66,7 +66,7 @@ REQUIRE_SEQUENTIAL = False  # Faster solving
 LIFO_EPSILON_KWH = 0
 
 # Optimizer settings
-MAX_AS_RATIO = 0.8
+MAX_AS_RATIO = 0.9 # If set to 0.8, when C-rate = 0.25, max AS capacity = 4472 * 0.25 * 0.8 = 894.4 kW < 1MW miniumm bid requirement
 ENABLE_CROSS_MARKET_EXCLUSIVITY = True
 
 # MPC settings (load from config)
@@ -95,11 +95,11 @@ BASE_OUTPUT_DIR = "submission_results"
 
 
 # %% 
-country = 'AT'
+# country = 'AT'
 
-preprocessed_dir = project_root / "data" / "parquet" / "preprocessed"
-country_data = load_preprocessed_country_data(country, data_dir=preprocessed_dir)
-country_data.tail(23)
+# preprocessed_dir = project_root / "data" / "parquet" / "preprocessed"
+# country_data = load_preprocessed_country_data(country, data_dir=preprocessed_dir)
+# country_data.tail(23)
 
 # %%
 
@@ -109,26 +109,26 @@ country_data.tail(23)
 
 SCENARIOS = [
     # Round 1: C-rate 0.25
-    # ('CH', 0.25),
-    # ('DE_LU', 0.25),
-    # ('AT', 0.25),
-    ('HU', 0.25),
-    # ('CZ', 0.25),
+    # # ('CH', 0.25), # DONE
+    # ('DE_LU', 0.25), #DONE
+    # ('AT', 0.25), #DONE
+    # ('HU', 0.25),  #DONE
+    # ('CZ', 0.25), #DONE
 
 
-    # Round 2: C-rate 0.33
-    # ('CH', 0.33),
-    # ('DE_LU', 0.33),
-    # ('AT', 0.33),
-    # ('HU', 0.33),
-    # ('CZ', 0.33),
+    # # Round 2: C-rate 0.33
+    # # ('CH', 0.33), #DONE
+    # ('DE_LU', 0.33),  #DONE
+    # ('AT', 0.33), #DONE
+    # ('HU', 0.33),  #DONE
+    # ('CZ', 0.33), #DONE
 
     # Round 3: C-rate 0.5 (highest priority)
-    # ('CH', 0.5),
-    # ('DE_LU', 0.5),
-    # ('AT', 0.5),
-    # ('HU', 0.5),
-    # ('CZ', 0.5),
+    # ('CH', 0.5), # DONE
+    ('DE_LU', 0.5),
+    ('AT', 0.5),
+    ('HU', 0.5),
+    ('CZ', 0.5),
 
 
 ]
@@ -410,7 +410,7 @@ def main():
     print("=" * 60)
     print("BATCH EXECUTION: FINAL SUBMISSION")
     print("=" * 60)
-    print(f"Scenarios: 15 ({TEST_DURATION_DAYS} days each)")
+    print(f"Scenarios: {len(SCENARIOS)} ({TEST_DURATION_DAYS} days each)")
     print(f"Solver: {DEFAULT_SOLVER} | Horizon: {HORIZON_HOURS}h / Exec: {EXECUTION_HOURS}h")
     print(f"Output: {BASE_OUTPUT_DIR}/")
     print("=" * 60)
@@ -425,7 +425,7 @@ def main():
         logger.info(f"{'=' * 80}\n")
 
         # Console progress
-        print(f"\n[{i}/15] {country} @ C-rate {c_rate}...", flush=True)
+        print(f"\n[{i}/{len(SCENARIOS)}] {country} @ C-rate {c_rate}...", flush=True)
 
         result = run_scenario(country, c_rate, logger)
         results_list.append(result)

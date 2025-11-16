@@ -97,3 +97,4 @@ gha-creds-*.json
 # ============================================
 py_script/test/archive/
 py_script/visualization/archive/
+notebook/archive

@@ -1,25 +1,21 @@
 {
-  "default_solver": "gurobi",
+  "default_solver": "highs",
   "solver_time_limit_sec": 900,
   "solver_options": {
     "cplex": {
       "timelimit": 900,
-      "mip_tolerances_mipgap": 0.03
+      "mip_tolerances_mipgap": 0.01
     },
     "gurobi": {
     "TimeLimit": 900,
-    "MIPGap": 0.03,
+    "MIPGap": 0.01,
     "Threads": 0,            
     "MIPFocus": 2,          
     "description": "Threads: 0 = use all available cores; MIPFocus: 1=feasibility, 2=optimality, 3=bound;  solver options for balancing speed and solution quality"
     },
     "highs": {
       "time_limit": 900.0,
-      "mip_rel_gap": 0.03
-    },
-    "cbc": {
-      "seconds": 900,
-      "ratio": 0.03
+      "mip_rel_gap": 0.01
     }
   }
 }

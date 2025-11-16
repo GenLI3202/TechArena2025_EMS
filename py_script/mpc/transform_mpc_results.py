@@ -163,9 +163,17 @@ def extract_iteration_summary(
         - iteration: int (0-indexed)
         - start_timestep: int
         - end_timestep: int
-        - revenue: float (EUR)
-        - degradation_cost: float (EUR)
-        - profit: float (EUR)
+        - revenue: float (EUR) - aggregated total revenue
+        - degradation_cost: float (EUR) - aggregated total degradation
+        - profit: float (EUR) - net profit
+        - da_discharge_revenue: float (EUR) - detailed breakdown
+        - da_charge_cost: float (EUR) - detailed breakdown
+        - fcr_revenue: float (EUR) - detailed breakdown
+        - afrr_pos_cap_revenue: float (EUR) - detailed breakdown
+        - afrr_neg_cap_revenue: float (EUR) - detailed breakdown
+        - afrr_e_revenue: float (EUR) - detailed breakdown
+        - cyclic_cost: float (EUR) - detailed breakdown
+        - calendar_cost: float (EUR) - detailed breakdown
         - initial_soc: float (kWh) - if include_soc_trajectory=True
         - final_soc: float (kWh) - if include_soc_trajectory=True
         - solve_time: float (seconds) - if available
@@ -180,13 +188,28 @@ def extract_iteration_summary(
     iteration_data = []
 
     for i, iter_result in enumerate(mpc_results['iteration_results']):
+        # Get window_results for detailed breakdown (from MPC simulator)
+        window_results = iter_result.get('window_results', {})
+
         row = {
             'iteration': i,
             'start_timestep': iter_result.get('start_timestep', i * 96),  # Assume 24h = 96 timesteps
             'end_timestep': iter_result.get('end_timestep', (i + 1) * 96),
+            # Aggregated (backward compatibility)
             'revenue': iter_result.get('revenue', 0.0),
             'degradation_cost': iter_result.get('degradation_cost', 0.0),
             'profit': iter_result.get('profit', 0.0),
+            # Detailed revenue breakdown
+            # Check iter_result first (from calculated breakdown), then window_results (from MPC)
+            'da_discharge_revenue': iter_result.get('da_discharge_revenue', window_results.get('da_discharge_revenue', 0.0)),
+            'da_charge_cost': iter_result.get('da_charge_cost', window_results.get('da_charge_cost', 0.0)),
+            'fcr_revenue': iter_result.get('fcr_revenue', window_results.get('fcr_revenue', 0.0)),
+            'afrr_pos_cap_revenue': iter_result.get('afrr_pos_cap_revenue', window_results.get('afrr_pos_cap_revenue', 0.0)),
+            'afrr_neg_cap_revenue': iter_result.get('afrr_neg_cap_revenue', window_results.get('afrr_neg_cap_revenue', 0.0)),
+            'afrr_e_revenue': iter_result.get('afrr_e_revenue', window_results.get('afrr_e_revenue', 0.0)),
+            # Detailed cost breakdown
+            'cyclic_cost': iter_result.get('cyclic_cost', window_results.get('cyclic_cost', 0.0)),
+            'calendar_cost': iter_result.get('calendar_cost', window_results.get('calendar_cost', 0.0)),
         }
 
         # Add SOC trajectory if requested
