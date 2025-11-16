@@ -725,9 +725,8 @@ def _extract_country_from_wide_tables(
     if 'day_ahead' not in market_tables:
         raise ValueError("day_ahead market data not found")
 
-    # Normalize timestamps to minute precision (Excel has inconsistent seconds: 00:00:00.5, 00:00:01, etc.)
-    # CRITICAL FIX: Use floor('min') not floor('s') because source data has random +1 second offsets
-    timestamps = pd.to_datetime(market_tables['day_ahead'][TIMESTAMP_COL]).dt.floor('min')
+    # Round timestamps to nearest second to avoid floating-point alignment issues
+    timestamps = pd.to_datetime(market_tables['day_ahead'][TIMESTAMP_COL]).dt.round('s')
 
     # Initialize output DataFrame
     country_df = pd.DataFrame()
@@ -741,8 +740,8 @@ def _extract_country_from_wide_tables(
     # Extract FCR prices (need to forward-fill from 4-hour blocks to 15-min)
     try:
         fcr_df = market_tables['fcr'].copy()
-        # Normalize to minute precision (match DA timestamps)
-        fcr_df[TIMESTAMP_COL] = pd.to_datetime(fcr_df[TIMESTAMP_COL]).dt.floor('min')
+        # Round timestamps for alignment
+        fcr_df[TIMESTAMP_COL] = pd.to_datetime(fcr_df[TIMESTAMP_COL]).dt.round('s')
         fcr_df = fcr_df.set_index(TIMESTAMP_COL)
         # Reindex to 15-min and forward fill
         fcr_reindexed = fcr_df.reindex(timestamps).ffill()
@@ -753,8 +752,8 @@ def _extract_country_from_wide_tables(
     # Extract aFRR capacity prices (need to forward-fill from 4-hour blocks to 15-min)
     try:
         afrr_cap_df = market_tables['afrr_capacity'].copy()
-        # Normalize to minute precision (match DA timestamps)
-        afrr_cap_df[TIMESTAMP_COL] = pd.to_datetime(afrr_cap_df[TIMESTAMP_COL]).dt.floor('min')
+        # Round timestamps for alignment
+        afrr_cap_df[TIMESTAMP_COL] = pd.to_datetime(afrr_cap_df[TIMESTAMP_COL]).dt.round('s')
         afrr_cap_df = afrr_cap_df.set_index(TIMESTAMP_COL)
         afrr_cap_reindexed = afrr_cap_df.reindex(timestamps).ffill()
         country_df['price_afrr_pos'] = afrr_cap_reindexed[f'{as_country}_Pos'].values

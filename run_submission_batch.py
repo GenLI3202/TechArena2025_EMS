@@ -7,11 +7,11 @@ Generates 15 annual MPC results for all country-crate combinations:
 - 3 C-rates: 0.25, 0.33, 0.5
 
 Execution order (priority-based):
-1. All countries at C-rate=0.5
+1. All countries at C-rate=0.25
 2. All countries at C-rate=0.33
-3. All countries at C-rate=0.25
+3. All countries at C-rate=0.50
 """
-
+# %%
 import sys
 import json
 import time
@@ -43,6 +43,10 @@ from py_script.data.load_process_market_data import load_preprocessed_country_da
 
 # Results export
 from py_script.validation.results_exporter import save_optimization_results
+
+# Suppress verbose logging from optimizer and MPC modules (keep warnings/errors)
+logging.getLogger('py_script.core.optimizer').setLevel(logging.WARNING)
+logging.getLogger('py_script.mpc.mpc_simulator').setLevel(logging.WARNING)
 
 # ================================================================================
 # CONFIGURATION
@@ -89,66 +93,75 @@ CHECKPOINT_INTERVAL_MINUTES = 2
 SAVE_RESULTS = True
 BASE_OUTPUT_DIR = "submission_results"
 
+
+# %% 
+country = 'AT'
+
+preprocessed_dir = project_root / "data" / "parquet" / "preprocessed"
+country_data = load_preprocessed_country_data(country, data_dir=preprocessed_dir)
+country_data.tail(23)
+
+# %%
+
 # ================================================================================
 # SCENARIO DEFINITIONS (Priority-ordered)
 # ================================================================================
 
 SCENARIOS = [
-    # Round 1: C-rate 0.5 (highest priority)
-    ('CH', 0.5),
-    ('DE_LU', 0.5),
-    ('AT', 0.5),
-    ('HU', 0.5),
-    ('CZ', 0.5),
+    # Round 1: C-rate 0.25
+    # ('CH', 0.25),
+    # ('DE_LU', 0.25),
+    # ('AT', 0.25),
+    ('HU', 0.25),
+    # ('CZ', 0.25),
+
 
     # Round 2: C-rate 0.33
-    ('CH', 0.33),
-    ('DE_LU', 0.33),
-    ('AT', 0.33),
-    ('HU', 0.33),
-    ('CZ', 0.33),
+    # ('CH', 0.33),
+    # ('DE_LU', 0.33),
+    # ('AT', 0.33),
+    # ('HU', 0.33),
+    # ('CZ', 0.33),
 
-    # Round 3: C-rate 0.25
-    ('CH', 0.25),
-    ('DE_LU', 0.25),
-    ('AT', 0.25),
-    ('HU', 0.25),
-    ('CZ', 0.25),
+    # Round 3: C-rate 0.5 (highest priority)
+    # ('CH', 0.5),
+    # ('DE_LU', 0.5),
+    # ('AT', 0.5),
+    # ('HU', 0.5),
+    # ('CZ', 0.5),
+
+
 ]
 
 # ================================================================================
 # LOGGING SETUP
 # ================================================================================
+TIMENOW_STR = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 def setup_logging():
-    """Setup logging to both file and console"""
-    log_file = project_root / BASE_OUTPUT_DIR / "batch_execution.log"
-
+    """Setup logging: detailed file logs, errors-only to console"""
+    log_file = project_root / BASE_OUTPUT_DIR / f"batch_execution_{TIMENOW_STR}.log"
     # Create logger
     logger = logging.getLogger('batch_executor')
     logger.setLevel(logging.INFO)
 
-    # File handler
+    # File handler - detailed logs
     fh = logging.FileHandler(log_file, mode='w')
     fh.setLevel(logging.INFO)
-
-    # Console handler
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-
-    # Formatter
-    formatter = logging.Formatter(
+    file_formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
-
+    fh.setFormatter(file_formatter)
     logger.addHandler(fh)
+
+    # Console handler - errors only (no duplicate INFO messages)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
     logger.addHandler(ch)
 
     return logger
-
+# %%
 # ================================================================================
 # MAIN EXECUTION FUNCTION
 # ================================================================================
@@ -249,6 +262,7 @@ def run_scenario(country, c_rate, logger):
         logger.info(f"  Profit: €{mpc_results['net_profit']:,.2f}")
         logger.info(f"  Revenue: €{mpc_results['total_revenue']:,.2f}")
         logger.info(f"  Degradation: €{mpc_results['total_degradation_cost']:,.2f}")
+        
 
         # 5. Transform and save results
         logger.info(f"[5/5] Transforming and saving results...")
@@ -273,6 +287,10 @@ def run_scenario(country, c_rate, logger):
             'c_rate': c_rate,
 
             # MPC settings
+            "optimizer_settings": {
+                "require_sequential": REQUIRE_SEQUENTIAL,
+                "lifo_epsilon_kwh": LIFO_EPSILON_KWH,
+            },
             'mpc_horizon_hours': HORIZON_HOURS,
             'mpc_execution_hours': EXECUTION_HOURS,
             'mpc_initial_soc_fraction': INITIAL_SOC_FRACTION,
@@ -364,6 +382,7 @@ def run_scenario(country, c_rate, logger):
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
 
+# %%
 # ================================================================================
 # MAIN BATCH EXECUTION
 # ================================================================================
@@ -387,6 +406,15 @@ def main():
     logger.info("=" * 80)
     logger.info("")
 
+    # Console summary
+    print("=" * 60)
+    print("BATCH EXECUTION: FINAL SUBMISSION")
+    print("=" * 60)
+    print(f"Scenarios: 15 ({TEST_DURATION_DAYS} days each)")
+    print(f"Solver: {DEFAULT_SOLVER} | Horizon: {HORIZON_HOURS}h / Exec: {EXECUTION_HOURS}h")
+    print(f"Output: {BASE_OUTPUT_DIR}/")
+    print("=" * 60)
+
     # Execute all scenarios
     batch_start = time.time()
     results_list = []
@@ -396,14 +424,19 @@ def main():
         logger.info(f"SCENARIO {i}/{len(SCENARIOS)}: {country} @ C-rate {c_rate}")
         logger.info(f"{'=' * 80}\n")
 
+        # Console progress
+        print(f"\n[{i}/15] {country} @ C-rate {c_rate}...", flush=True)
+
         result = run_scenario(country, c_rate, logger)
         results_list.append(result)
 
         # Brief summary
         if result['success']:
             logger.info(f"✓ Success | Profit: €{result['profit']:,.2f} | Time: {result['solve_time']/60:.1f} min")
+            print(f"  ✓ €{result['profit']:,.0f} | {result['solve_time']/60:.1f}min")
         else:
             logger.info(f"✗ Failed | Error: {result['error']}")
+            print(f"  ✗ FAILED: {result['error']}")
 
     batch_time = time.time() - batch_start
 
@@ -413,7 +446,7 @@ def main():
     logger.info("=" * 80)
 
     summary_df = pd.DataFrame(results_list)
-    summary_csv_path = project_root / BASE_OUTPUT_DIR / "batch_summary.csv"
+    summary_csv_path = project_root / BASE_OUTPUT_DIR / f"batch_summary_{TIMENOW_STR}.csv"
     summary_df.to_csv(summary_csv_path, index=False)
 
     # Statistics
@@ -443,6 +476,19 @@ def main():
     logger.info("BATCH EXECUTION COMPLETE")
     logger.info("=" * 80)
 
+    # Console summary
+    print("\n" + "=" * 60)
+    print("BATCH COMPLETE")
+    print("=" * 60)
+    print(f"Success: {n_success}/{len(SCENARIOS)} | Failed: {n_failed}")
+    print(f"Total time: {batch_time/60:.1f}min ({batch_time/3600:.2f}h)")
+    if n_success > 0:
+        successful_results = summary_df[summary_df['success']]
+        print(f"Total Profit: €{successful_results['profit'].sum():,.0f}")
+        print(f"Avg Profit: €{successful_results['profit'].mean():,.0f}")
+    print(f"Results: {summary_csv_path}")
+    print("=" * 60)
+
     return summary_df
 
 # ================================================================================
@@ -451,6 +497,6 @@ def main():
 
 if __name__ == "__main__":
     summary = main()
-    print(f"\n✓ Batch execution complete! Check {BASE_OUTPUT_DIR}/batch_summary.csv for results.")
+    print(f"\n✓ Batch execution complete! Check {BASE_OUTPUT_DIR}/batch_summary_{TIMENOW_STR}.csv for results.")
 
 # %%
