@@ -27,6 +27,7 @@ input/
 
 # Large JSON result files (8.5GB+)
 validation_results/**/*.html
+submission_results/
 
 # Large JSONL data files (200K+ lines)
 **/input/TechArena2025_data_tidy.jsonl

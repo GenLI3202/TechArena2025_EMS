@@ -3,7 +3,7 @@
   "version": "1.0",
 
   "test_scenario": {
-    "country": "DE_LU",
+    "country": "AT",
     "c_rate": 0.5,
     "data_source": "preprocessed",
     "description": "Basic test scenario settings. Options: data_source='preprocessed' (fast) or 'excel' (submission)"

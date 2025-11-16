@@ -4,11 +4,11 @@ Phase 2 MPC Testing - Interactive Version
 
 This script provides a flexible testing and validation harness for the MPC (Model Predictive Control) simulation framework.
 
-This version has cell markers (# %%) for block-by-block execution in VS Code.
+This version has cell markers () for block-by-block execution in VS Code.
 Run cells individually using Shift+Enter or clicking "Run Cell" above each block.
 """
 
-# %%
+
 # ================================================================================
 # [SECTION 1] SETUP & IMPORTS
 # ================================================================================
@@ -64,7 +64,7 @@ from py_script.validation.results_exporter import save_optimization_results
 print("[OK] All imports successful!")
 print(f"Project root: {project_root}")
 
-# %%
+
 # ================================================================================
 # [SECTION 2] CONFIGURATION
 # ================================================================================
@@ -126,7 +126,7 @@ DEFAULT_SOLVER_TIME_LIMIT = solver_config.get('solver_time_limit_sec', 900)
 print(f"\n[SOLVER] Default solver: {DEFAULT_SOLVER}")
 print(f"[SOLVER] Time limit: {DEFAULT_SOLVER_TIME_LIMIT}s")
 
-# %%
+
 # ============================================================================
 # Extract Scenario Parameters from Config
 # ============================================================================
@@ -184,7 +184,7 @@ LIFO_EPSILON_KWH = 0            # Tolerance for LIFO segment fullness (kWh)
 
 # Checkpoint configuration (for long-running simulations)
 ENABLE_CHECKPOINTING = True             # Enable automatic checkpoint saving
-CHECKPOINT_INTERVAL_MINUTES = 5        # Save checkpoint every N minutes
+CHECKPOINT_INTERVAL_MINUTES = 2        # Save checkpoint every N minutes
 # Note: For meta-optimizer mode, modify MetaOptimizer class to accept these parameters
 
 # Display scenario summary
@@ -228,7 +228,7 @@ if ENABLE_META_OPTIMIZER:
     print(f"  Project Lifetime:   {META_LIFETIME} years")
 print("=" * 80)
 
-# %%
+
 # ============================================================================
 # Load Market Data
 # ============================================================================
@@ -291,7 +291,7 @@ print(f"   aFRR+ Energy Price: {country_data_slice['price_afrr_energy_pos'].min(
 print(f"   aFRR- Energy Price: {country_data_slice['price_afrr_energy_neg'].min():.2f} - {country_data_slice['price_afrr_energy_neg'].max():.2f} EUR/MWh")
 
 
-# %%
+
 # ================================================================================
 # [SECTION 3] RUN MPC SIMULATION OR LOAD SAVED RESULTS
 # ================================================================================
@@ -496,7 +496,7 @@ else:
 
         # Run simulation with optional checkpoint saving
         if ENABLE_CHECKPOINTING:
-            checkpoint_path = project_root / f"mpc_checkpoint_{TEST_COUNTRY}_{TEST_C_RATE}_{TEST_DURATION_DAYS}_backup.pkl"
+            checkpoint_path = project_root / "mpc_checkpoint_backup.pkl"
             print(f"   Checkpointing enabled: every {CHECKPOINT_INTERVAL_MINUTES} minutes")
             print(f"   Checkpoint file: {checkpoint_path}")
             mpc_results = simulator.run_full_simulation(
@@ -529,7 +529,7 @@ else:
     print(f"Simulation Time:        {simulation_time:.2f}s ({simulation_time/60:.2f} min)")
     print("=" * 80)
 
-# %%
+
 # ================================================================================
 # [SECTION 4] TRANSFORM & SAVE RESULTS
 # ================================================================================
@@ -639,7 +639,7 @@ if not LOAD_FROM_SAVED:
 else:
     print("[INFO] Using loaded summary metrics")
 
-# %%
+
 # ============================================================================
 # Save Results to Disk
 # ============================================================================
@@ -687,7 +687,7 @@ else:
     print("=" * 80)
     output_directory = Path(".")
 
-# %%
+
 # ================================================================================
 # [SECTION 5] STANDARD VALIDATION PLOTS
 # ================================================================================
@@ -739,10 +739,10 @@ if ENABLE_STANDARD_PLOTS:
 else:
     print("\n[WARNING] Standard plots disabled (ENABLE_STANDARD_PLOTS = False)")
 
-# %%
+
 viz_df['e_soc']
 
-# %%
+
 # ================================================================================
 # [SECTION 6] MPC-SPECIFIC ANALYSIS PLOTS
 # ================================================================================
@@ -844,9 +844,9 @@ if LOAD_FROM_SAVED:
         SAVE_FORMAT = 'html'
 
 
-# %%
+
 mpc_results
-# %%
+
 
 if ENABLE_MPC_PLOTS:
     plots_dir = output_directory / "plots" if SAVE_RESULTS else Path(".")
@@ -902,7 +902,7 @@ if ENABLE_MPC_PLOTS:
 else:
     print("\n[WARNING] MPC plots disabled (ENABLE_MPC_PLOTS = False)")
 
-# %%
+
 # ================================================================================
 # [COMPLETE] NOTEBOOK COMPLETE!
 # ================================================================================
