@@ -446,6 +446,31 @@ For detailed usage instructions, see:
 
 ## Recent Updates
 
+### November 2025 - Production System Deployment
+- ✅ **MPC Batch Execution System**
+  - Automated 15-scenario full-year (365-day) MPC simulations
+  - Script: `run_submission_batch.py`
+  - Checkpoint-based execution with periodic saving every 2 minutes
+  - Priority-ordered scenario execution by C-rate groups
+  - HiGHS solver integration as default for open-source deployment
+
+- ✅ **Comprehensive Results Analysis Framework**
+  - Interactive analysis script: `notebook/py_version/p2d_results_ana.py`
+  - Multi-level analysis: batch summary, country rankings, C-rate impact analysis
+  - 10 visualization types per scenario (4 market + 6 custom analysis plots)
+  - Automated validation checks and markdown report generation
+  - Financial breakdown with McKinsey-style waterfall and pie charts
+
+- ✅ **Critical Bug Fixes**
+  - Fixed data corruption bug in MPC result aggregation (#12)
+  - Improved numerical stability in degradation cost calculations
+  - Enhanced constraint validation across all scenarios
+
+- ✅ **Solver Configuration Updates**
+  - HiGHS as default solver (open-source alternative to Gurobi/CPLEX)
+  - Auto-detection priority: Gurobi > CPLEX > CBC > GLPK > HiGHS
+  - Standardized solver timeout: 900s, MIP gap: 0.01
+
 ### November 2025 - Code Quality Sprint
 - ✅ **Refactored optimizer architecture** for clean separation of concerns
   - `solve_model()` now only handles solving (returns model + results)
@@ -458,8 +483,6 @@ For detailed usage instructions, see:
   - Comprehensive documentation in `py_script/validation/README.md`
 - ✅ **Updated all test scripts** to use new refactored API
 - ✅ **Improved code maintainability** and extensibility
-
-See `VALIDATION_UTILITIES_SUMMARY.md` for detailed implementation notes.
 
 ---
 

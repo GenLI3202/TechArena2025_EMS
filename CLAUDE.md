@@ -96,9 +96,15 @@ country_data = load_preprocessed_country_data('DE_LU')
 
 ### Solver Configuration
 The project auto-detects available MILP solvers in order: Gurobi > CPLEX > CBC > GLPK > HiGHS
-- **CPLEX/Gurobi**: Best performance for large-scale problems
-- **CBC**: Good open-source option
-- **GLPK**: Fallback, slower for complex models
+- **Gurobi/CPLEX**: Best performance for large-scale problems (commercial)
+- **HiGHS**: **Current default** - Fast open-source solver (recommended)
+- **CBC**: Good open-source option, slower than HiGHS
+- **GLPK**: Fallback, slowest for complex models
+
+**Solver Settings** (configured in `data/p2_config/solver_config.json`):
+- Default solver: `highs`
+- Time limit: 900 seconds (15 minutes)
+- MIP gap tolerance: 0.01 (1%)
 
 ## Important Constraints
 
@@ -131,19 +137,33 @@ Refer to `doc\p2_model\p2_bi_model_ggdp.tex`
 ## Testing and Validation
 
 ### Output Files saved destinations
-- **Solutions**: 
-   1. `validation_results/{validation_name}/solution_*.csv` (detailed decision variable time series)
-   2. `validation_results/{validation_name}/performance_*.json` (Summary statistics, such as total profit including coponents profits, degradation costs, solver status, runtime, etc.)
+- **Solutions**:
+   1. `validation_results/{validation_name}/solution_timeseries.csv` (detailed decision variable time series)
+   2. `validation_results/{validation_name}/performance_summary.json` (Summary statistics: total profit, revenue components, degradation costs, solver status, runtime, etc.)
+   3. `validation_results/{validation_name}/iteration_summary.csv` (MPC-specific: per-iteration metrics with detailed financial breakdown)
 - **Visualizations**: `validation_results/{validation_name}/plots/*.html` (or png)
-- **Python Scripts**: Build minimum number of new wheels. When develop or test, first look at `./pyscript/` for existing utilities. If new scripts are needed, place in appropriate subfolder under `./pyscript/`.
-- **Metadata**: JSON files with optimization statistics
+- **Batch Results**: `submission_results/` (for final submission runs)
+  - Batch summary CSV with all scenarios
+  - Individual scenario directories with full results
+  - Analysis reports and comparison plots
+- **Python Scripts**: Build minimum number of new wheels. When develop or test, first look at `./py_script/` for existing utilities. If new scripts are needed, place in appropriate subfolder under `./py_script/`.
 
 ### Visualization Outputs
-Four standard plots generated:
+**Standard Optimization Plots** (4):
 1. **da_market_price_bid.html**: Day-ahead market participation
 2. **afrr_energy_market_price_bid.html**: aFRR energy market (shows 0 prices correctly)
 3. **capacity_markets_price_bid.html**: FCR/aFRR capacity reservations
 4. **soc_and_power_bids.html**: Battery SOC trajectory with all power flows
+
+**MPC-Specific Plots** (3):
+5. **mpc_iteration_boundaries.html**: Horizon windows and execution steps
+6. **mpc_iteration_performance.html**: Per-iteration profit/revenue/cost waterfall charts
+7. **mpc_state_continuity.html**: SOC continuity validation across iterations
+
+**Custom Analysis Plots** (3):
+8. **financial_revenue_breakdown.html**: Revenue and cost breakdown pie charts
+9. **daily_profit_distribution.html**: Histogram of daily profit distribution
+10. **analysis_*.html**: Batch-level comparison plots (country, C-rate, heatmaps)
 
 ## Important Implementation Details
 
@@ -176,9 +196,53 @@ e_soc_j[t, j-1] >= (E_seg[j-1] - epsilon) * z_segment_active[t, j]
 **Validation:** Check cyclic SOC stacked plot - lower segments should show complete fills before upper segments activate
 
 
+## Production Workflows
+
+### Running MPC Batch Simulations
+For final submission results (15 scenarios × 365 days):
+
+```bash
+# Run batch execution
+python run_submission_batch.py
+```
+
+**Features**:
+- Checkpoint-based execution (saves every 2 minutes)
+- Priority-ordered execution (by C-rate groups)
+- Automated logging to `submission_results/batch_execution_TIMESTAMP.log`
+- Results saved to `submission_results/TIMESTAMP_country_crateX.X/`
+
+**Configuration** (edit in `run_submission_batch.py`):
+- `TEST_DURATION_DAYS`: 365 (full year)
+- `ALPHA`: 1.0 (full degradation weight)
+- `HORIZON_HOURS` / `EXECUTION_HOURS`: from `mpc_config.json`
+- `DEFAULT_SOLVER`: from `solver_config.json` (currently `highs`)
+- `MAX_AS_RATIO`: 0.9 (90% of power for AS markets)
+
+### Analyzing Batch Results
+After batch execution completes:
+
+```bash
+# Run comprehensive analysis
+python notebook/py_version/p2d_results_ana.py
+```
+
+**Outputs**:
+- Batch summary statistics
+- Country and C-rate rankings
+- Profitability heatmaps
+- Individual scenario deep-dives with 10 plots each
+- Validation checks and markdown report
+
+**Configuration** (edit in script):
+- `ANALYSIS_MODE`: "batch" (all scenarios) or "single" (one scenario)
+- `GENERATE_PLOTS`: True/False
+- `SAVE_ANALYSIS_REPORT`: True/False
+
 ## Known Issues and Workarounds
 
-1. **aFRR zero prices**: Must use preprocessing to convert to NaN
-2. **Solver timeouts**: Large problems may need increased time limits
-3. **Memory usage**: Full-year optimization requires significant RAM
+1. **aFRR zero prices**: Must use preprocessing to convert to NaN (FIXED - automatic)
+2. **Solver timeouts**: Large problems may need increased time limits (current: 900s)
+3. **Memory usage**: Full-year optimization requires significant RAM (2-4GB per scenario)
 4. **Windows paths**: Use raw strings or forward slashes for file paths
+5. **Data corruption bug**: Fixed in commit f6fb04a - verify with results analysis script

@@ -52,5 +52,28 @@
     "auto_generate_run_name": true,
     "custom_run_name": null,
     "description": "Output settings. If auto_generate_run_name=true, uses format: mpc_{country}_{duration}d_alpha{alpha}. Otherwise uses custom_run_name"
+  },
+
+  "alpha_meta_optimization": {
+    "enabled": false,
+    "test_mode": true,
+    "test_days": 14,
+    "full_days": 365,
+    "alpha_range": {
+      "min": 0.5,
+      "max": 1.5,
+      "step": 0.1
+    },
+    "parallel_execution": {
+      "enabled": true,
+      "n_jobs": 4
+    },
+    "financial_params": {
+      "wacc": 0.08,
+      "inflation_rate": 0.02,
+      "project_lifetime_years": 10
+    },
+    "output_dir": "validation_results/alpha_meta_optimization",
+    "description": "Alpha meta-optimization configuration. Use with p2e_alpha_meta_optimization.py script for parameter tuning and Pareto analysis."
   }
 }
