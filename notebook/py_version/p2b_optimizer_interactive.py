@@ -134,7 +134,7 @@ CONFIGURATION NOTES:
 TEST_COUNTRY = "DE_LU"                 # Options: DE_LU, AT, CH, HU, CZ
 TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
-TEST_TIME_HORIZON_HOURS = 24        # Time horizon in hours (24h feasible with 6-segment config)
+TEST_TIME_HORIZON_HOURS = 36        # Time horizon in hours (24h feasible with 6-segment config)
 TEST_START_STEP = int(96*15)         # Starting time step (96 = 1 day in 15-min intervals)
 TEST_MODEL = "III"                  # Options: "I", "II", "III"
 USE_EV_WEIGHTING = True            # Enable aFRR EV weighting
@@ -296,8 +296,12 @@ solved_model, solver_results = optimizer.solve_model(model, solver_name=DEFAULT_
 solve_time = time.time() - solve_start
 
 print(f"[OK] Model solved in {solve_time:.2f} seconds")
-print(f"Status:      {solver_results.solver.status}")
-print(f"Termination: {solver_results.solver.termination_condition}")
+try:
+    print(f"Status:      {solver_results.solver.status}")
+    print(f"Termination: {solver_results.solver.termination_condition}")
+except AttributeError:
+    # Fallback for different solver result structures
+    print(f"Solver info: {solver_results.solver if hasattr(solver_results, 'solver') else 'N/A'}")
 
 # %%
 # ============================================================================

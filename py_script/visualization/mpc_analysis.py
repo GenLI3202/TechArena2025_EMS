@@ -132,10 +132,10 @@ def plot_iteration_boundaries(
         # Add vertical line at iteration start
         fig.add_vline(
             x=start_ts * 0.25,
-            line=dict(color=MCKINSEY_COLORS['red'], width=1, dash='dash'),
+            line=dict(color=MCKINSEY_COLORS['negative'], width=1, dash='dash'),
             annotation_text=f"Iter {i}",
             annotation_position="top",
-            annotation=dict(font=dict(size=10, color=MCKINSEY_COLORS['red']))
+            annotation=dict(font=dict(size=10, color=MCKINSEY_COLORS['negative']))
         )
 
         # Optionally show horizon windows
@@ -148,7 +148,7 @@ def plot_iteration_boundaries(
             fig.add_vrect(
                 x0=start_ts * 0.25,
                 x1=min(end_ts * 0.25, max(hours)),
-                fillcolor=MCKINSEY_COLORS['gray'],
+                fillcolor=MCKINSEY_COLORS['gray_light'],
                 opacity=0.1,
                 layer="below",
                 line_width=0,
@@ -162,10 +162,10 @@ def plot_iteration_boundaries(
         if final_ts < len(timesteps):
             fig.add_vline(
                 x=final_ts * 0.25,
-                line=dict(color=MCKINSEY_COLORS['red'], width=1, dash='dash'),
+                line=dict(color=MCKINSEY_COLORS['negative'], width=1, dash='dash'),
                 annotation_text=f"Iter {len(iteration_results)}",
                 annotation_position="top",
-                annotation=dict(font=dict(size=10, color=MCKINSEY_COLORS['red']))
+                annotation=dict(font=dict(size=10, color=MCKINSEY_COLORS['negative']))
             )
 
     # Update layout
@@ -174,7 +174,7 @@ def plot_iteration_boundaries(
         title_text += f" {title_suffix}"
 
     fig.update_layout(
-        title=dict(text=title_text, font=dict(size=16, **MCKINSEY_FONTS)),
+        title=dict(text=title_text, font=dict(size=MCKINSEY_FONTS['title_size'], family=MCKINSEY_FONTS['family'])),
         xaxis_title="Time (hours)",
         yaxis_title="State of Charge (%)",
         yaxis_range=[0, 105],
@@ -182,7 +182,7 @@ def plot_iteration_boundaries(
         hovermode='x unified',
         showlegend=True,
         legend=dict(x=0.02, y=0.98, xanchor='left', yanchor='top'),
-        font=MCKINSEY_FONTS,
+        font=dict(family=MCKINSEY_FONTS['family'], size=MCKINSEY_FONTS['axis_label_size']),
         height=500
     )
 
@@ -244,7 +244,7 @@ def plot_iteration_performance(
             x=iter_df['iteration'],
             y=iter_df['revenue'],
             name='Revenue',
-            marker_color=MCKINSEY_COLORS['green'],
+            marker_color=MCKINSEY_COLORS['positive'],
             hovertemplate='Iteration %{x}<br>Revenue: €%{y:,.0f}<extra></extra>'
         ),
         secondary_y=False if show_cumulative else None
@@ -256,7 +256,7 @@ def plot_iteration_performance(
             x=iter_df['iteration'],
             y=-iter_df['degradation_cost'],
             name='Degradation Cost',
-            marker_color=MCKINSEY_COLORS['red'],
+            marker_color=MCKINSEY_COLORS['negative'],
             hovertemplate='Iteration %{x}<br>Degradation: -€%{y:,.0f}<extra></extra>'
         ),
         secondary_y=False if show_cumulative else None
@@ -283,7 +283,7 @@ def plot_iteration_performance(
                 y=cumulative_profit,
                 mode='lines+markers',
                 name='Cumulative Profit',
-                line=dict(color=MCKINSEY_COLORS['orange'], width=3),
+                line=dict(color=MCKINSEY_COLORS['dark_blue'], width=3),
                 marker=dict(size=8),
                 hovertemplate='Iteration %{x}<br>Cumulative: €%{y:,.0f}<extra></extra>'
             ),
@@ -296,14 +296,14 @@ def plot_iteration_performance(
         title_text += f" {title_suffix}"
 
     fig.update_layout(
-        title=dict(text=title_text, font=dict(size=16, **MCKINSEY_FONTS)),
+        title=dict(text=title_text, font=dict(size=MCKINSEY_FONTS['title_size'], family=MCKINSEY_FONTS['family'])),
         xaxis_title="MPC Iteration",
         barmode='relative',
         template="plotly_white",
         hovermode='x unified',
         showlegend=True,
         legend=dict(x=0.02, y=0.98, xanchor='left', yanchor='top'),
-        font=MCKINSEY_FONTS,
+        font=dict(family=MCKINSEY_FONTS['family'], size=MCKINSEY_FONTS['axis_label_size']),
         height=500
     )
 
@@ -363,6 +363,9 @@ def plot_state_continuity(
     - Red markers: potential discontinuity (exceeds tolerance)
     - SOC should be continuous - any red markers indicate potential MPC implementation issues
     """
+    if 'soc_trajectory' not in mpc_results:
+        raise ValueError("mpc_results missing 'soc_trajectory' key. Ensure MPC simulation includes SOC tracking.")
+
     soc_trajectory = mpc_results['soc_trajectory']
 
     if not soc_trajectory or len(soc_trajectory) < 2:
@@ -390,7 +393,7 @@ def plot_state_continuity(
             name='SOC at Iteration Boundary',
             line=dict(color=MCKINSEY_COLORS['navy'], width=2),
             marker=dict(size=10, color=[
-                MCKINSEY_COLORS['green'] if cont else MCKINSEY_COLORS['red']
+                MCKINSEY_COLORS['positive'] if cont else MCKINSEY_COLORS['negative']
                 for cont in is_continuous
             ]),
             hovertemplate='Iteration %{x}<br>SOC: %{y:.2f}%<br>Diff: %{customdata:.3f}%<extra></extra>',
@@ -402,7 +405,7 @@ def plot_state_continuity(
     mean_soc = np.mean(soc_pct)
     fig.add_hline(
         y=mean_soc,
-        line=dict(color=MCKINSEY_COLORS['gray'], width=1, dash='dot'),
+        line=dict(color=MCKINSEY_COLORS['gray_medium'], width=1, dash='dot'),
         annotation_text=f"Mean SOC: {mean_soc:.1f}%",
         annotation_position="right"
     )
@@ -419,7 +422,7 @@ def plot_state_continuity(
     fig.update_layout(
         title=dict(
             text=f"{title_text}<br><sub>{status_text}</sub>",
-            font=dict(size=16, **MCKINSEY_FONTS)
+            font=dict(size=MCKINSEY_FONTS['title_size'], family=MCKINSEY_FONTS['family'])
         ),
         xaxis_title="MPC Iteration",
         yaxis_title="State of Charge (%)",
@@ -428,7 +431,7 @@ def plot_state_continuity(
         hovermode='x unified',
         showlegend=True,
         legend=dict(x=0.02, y=0.98, xanchor='left', yanchor='top'),
-        font=MCKINSEY_FONTS,
+        font=dict(family=MCKINSEY_FONTS['family'], size=MCKINSEY_FONTS['axis_label_size']),
         height=500,
         annotations=[
             dict(
@@ -437,7 +440,7 @@ def plot_state_continuity(
                 x=0.5, y=-0.15,
                 xanchor='center', yanchor='top',
                 showarrow=False,
-                font=dict(size=10, color=MCKINSEY_COLORS['gray'])
+                font=dict(size=10, color=MCKINSEY_COLORS['gray_medium'])
             )
         ]
     )
@@ -511,7 +514,7 @@ def plot_solver_performance(
     mean_time = iter_df['solve_time'].mean()
     fig.add_hline(
         y=mean_time,
-        line=dict(color=MCKINSEY_COLORS['orange'], width=2, dash='dash'),
+        line=dict(color=MCKINSEY_COLORS['dark_blue'], width=2, dash='dash'),
         annotation_text=f"Mean: {mean_time:.2f}s",
         annotation_position="right"
     )
@@ -527,14 +530,14 @@ def plot_solver_performance(
     fig.update_layout(
         title=dict(
             text=f"{title_text}<br><sub>{subtitle}</sub>",
-            font=dict(size=16, **MCKINSEY_FONTS)
+            font=dict(size=MCKINSEY_FONTS['title_size'], family=MCKINSEY_FONTS['family'])
         ),
         xaxis_title="MPC Iteration",
         yaxis_title="Solve Time (seconds)",
         template="plotly_white",
         hovermode='x unified',
         showlegend=False,
-        font=MCKINSEY_FONTS,
+        font=dict(family=MCKINSEY_FONTS['family'], size=MCKINSEY_FONTS['axis_label_size']),
         height=400
     )
 

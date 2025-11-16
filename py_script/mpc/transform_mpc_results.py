@@ -1,7 +1,7 @@
 """
 Utilities for transforming MPC simulation results for visualization and analysis.
 
-This module provides functions to convert MPC annual_bids_df from internal format
+This module provides functions to convert MPC total_bids_df from internal format
 (MW units, minimal columns) to the format expected by visualization functions
 (kW units, all required columns with standardized names).
 """
@@ -11,12 +11,12 @@ from typing import Optional
 
 
 def transform_mpc_results_for_viz(
-    annual_bids_df: pd.DataFrame,
+    total_bids_df: pd.DataFrame,
     country_data: pd.DataFrame,
     battery_capacity_kwh: float = 4472.0
 ) -> pd.DataFrame:
     """
-    Transform MPC annual_bids_df to format expected by visualization functions.
+    Transform MPC total_bids_df to format expected by visualization functions.
 
     Handles:
     - MW → kW conversion for power variables
@@ -27,7 +27,7 @@ def transform_mpc_results_for_viz(
 
     Parameters
     ----------
-    annual_bids_df : pd.DataFrame
+    total_bids_df : pd.DataFrame
         MPC simulation output with columns:
         - timestep: int
         - e_soc: float (kWh)
@@ -69,7 +69,7 @@ def transform_mpc_results_for_viz(
     >>>
     >>> # Transform for visualization
     >>> viz_df = transform_mpc_results_for_viz(
-    ...     results['annual_bids_df'],
+    ...     results['total_bids_df'],
     ...     country_data
     ... )
     >>>
@@ -81,16 +81,16 @@ def transform_mpc_results_for_viz(
     -----
     - MPC outputs are in MW, but visualization functions expect kW for power
     - Capacity bids (c_fcr, c_afrr_pos, c_afrr_neg) remain in MW as expected
-    - Price columns are aligned by slicing country_data to match annual_bids_df length
+    - Price columns are aligned by slicing country_data to match total_bids_df length
     - SOC percentage is calculated as: soc_pct = e_soc / battery_capacity_kwh * 100
     """
     # Create a copy to avoid modifying original
-    viz_df = annual_bids_df.copy()
+    viz_df = total_bids_df.copy()
 
     # Verify we have the expected number of rows
     if len(viz_df) > len(country_data):
         raise ValueError(
-            f"annual_bids_df has {len(viz_df)} rows but country_data only has "
+            f"total_bids_df has {len(viz_df)} rows but country_data only has "
             f"{len(country_data)} rows. Cannot align data."
         )
 
@@ -105,7 +105,7 @@ def transform_mpc_results_for_viz(
     viz_df['price_afrr_energy_pos'] = country_data['price_afrr_energy_pos'].iloc[:len(viz_df)].values
     viz_df['price_afrr_energy_neg'] = country_data['price_afrr_energy_neg'].iloc[:len(viz_df)].values
 
-    # NOTE: Capacity bids (c_fcr, c_afrr_pos, c_afrr_neg) are already in annual_bids_df from MPC
+    # NOTE: Capacity bids (c_fcr, c_afrr_pos, c_afrr_neg) are already in total_bids_df from MPC
     # DO NOT overwrite them here!
 
     # Add derived columns required by visualization functions

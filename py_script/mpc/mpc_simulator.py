@@ -288,7 +288,7 @@ class MPCSimulator:
                 - total_revenue: Total annual revenue (EUR)
                 - total_degradation_cost: Total degradation cost (EUR)
                 - final_soc: Final state of charge (kWh)
-                - soc_trajectory: List of SOC values over time
+                - soc_total_bids_df: List of SOC values over time
                 - iteration_results: Detailed results per iteration
                 - validation_reports: Constraint validation reports (if enabled)
         """
@@ -304,7 +304,7 @@ class MPCSimulator:
 
         # Storage for results
         iteration_results = []
-        all_soc_trajectory = [current_total_soc]
+        all_soc_total_bids_df = [current_total_soc]
         validation_reports = []
 
         # Aggregated results
@@ -471,7 +471,13 @@ class MPCSimulator:
                 'iteration': iteration,
                 't_start': t_start,
                 't_end_execution': t_end_execution,
-                'window_results': window_results,
+                'start_timestep': t_start,
+                'end_timestep': t_start + actual_execution_length,
+                # Flatten financial data for easy access
+                'revenue': window_results['total_revenue'],
+                'degradation_cost': window_results['total_degradation_cost'],
+                'profit': window_results['total_revenue'] - window_results['total_degradation_cost'],
+                'window_results': window_results,  # Keep full results for reference
                 'solve_time': solution['solve_time'],
                 'validation': validation_report,
                 'solution': solution,  # Store full solution for bid extraction
@@ -492,7 +498,7 @@ class MPCSimulator:
                 }
                 all_bids_list.append(bid_row)
 
-                # Extract SOC for 15-min trajectory
+                # Extract SOC for 15-min total_bids_df
                 if 'e_soc' in solution:
                     all_soc_15min.append(solution['e_soc'].get(t_exec, current_total_soc))
                 elif hasattr(model, 'e_soc_j'):
@@ -523,7 +529,7 @@ class MPCSimulator:
                 # Model I: Use total SOC
                 current_total_soc = pyo.value(model.e_soc[last_execution_step])
 
-            all_soc_trajectory.append(current_total_soc)
+            all_soc_total_bids_df.append(current_total_soc)
 
             logger.info("  Final SOC: %.2f kWh (%.1f%%)",
                        current_total_soc,
@@ -543,7 +549,7 @@ class MPCSimulator:
                         'iteration': iteration,
                         'current_total_soc': current_total_soc,
                         'iteration_results': iteration_results.copy(),
-                        'all_soc_trajectory': all_soc_trajectory.copy(),
+                        'all_soc_total_bids_df': all_soc_total_bids_df.copy(),
                         'all_bids_list': all_bids_list.copy(),
                         'all_soc_15min': all_soc_15min.copy(),
                         'total_da_revenue': total_da_revenue,
@@ -569,7 +575,7 @@ class MPCSimulator:
 
         # CRITICAL: Create annual bid DataFrame for submission
         import pandas as pd
-        annual_bids_df = pd.DataFrame(all_bids_list)
+        total_bids_df = pd.DataFrame(all_bids_list)
 
         logger.info("")
         logger.info("=" * 80)
@@ -588,7 +594,7 @@ class MPCSimulator:
                    current_total_soc,
                    100 * current_total_soc / self.battery_params['capacity_kwh'])
         logger.info("  Annual bids DataFrame: %d rows x %d columns",
-                   len(annual_bids_df), len(annual_bids_df.columns))
+                   len(total_bids_df), len(total_bids_df.columns))
         logger.info("=" * 80)
 
         return {
@@ -602,13 +608,13 @@ class MPCSimulator:
             'calendar_cost': total_calendar_cost,
             'net_profit': net_profit,
 
-            # State trajectory
+            # State total_bids_df
             'final_soc': current_total_soc,
-            'soc_trajectory': all_soc_trajectory,  # Iteration boundaries
+            'soc_total_bids_df': all_soc_total_bids_df,  # Iteration boundaries
             'soc_15min': all_soc_15min,  # Every 15-min interval
 
             # CRITICAL: Annual bid DataFrame for submission
-            'annual_bids_df': annual_bids_df,
+            'total_bids_df': total_bids_df,
 
             # Detailed results
             'iteration_results': iteration_results,
@@ -619,6 +625,6 @@ class MPCSimulator:
                 'c_rate': self.c_rate,
                 'horizon_hours': self.horizon_hours,
                 'execution_hours': self.execution_hours,
-                'total_timesteps': len(annual_bids_df),
+                'total_timesteps': len(total_bids_df),
             },
         }

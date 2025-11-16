@@ -8,7 +8,9 @@
       "Bash(ping:*)",
       "Bash(tee:*)",
       "Bash(cat:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(dir /B \"H:\\TUM-PC\\TUM_CEM_PhD\\a_tech_arena_hw\\TechArena2025_EMS\\validation_results\\mpc_validation\" 2)",
+      "Bash(dir \"H:\\TUM-PC\\TUM_CEM_PhD\\a_tech_arena_hw\\TechArena2025_EMS\\validation_results\\mpc_validation\\20251116_013155_mpc_ch_3d_alpha1.0\")"
     ],
     "deny": [],
     "ask": []

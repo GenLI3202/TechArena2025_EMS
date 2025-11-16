@@ -77,7 +77,8 @@ print(f"Project root: {project_root}")
 LOAD_FROM_SAVED = False
 
 # Path to saved MPC results directory (only used if LOAD_FROM_SAVED = True)
-SAVED_RESULTS_DIR = "validation_results/mpc_validation/20251115_141102_mpc_ch_2d_alpha1.0"
+saved_stamp = "your_timestamp_here"  # e.g., "20251115_141102"
+SAVED_RESULTS_DIR = f"validation_results/mpc_validation/{saved_stamp}"
 
 # ============================================================================
 # Configuration Files
@@ -125,45 +126,28 @@ DEFAULT_SOLVER_TIME_LIMIT = solver_config.get('solver_time_limit_sec', 900)
 print(f"\n[SOLVER] Default solver: {DEFAULT_SOLVER}")
 print(f"[SOLVER] Time limit: {DEFAULT_SOLVER_TIME_LIMIT}s")
 
+# %%
 # ============================================================================
 # Extract Scenario Parameters from Config
 # ============================================================================
 
+# ===
 # Test scenario (from mpc_test_config.json)
-TEST_COUNTRY = mpc_test_config['test_scenario']['country']
-TEST_DURATION_DAYS = mpc_test_config['test_scenario']['duration_days']
+TEST_COUNTRY = mpc_test_config['test_scenario']['country'] # DE_LU, CH, AT, CZ, HU
 TEST_C_RATE = mpc_test_config['test_scenario']['c_rate']
-DATA_SOURCE = mpc_test_config['test_scenario']['data_source']
-
+DATA_SOURCE = mpc_test_config['test_scenario']['data_source'] # 'preprocessed' or 'excel'
 # Alpha settings
 ALPHA_MODE = mpc_test_config['alpha_settings']['mode']
 SINGLE_ALPHA = mpc_test_config['alpha_settings']['single_alpha']
 ALPHA_SWEEP_RANGE = mpc_test_config['alpha_settings']['sweep_range']
-
 # Meta-optimizer settings
 ENABLE_META_OPTIMIZER = mpc_test_config['meta_optimizer']['enabled']
 META_N_JOBS = mpc_test_config['meta_optimizer']['n_jobs']
 META_WACC = mpc_test_config['meta_optimizer']['wacc']
 META_INFLATION = mpc_test_config['meta_optimizer']['inflation_rate']
 META_LIFETIME = mpc_test_config['meta_optimizer']['project_lifetime_years']
-
-# MPC execution settings (from mpc_config.json)
-HORIZON_HOURS = mpc_config['mpc_parameters']['horizon_hours']
-EXECUTION_HOURS = mpc_config['mpc_parameters']['execution_hours']
-INITIAL_SOC_FRACTION = mpc_config['mpc_parameters']['initial_soc_fraction']
-VALIDATE_CONSTRAINTS = mpc_config['mpc_parameters']['validate_constraints']
-
 # Max iterations (from mpc_test_config.json)
-MAX_ITERATIONS = mpc_test_config['mpc_execution']['max_iterations']
-
-# Optimizer configuration (applies to single-alpha mode only)
-ENABLE_CROSS_MARKET_EXCLUSIVITY = True  # Set to False to disable Cst-8 (reduces constraints)
-MAX_AS_RATIO = 0.8                      # Max ancillary service ratio (80%)
-
-# Checkpoint configuration (for long-running simulations)
-ENABLE_CHECKPOINTING = True             # Enable automatic checkpoint saving
-CHECKPOINT_INTERVAL_MINUTES = 30        # Save checkpoint every N minutes
-# Note: For meta-optimizer mode, modify MetaOptimizer class to accept these parameters
+# MAX_ITERATIONS = mpc_test_config['mpc_execution']['max_iterations']
 
 # Visualization settings
 ENABLE_STANDARD_PLOTS = mpc_test_config['visualization']['enable_standard_plots']
@@ -176,6 +160,32 @@ SAVE_RESULTS = mpc_test_config['output']['save_results']
 BASE_OUTPUT_DIR = mpc_test_config['output']['base_output_dir']
 AUTO_GENERATE_RUN_NAME = mpc_test_config['output']['auto_generate_run_name']
 CUSTOM_RUN_NAME = mpc_test_config['output']['custom_run_name']
+
+
+# ===
+# MPC execution settings (from mpc_config.json)
+HORIZON_HOURS = mpc_config['mpc_parameters']['horizon_hours']
+EXECUTION_HOURS = mpc_config['mpc_parameters']['execution_hours']
+TEST_DURATION_DAYS = mpc_config['mpc_parameters']['duration_days']
+INITIAL_SOC_FRACTION = mpc_config['mpc_parameters']['initial_soc_fraction']
+VALIDATE_CONSTRAINTS = mpc_config['mpc_parameters']['validate_constraints']
+
+
+# Optimizer configuration (applies to single-alpha mode only)
+ENABLE_CROSS_MARKET_EXCLUSIVITY = True  # Set to False to disable Cst-8 (reduces constraints)
+MAX_AS_RATIO = 0.8                      # Max ancillary service ratio (80%)
+
+# SOC operating limits (fraction of battery capacity)
+SOC_MIN = 0.1  # Minimum SOC (0% - 100% allowed per challenge rules)
+SOC_MAX = 0.9  # Maximum SOC (100%)
+REQUIRE_SEQUENTIAL = False          # Enforce sequential activation for charging the BESS
+LIFO_EPSILON_KWH = 0            # Tolerance for LIFO segment fullness (kWh)
+
+
+# Checkpoint configuration (for long-running simulations)
+ENABLE_CHECKPOINTING = True             # Enable automatic checkpoint saving
+CHECKPOINT_INTERVAL_MINUTES = 2        # Save checkpoint every N minutes
+# Note: For meta-optimizer mode, modify MetaOptimizer class to accept these parameters
 
 # Display scenario summary
 print("=" * 80)
@@ -190,11 +200,12 @@ print("MPC Settings:")
 print(f"  Horizon:            {HORIZON_HOURS} hours")
 print(f"  Execution:          {EXECUTION_HOURS} hours")
 print(f"  Initial SOC:        {INITIAL_SOC_FRACTION * 100:.0f}%")
-print(f"  Max Iterations:     {MAX_ITERATIONS if MAX_ITERATIONS else 'Full duration'}")
+# print(f"  Max Iterations:     {MAX_ITERATIONS if MAX_ITERATIONS else 'Full duration'}")
 print()
 print("Optimizer Settings:")
-print(f"  Solver:             {DEFAULT_SOLVER.UPPER()}")
+print(f"  Solver:             {DEFAULT_SOLVER.upper()}")
 print(f"  Max AS Ratio:       {MAX_AS_RATIO * 100:.0f}%")
+print(f"  SOC Limits:         {SOC_MIN * 100:.0f}% - {SOC_MAX * 100:.0f}%")
 print(f"  Cross-Market Exclusivity (Cst-8): {ENABLE_CROSS_MARKET_EXCLUSIVITY}")
 print(f"  Checkpointing:      {'Enabled' if ENABLE_CHECKPOINTING else 'Disabled'}")
 if ENABLE_CHECKPOINTING:
@@ -217,7 +228,7 @@ if ENABLE_META_OPTIMIZER:
     print(f"  Project Lifetime:   {META_LIFETIME} years")
 print("=" * 80)
 
-
+# %%
 # ============================================================================
 # Load Market Data
 # ============================================================================
@@ -276,6 +287,9 @@ print(f"   DA Price:           {country_data_slice['price_day_ahead'].min():.2f}
 print(f"   FCR Price:          {country_data_slice['price_fcr'].min():.2f} - {country_data_slice['price_fcr'].max():.2f} EUR/MW")
 print(f"   aFRR+ Cap Price:    {country_data_slice['price_afrr_pos'].min():.2f} - {country_data_slice['price_afrr_pos'].max():.2f} EUR/MW")
 print(f"   aFRR- Cap Price:    {country_data_slice['price_afrr_neg'].min():.2f} - {country_data_slice['price_afrr_neg'].max():.2f} EUR/MW")
+print(f"   aFRR+ Energy Price: {country_data_slice['price_afrr_energy_pos'].min():.2f} - {country_data_slice['price_afrr_energy_pos'].max():.2f} EUR/MWh")
+print(f"   aFRR- Energy Price: {country_data_slice['price_afrr_energy_neg'].min():.2f} - {country_data_slice['price_afrr_energy_neg'].max():.2f} EUR/MWh")
+
 
 # %%
 # ================================================================================
@@ -291,9 +305,8 @@ if LOAD_FROM_SAVED:
     print("[LOAD] LOADING SAVED MPC RESULTS")
     print("=" * 80)
 
-    from pathlib import Path
-
-    saved_dir = Path(SAVED_RESULTS_DIR)
+    # Construct absolute path from project root
+    saved_dir = project_root / SAVED_RESULTS_DIR
 
     if not saved_dir.exists():
         raise FileNotFoundError(f"Saved results directory not found: {saved_dir}")
@@ -327,13 +340,24 @@ if LOAD_FROM_SAVED:
     EXECUTION_HOURS = perf_summary['mpc_execution_hours']
     simulation_time = perf_summary['simulation_time_sec']
 
+    # Reconstruct SOC trajectory from iteration boundaries
+    # Extract SOC values at end of each iteration from solution timeseries
+    soc_trajectory = [perf_summary['initial_soc_kwh']]
+    for _, iter_row in iteration_summary.iterrows():
+        end_idx = int(iter_row['end_timestep'])  # Convert to Python int for .iloc
+        if end_idx < len(viz_df):
+            soc_trajectory.append(viz_df['soc_kwh'].iloc[end_idx])
+    # Ensure final SOC is included
+    if len(soc_trajectory) <= len(iteration_summary):
+        soc_trajectory.append(perf_summary['final_soc_kwh'])
+
     # Reconstruct mpc_results for plotting functions
     mpc_results = {
         'total_revenue': perf_summary['total_revenue_eur'],
         'total_degradation_cost': perf_summary['total_degradation_eur'],
         'net_profit': perf_summary['total_profit_eur'],
         'final_soc': perf_summary['final_soc_kwh'],
-        'soc_trajectory': [perf_summary['initial_soc_kwh']] + iteration_summary['final_soc'].tolist(),
+        'soc_trajectory': soc_trajectory,
         'soc_15min': viz_df['soc_kwh'].tolist(),
         'iteration_results': iteration_summary.to_dict('records'),
         'da_revenue': perf_summary.get('revenue_da_eur', 0),
@@ -349,6 +373,18 @@ if LOAD_FROM_SAVED:
     # Set output directory to saved location
     output_directory = saved_dir
     SAVE_RESULTS = False  # Don't overwrite existing results
+
+    # Set visualization settings for loaded results (if not already defined)
+    if 'ENABLE_MPC_PLOTS' not in dir():
+        ENABLE_MPC_PLOTS = True  # Enable plotting by default
+    if 'MPC_PLOT_OPTIONS' not in dir():
+        MPC_PLOT_OPTIONS = {
+            'iteration_boundaries': True,
+            'iteration_performance': True,
+            'state_continuity': True
+        }
+    if 'SAVE_FORMAT' not in dir():
+        SAVE_FORMAT = 'html'
 
     print("\n" + "=" * 80)
     print("[RESULTS] LOADED MPC RESULTS SUMMARY")
@@ -415,7 +451,7 @@ else:
         best_alpha, best_roi, all_results = meta_opt.optimize_alpha(
             alpha_values,
             initial_soc_fraction=INITIAL_SOC_FRACTION,
-            max_iterations=MAX_ITERATIONS
+            # max_iterations=MAX_ITERATIONS
         )
 
         # Extract best result
@@ -441,6 +477,11 @@ else:
         # Configure optimizer settings
         optimizer.max_as_ratio = MAX_AS_RATIO
         optimizer.market_params['enable_cross_market_exclusivity'] = ENABLE_CROSS_MARKET_EXCLUSIVITY
+        optimizer.battery_params['soc_min'] = SOC_MIN  # Apply SOC limits
+        optimizer.battery_params['soc_max'] = SOC_MAX
+        optimizer.degradation_params['lifo_epsilon_kwh'] = LIFO_EPSILON_KWH
+        optimizer.degradation_params['require_sequential'] = REQUIRE_SEQUENTIAL
+
 
         # Initialize MPC simulator
         simulator = MPCSimulator(
@@ -460,7 +501,7 @@ else:
             print(f"   Checkpoint file: {checkpoint_path}")
             mpc_results = simulator.run_full_simulation(
                 initial_soc_fraction=INITIAL_SOC_FRACTION,
-                max_iterations=MAX_ITERATIONS,
+                # max_iterations=MAX_ITERATIONS,
                 checkpoint_interval_minutes=CHECKPOINT_INTERVAL_MINUTES,
                 checkpoint_path=str(checkpoint_path)
             )
@@ -468,7 +509,7 @@ else:
             print("   Checkpointing disabled")
             mpc_results = simulator.run_full_simulation(
                 initial_soc_fraction=INITIAL_SOC_FRACTION,
-                max_iterations=MAX_ITERATIONS
+                # max_iterations=MAX_ITERATIONS
             )
 
         print(f"\n[OK] MPC Simulation Complete!")
@@ -502,13 +543,13 @@ if not LOAD_FROM_SAVED:
     print("[TRANSFORM] TRANSFORMING RESULTS FOR VISUALIZATION")
     print("=" * 80)
 
-    # Extract annual bids DataFrame
-    annual_bids_df = mpc_results['annual_bids_df']
-    print(f"Annual bids DataFrame: {annual_bids_df.shape[0]} timesteps")
+    # Extract Complete bids DataFrame
+    total_bids_df = mpc_results['total_bids_df']
+    print(f"Complete bids DataFrame: {total_bids_df.shape[0]} timesteps")
 
     # Transform to visualization format
     viz_df = transform_mpc_results_for_viz(
-        annual_bids_df,
+        total_bids_df,
         country_data_slice,
         battery_capacity_kwh=4472.0
     )
@@ -558,8 +599,8 @@ if not LOAD_FROM_SAVED:
         'degradation_calendar_eur': mpc_results.get('calendar_cost', 0),
 
         # SOC metrics
-        'initial_soc_kwh': mpc_results['soc_trajectory'][0] if mpc_results['soc_trajectory'] else INITIAL_SOC_FRACTION * 4472,
-        'final_soc_kwh': mpc_results['final_soc'],
+        'initial_soc_kwh': mpc_results.get('soc_trajectory', [INITIAL_SOC_FRACTION * 4472])[0],
+        'final_soc_kwh': mpc_results.get('final_soc', INITIAL_SOC_FRACTION * 4472),
 
         # Timing
         'simulation_time_sec': simulation_time,
@@ -574,17 +615,23 @@ if not LOAD_FROM_SAVED:
 
     # Add meta-optimizer results if applicable
     if ENABLE_META_OPTIMIZER and ALPHA_MODE == 'sweep':
-        summary_metrics['meta_optimizer'] = {
-            'enabled': True,
-            'best_alpha': best_alpha,
-            'best_roi': best_roi,
-            'alpha_range': {
-                'min': ALPHA_SWEEP_RANGE['min'],
-                'max': ALPHA_SWEEP_RANGE['max'],
-                'step': ALPHA_SWEEP_RANGE['step']
-            },
-            'all_alphas': {str(float(a)): float(all_results[a]['roi']) for a in alpha_values}
-        }
+        # Check if meta-optimizer variables exist (defensive programming)
+        required_vars = ['best_alpha', 'best_roi', 'all_results', 'alpha_values']
+        if all(var in locals() for var in required_vars):
+            summary_metrics['meta_optimizer'] = {
+                'enabled': True,
+                'best_alpha': best_alpha,
+                'best_roi': best_roi,
+                'alpha_range': {
+                    'min': ALPHA_SWEEP_RANGE['min'],
+                    'max': ALPHA_SWEEP_RANGE['max'],
+                    'step': ALPHA_SWEEP_RANGE['step']
+                },
+                'all_alphas': {str(float(a)): float(all_results[a]['roi']) for a in alpha_values}
+            }
+        else:
+            missing = [v for v in required_vars if v not in locals()]
+            print(f"[WARNING] Meta-optimizer enabled but missing variables: {missing} - skipping meta-optimizer summary")
 
     print("[OK] Summary metrics prepared")
     print(f"\nTotal Revenue: €{summary_metrics['total_revenue_eur']:,.2f}")
@@ -693,9 +740,113 @@ else:
     print("\n[WARNING] Standard plots disabled (ENABLE_STANDARD_PLOTS = False)")
 
 # %%
+viz_df['e_soc']
+
+# %%
 # ================================================================================
 # [SECTION 6] MPC-SPECIFIC ANALYSIS PLOTS
 # ================================================================================
+
+# Path to saved MPC results directory (only used if LOAD_FROM_SAVED = True)
+# saved_stamp = "20251116_013155_mpc_ch_3d_alpha1.0"  # e.g., "20251115_141102"
+SAVED_RESULTS_DIR = f"validation_results/mpc_validation/20251116_021804_mpc_ch_3d_alpha1.0"
+
+LOAD_FROM_SAVED = True
+
+if LOAD_FROM_SAVED:
+    # ============================================================================
+    # Load Previously Saved MPC Results
+    # ============================================================================
+
+    print("\n" + "=" * 80)
+    print("[LOAD] LOADING SAVED MPC RESULTS")
+    print("=" * 80)
+
+    # Construct absolute path from project root
+    saved_dir = project_root / SAVED_RESULTS_DIR
+
+    if not saved_dir.exists():
+        raise FileNotFoundError(f"Saved results directory not found: {saved_dir}")
+
+    print(f"\nLoading from: {saved_dir}")
+
+    # Load performance summary
+    perf_file = saved_dir / "performance_summary.json"
+    with open(perf_file, 'r') as f:
+        perf_summary = json.load(f)
+    print(f"  [OK] Loaded performance_summary.json")
+
+    # Load iteration summary
+    iter_file = saved_dir / "iteration_summary.csv"
+    iteration_summary = pd.read_csv(iter_file)
+    print(f"  [OK] Loaded iteration_summary.csv ({len(iteration_summary)} iterations)")
+
+    # Load solution timeseries
+    sol_file = saved_dir / "solution_timeseries.csv"
+    viz_df = pd.read_csv(sol_file, index_col=0)
+    if 'timestamp' in viz_df.columns:
+        viz_df['timestamp'] = pd.to_datetime(viz_df['timestamp'])
+    print(f"  [OK] Loaded solution_timeseries.csv ({len(viz_df)} timesteps)")
+
+    # Extract parameters from saved results
+    TEST_COUNTRY = perf_summary['country']
+    TEST_DURATION_DAYS = perf_summary['test_duration_days']
+    TEST_C_RATE = perf_summary['c_rate']
+    used_alpha = perf_summary['alpha']
+    HORIZON_HOURS = perf_summary['mpc_horizon_hours']
+    EXECUTION_HOURS = perf_summary['mpc_execution_hours']
+    simulation_time = perf_summary['simulation_time_sec']
+
+    # Reconstruct SOC trajectory from iteration boundaries
+    # Extract SOC values at end of each iteration from solution timeseries
+    soc_trajectory = [perf_summary['initial_soc_kwh']]
+    for _, iter_row in iteration_summary.iterrows():
+        end_idx = int(iter_row['end_timestep'])  # Convert to Python int for .iloc
+        if end_idx < len(viz_df):
+            soc_trajectory.append(viz_df['soc_kwh'].iloc[end_idx])
+    # Ensure final SOC is included
+    if len(soc_trajectory) <= len(iteration_summary):
+        soc_trajectory.append(perf_summary['final_soc_kwh'])
+
+    # Reconstruct mpc_results for plotting functions
+    mpc_results = {
+        'total_revenue': perf_summary['total_revenue_eur'],
+        'total_degradation_cost': perf_summary['total_degradation_eur'],
+        'net_profit': perf_summary['total_profit_eur'],
+        'final_soc': perf_summary['final_soc_kwh'],
+        'soc_trajectory': soc_trajectory,
+        'soc_15min': viz_df['soc_kwh'].tolist(),
+        'iteration_results': iteration_summary.to_dict('records'),
+        'da_revenue': perf_summary.get('revenue_da_eur', 0),
+        'afrr_e_revenue': perf_summary.get('revenue_afrr_energy_eur', 0),
+        'as_revenue': perf_summary.get('revenue_as_capacity_eur', 0),
+        'cyclic_cost': perf_summary.get('degradation_cyclic_eur', 0),
+        'calendar_cost': perf_summary.get('degradation_calendar_eur', 0),
+    }
+
+    # Build summary metrics
+    summary_metrics = perf_summary.copy()
+
+    # Set output directory to saved location
+    output_directory = saved_dir
+    SAVE_RESULTS = False  # Don't overwrite existing results
+
+    # Set visualization settings for loaded results (if not already defined)
+    if 'ENABLE_MPC_PLOTS' not in dir():
+        ENABLE_MPC_PLOTS = True  # Enable plotting by default
+    if 'MPC_PLOT_OPTIONS' not in dir():
+        MPC_PLOT_OPTIONS = {
+            'iteration_boundaries': True,
+            'financial_breakdown': True,
+            'soc_evolution': True
+        }
+    if 'SAVE_FORMAT' not in dir():
+        SAVE_FORMAT = 'html'
+
+
+# %%
+mpc_results
+# %%
 
 if ENABLE_MPC_PLOTS:
     plots_dir = output_directory / "plots" if SAVE_RESULTS else Path(".")

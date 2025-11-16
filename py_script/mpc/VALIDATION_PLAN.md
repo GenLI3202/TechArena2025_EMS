@@ -275,9 +275,9 @@ simulator = MPCSimulator(
 results = simulator.run_simulation()
 
 # Validation checks
-soc_trajectory = results['soc_trajectory']
-soc_changes = [abs(soc_trajectory[i+1] - soc_trajectory[i])
-               for i in range(len(soc_trajectory)-1)]
+soc_total_bids_df = results['soc_total_bids_df']
+soc_changes = [abs(soc_total_bids_df[i+1] - soc_total_bids_df[i])
+               for i in range(len(soc_total_bids_df)-1)]
 
 # Export results
 with open('results/mpc_validation/correctness/t1_1_soc_continuity.json', 'w') as f:
@@ -286,7 +286,7 @@ with open('results/mpc_validation/correctness/t1_1_soc_continuity.json', 'w') as
         'status': 'PASS' if max(soc_changes) < 0.1 else 'FAIL',
         'max_soc_change': max(soc_changes),
         'mean_soc_change': sum(soc_changes) / len(soc_changes),
-        'soc_trajectory': soc_trajectory,
+        'soc_total_bids_df': soc_total_bids_df,
         'iteration_count': len(results['iteration_results'])
     }, f, indent=2)
 ```

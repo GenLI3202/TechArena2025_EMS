@@ -231,7 +231,7 @@ if not validation_report['summary']['all_passed']:
     'total_degradation_cost': 12345.67, # EUR
     'net_profit': 111111.11,            # EUR
     'final_soc': 2236.0,                # kWh
-    'soc_trajectory': [2236, 2100, ...],
+    'soc_total_bids_df': [2236, 2100, ...],
     'iteration_results': [...],
     'validation_reports': [...]
 }

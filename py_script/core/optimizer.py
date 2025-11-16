@@ -1003,8 +1003,9 @@ class BESSOptimizerModelI:
                 gurobi_options = self.solver_config.get('solver_options', {}).get('gurobi', {})
                 solver.options['TimeLimit'] = self.market_params['solver_time_limit']
                 solver.options['MIPGap'] = gurobi_options.get('MIPGap', 0.03)
+                solver.options['OutputFlag'] = 0  # Suppress verbose Gurobi output
                 # solver.options['Threads'] = gurobi_options.get('Threads', 4)
-                # solver.options['MIPFocus'] = gurobi_options.get('MIPFocus', 0)
+                solver.options['MIPFocus'] = gurobi_options.get('MIPFocus', 0)
             elif solver_name.lower() == 'highs':
                 solver.options['time_limit'] = self.market_params['solver_time_limit']
                 solver.options['mip_rel_gap'] = self.solver_config.get('solver_options', {}).get('highs', {}).get('mip_rel_gap', 0.01)
@@ -1771,7 +1772,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             # Tolerance for numerical stability and solver performance
             # Larger epsilon = larger feasible region = faster solve
             # 5 kWh ~ 1.1% of 447.2 kWh segment (acceptable tolerance)
-            epsilon = self.degradation_params.get('lifo_epsilon_kwh', 5.0)  # kWh
+            epsilon = self.degradation_params.get('lifo_epsilon_kwh', 0.0)  # kWh
 
             # If segment j is active (has ANY energy), segment j-1 must be full
             # z_segment_active[t,j] = 1 if e_soc_j[t,j] > 0
@@ -1785,7 +1786,7 @@ class BESSOptimizerModelII(BESSOptimizerModelI):
             rule=segment_lifo_fullness_rule,
             doc="CRITICAL: LIFO fullness prerequisite - segment j only has energy if j-1 is full (Xu et al. 2017)"
         )
-        epsilon_val = self.degradation_params.get('lifo_epsilon_kwh', 5.0)
+        epsilon_val = self.degradation_params.get('lifo_epsilon_kwh', 0.0)
         logger.info(f"Added LIFO fullness prerequisite constraints (epsilon={epsilon_val} kWh) to enforce stacked tank behavior")
 
         # NOTE: segment_activation_cascade is REDUNDANT with segment_lifo_fullness
