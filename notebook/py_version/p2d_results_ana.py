@@ -71,7 +71,7 @@ RESULTS_PATH = project_root / RESULTS_BASE_DIR
 
 # Analysis mode
 ANALYSIS_MODE = "batch"  # "batch" = analyze all 15, "single" = analyze one scenario
-SELECTED_SCENARIO = "20251116_045552_ch_crate0.5"  # Used only if ANALYSIS_MODE = "single"
+SELECTED_SCENARIO = "20251116_183156_ch_crate0.33"  # Used only if ANALYSIS_MODE = "single"
 
 # Visualization settings
 GENERATE_PLOTS = True  # Set to False to skip plot generation (faster analysis)
@@ -168,10 +168,10 @@ def print_scenario_summary(results, verbose=True):
     print(f"  aFRR Energy:          >>{perf.get('revenue_afrr_energy_eur', 0):>12,.2f}")
     print(f"  AS Capacity:          >>{perf.get('revenue_as_capacity_eur', 0):>12,.2f}")
 
-    # Degradation breakdown
-    print(f"\nDegradation Breakdown:")
-    print(f"  Cyclic:               >>{perf.get('degradation_cyclic_eur', 0):>12,.2f}")
-    print(f"  Calendar:             >>{perf.get('degradation_calendar_eur', 0):>12,.2f}")
+    # # Degradation breakdown
+    # print(f"\nDegradation Breakdown:")
+    # print(f"  Cyclic:               >>{perf.get('degradation_cyclic_eur', 0):>12,.2f}")
+    # print(f"  Calendar:             >>{perf.get('degradation_calendar_eur', 0):>12,.2f}")
 
     # Battery operation
     print(f"\nBattery Operation:")
@@ -241,6 +241,123 @@ def validate_scenario(results):
         warnings.append(f"NEGATIVE PROFIT: >>{perf['total_profit_eur']:.2f}")
 
     return warnings
+
+
+def calculate_detailed_breakdown_from_solution(sol_df, iter_df, perf_summary):
+    """
+    Calculate detailed financial breakdown for each iteration from solution timeseries.
+
+    This computes what the MPC simulator should have saved but didn't in older runs.
+
+    Parameters
+    ----------
+    sol_df : pd.DataFrame
+        Solution timeseries with power bids, capacity bids, and prices
+    iter_df : pd.DataFrame
+        Iteration summary with start_timestep, end_timestep
+    perf_summary : dict
+        Performance summary (for degradation costs if available)
+
+    Returns
+    -------
+    pd.DataFrame
+        Enhanced iteration summary with detailed breakdown columns
+    """
+    iter_df_enhanced = iter_df.copy()
+
+    # Initialize detailed breakdown columns
+    iter_df_enhanced['da_discharge_revenue'] = 0.0
+    iter_df_enhanced['da_charge_cost'] = 0.0
+    iter_df_enhanced['fcr_revenue'] = 0.0
+    iter_df_enhanced['afrr_pos_cap_revenue'] = 0.0
+    iter_df_enhanced['afrr_neg_cap_revenue'] = 0.0
+    iter_df_enhanced['afrr_e_revenue'] = 0.0
+    iter_df_enhanced['afrr_pos_e_revenue'] = 0.0  # Separate tracking
+    iter_df_enhanced['afrr_neg_e_revenue'] = 0.0  # Separate tracking
+    iter_df_enhanced['cyclic_cost'] = 0.0
+    iter_df_enhanced['calendar_cost'] = 0.0
+
+    dt = 0.25  # 15-min timestep in hours
+
+    # Calculate for each iteration
+    for idx, row in iter_df_enhanced.iterrows():
+        start_ts = int(row['start_timestep'])
+        end_ts = int(row['end_timestep'])
+
+        # Slice solution data for this iteration
+        iter_sol = sol_df.iloc[start_ts:end_ts]
+
+        if len(iter_sol) == 0:
+            continue
+
+        # DA discharge revenue (positive)
+        da_discharge = (iter_sol['p_dis'] * iter_sol['price_da_eur_mwh'] / 1000 * dt).sum()
+        iter_df_enhanced.at[idx, 'da_discharge_revenue'] = da_discharge
+
+        # DA charge cost (positive value, will be negated in plot)
+        da_charge = (iter_sol['p_ch'] * iter_sol['price_da_eur_mwh'] / 1000 * dt).sum()
+        iter_df_enhanced.at[idx, 'da_charge_cost'] = da_charge
+
+        # FCR capacity revenue (4-hour blocks, so divide by 4 for 15-min resolution)
+        fcr_rev = (iter_sol['c_fcr'] * iter_sol['price_fcr_eur_mw'] / 4).sum()
+        iter_df_enhanced.at[idx, 'fcr_revenue'] = fcr_rev
+
+        # aFRR positive capacity revenue
+        afrr_pos_cap = (iter_sol['c_afrr_pos'] * iter_sol['price_afrr_cap_pos_eur_mw'] / 4).sum()
+        iter_df_enhanced.at[idx, 'afrr_pos_cap_revenue'] = afrr_pos_cap
+
+        # aFRR negative capacity revenue
+        afrr_neg_cap = (iter_sol['c_afrr_neg'] * iter_sol['price_afrr_cap_neg_eur_mw'] / 4).sum()
+        iter_df_enhanced.at[idx, 'afrr_neg_cap_revenue'] = afrr_neg_cap
+
+        # aFRR energy revenue (preliminary calculation - will be adjusted below)
+        # Note: This is the gross revenue before EV weighting
+        afrr_e_pos = (iter_sol['p_afrr_pos_e'] * iter_sol['price_afrr_energy_pos_eur_mwh'].fillna(0) / 1000 * dt).sum()
+        afrr_e_neg = (iter_sol['p_afrr_neg_e'] * iter_sol['price_afrr_energy_neg_eur_mwh'].fillna(0) / 1000 * dt).sum()
+        iter_df_enhanced.at[idx, 'afrr_pos_e_revenue'] = afrr_e_pos
+        iter_df_enhanced.at[idx, 'afrr_neg_e_revenue'] = afrr_e_neg
+        iter_df_enhanced.at[idx, 'afrr_e_revenue'] = afrr_e_pos + afrr_e_neg
+
+    # Adjust aFRR energy revenue to match performance summary (accounts for EV weighting)
+    if 'revenue_afrr_energy_eur' in perf_summary:
+        gross_afrr_e = iter_df_enhanced['afrr_e_revenue'].sum()
+        actual_afrr_e = perf_summary['revenue_afrr_energy_eur']
+
+        if gross_afrr_e > 0:
+            # Apply scaling factor to match actual revenue
+            scaling_factor = actual_afrr_e / gross_afrr_e
+            iter_df_enhanced['afrr_e_revenue'] *= scaling_factor
+            iter_df_enhanced['afrr_pos_e_revenue'] *= scaling_factor
+            iter_df_enhanced['afrr_neg_e_revenue'] *= scaling_factor
+
+    # Try to split degradation costs proportionally if we have totals
+    if 'degradation_cyclic_eur' in perf_summary and 'degradation_calendar_eur' in perf_summary:
+        total_cyclic = perf_summary['degradation_cyclic_eur']
+        total_calendar = perf_summary['degradation_calendar_eur']
+
+        # If we have per-iteration profit, we can estimate degradation proportionally
+        if 'profit' in iter_df_enhanced.columns:
+            # Use absolute values to avoid negative cost allocation when total profit is negative
+            total_abs_profit = iter_df_enhanced['profit'].abs().sum()
+
+            for idx, row in iter_df_enhanced.iterrows():
+                # Proportional allocation based on absolute profit share
+                # This ensures degradation costs are always positive (costs)
+                if total_abs_profit > 0:
+                    profit_share = abs(row['profit']) / total_abs_profit
+                else:
+                    profit_share = 1.0 / len(iter_df_enhanced)
+
+                iter_df_enhanced.at[idx, 'cyclic_cost'] = total_cyclic * profit_share
+                iter_df_enhanced.at[idx, 'calendar_cost'] = total_calendar * profit_share
+
+    # CRITICAL: Ensure all degradation costs are positive (costs should never be negative)
+    # This prevents costs from appearing on the revenue (positive) side of waterfall charts
+    iter_df_enhanced['cyclic_cost'] = iter_df_enhanced['cyclic_cost'].abs()
+    iter_df_enhanced['calendar_cost'] = iter_df_enhanced['calendar_cost'].abs()
+    iter_df_enhanced['da_charge_cost'] = iter_df_enhanced['da_charge_cost'].abs()
+
+    return iter_df_enhanced
 
 
 print("[OK] Helper functions defined")
@@ -409,7 +526,7 @@ if n_success > 0:
 
         fig_country.show()
 
-# %%
+# %% 
 # ================================================================================
 # [SECTION 6] C-RATE IMPACT ANALYSIS
 # ================================================================================
@@ -486,25 +603,68 @@ if n_success > 0 and GENERATE_PLOTS:
     pivot_profit = pivot_profit.sort_values('total', ascending=False)
     pivot_profit = pivot_profit.drop('total', axis=1)
 
-    # Create heatmap
+    # Import McKinsey colors for heatmap
+    from py_script.visualization.config import MCKINSEY_COLORS
+
+    # Create McKinsey blue color scale (light to dark blue)
+    # Custom colorscale: white -> light blue -> medium blue -> dark blue -> navy
+    mckinsey_blue_scale = [
+        [0.0, '#f8f9fa'],   # Very light gray (low profit)
+        [0.2, '#d4e6f1'],   # Light blue
+        [0.4, '#85c1e9'],   # Medium light blue
+        [0.6, '#3498db'],   # Medium blue
+        [0.8, '#2874a6'],   # Dark blue
+        [1.0, '#003f5c']    # Navy (high profit)
+    ]
+
+    # Create heatmap with McKinsey blue theme
     fig_heatmap = go.Figure(data=go.Heatmap(
         z=pivot_profit.values,
         x=[str(c) for c in pivot_profit.columns],
         y=pivot_profit.index,
-        colorscale='RdYlGn',
+        colorscale=mckinsey_blue_scale,
         text=[[f"{val:,.0f}" for val in row] for row in pivot_profit.values],
         texttemplate='%{text}',
-        textfont={"size": 10},
-        colorbar=dict(title="Profit (EUR)")
+        textfont={"size": 11, "color": "black"},
+        colorbar=dict(
+            title=dict(
+                text="Profit (EUR)",
+                font=dict(size=12, color=MCKINSEY_COLORS['navy'])
+            ),
+            tickfont=dict(size=10)
+        ),
+        hovertemplate='Country: %{y}<br>C-Rate: %{x}<br>Profit: €%{text}<extra></extra>'
     ))
 
     fig_heatmap.update_layout(
-        title="Profitability Heatmap: Country >> C-Rate",
+        title=dict(
+            text="Profitability Heatmap: Country >> C-Rate",
+            font=dict(size=16, color=MCKINSEY_COLORS['navy'])
+        ),
         xaxis_title="C-Rate",
         yaxis_title="Country",
-        font=dict(family='Arial', size=12),
-        height=400,
-        width=600
+        font=dict(family='Arial, Helvetica, sans-serif', size=12),
+        height=450,
+        width=650,
+        plot_bgcolor=MCKINSEY_COLORS['bg_white'],
+        paper_bgcolor=MCKINSEY_COLORS['bg_white']
+    )
+
+    # Update axes styling
+    fig_heatmap.update_xaxes(
+        showgrid=False,
+        showline=True,
+        linewidth=1,
+        linecolor=MCKINSEY_COLORS['gray_dark'],
+        tickfont=dict(size=11)
+    )
+
+    fig_heatmap.update_yaxes(
+        showgrid=False,
+        showline=True,
+        linewidth=1,
+        linecolor=MCKINSEY_COLORS['gray_dark'],
+        tickfont=dict(size=11)
     )
 
     if SAVE_PLOTS:
@@ -554,6 +714,8 @@ elif ANALYSIS_MODE == "batch":
 else:
     scenarios_to_analyze = []
 
+
+
 # Analyze each scenario
 for i, scenario_dir in enumerate(scenarios_to_analyze, 1):
     print(f"\n{'#' * 80}")
@@ -585,6 +747,16 @@ for i, scenario_dir in enumerate(scenarios_to_analyze, 1):
         perf = results['perf_summary']
         iter_df = results['iter_summary']
         sol_df = results['solution_df']
+
+        # Calculate detailed breakdown from solution timeseries if not already present
+        has_detailed = all(col in iter_df.columns for col in [
+            'da_discharge_revenue', 'da_charge_cost', 'fcr_revenue', 'cyclic_cost', 'calendar_cost'
+        ])
+
+        if not has_detailed:
+            if VERBOSE:
+                print("      [INFO] Computing detailed breakdown from solution timeseries...")
+            iter_df = calculate_detailed_breakdown_from_solution(sol_df, iter_df, perf)
 
         title_suffix = f"{perf['country']} @ C-rate {perf['c_rate']} ({perf['test_duration_days']}d)"
 
@@ -619,6 +791,12 @@ for i, scenario_dir in enumerate(scenarios_to_analyze, 1):
         if len(soc_trajectory) <= len(iter_df):
             soc_trajectory.append(perf['final_soc_kwh'])
 
+        # Build iteration_results with detailed financial breakdown
+        # NOTE: iter_df loaded from iteration_summary.csv should contain:
+        #   - Aggregated: revenue, degradation_cost, profit
+        #   - Detailed revenue: da_discharge_revenue, fcr_revenue, afrr_e_revenue, etc.
+        #   - Detailed costs: da_charge_cost, cyclic_cost, calendar_cost
+        # These detailed columns enable waterfall-style visualization in plot_iteration_performance()
         mpc_results = {
             'total_revenue': perf['total_revenue_eur'],
             'total_degradation_cost': perf['total_degradation_eur'],
@@ -626,20 +804,21 @@ for i, scenario_dir in enumerate(scenarios_to_analyze, 1):
             'final_soc': perf['final_soc_kwh'],
             'soc_trajectory': soc_trajectory,
             'soc_15min': sol_df['soc_kwh'].tolist(),
-            'iteration_results': iter_df.to_dict('records')
+            'iteration_results': iter_df.to_dict('records')  # Passes detailed breakdown to plotting
         }
 
-        print("  [5/10] Iteration Boundaries...")
-        fig5 = plot_iteration_boundaries(
-            mpc_results,
-            execution_hours=perf['mpc_execution_hours'],
-            title_suffix=title_suffix,
-            show_horizons=False
-        )
-        if SAVE_PLOTS:
-            fig5.write_html(str(plots_dir / f"mpc_iteration_boundaries.{PLOT_FORMAT}"))
+        # print("  [5/10] Iteration Boundaries...")
+        # fig5 = plot_iteration_boundaries(
+        #     mpc_results,
+        #     execution_hours=perf['mpc_execution_hours'],
+        #     title_suffix=title_suffix,
+        #     show_horizons=False
+        # )
+        # if SAVE_PLOTS:
+        #     fig5.write_html(str(plots_dir / f"mpc_iteration_boundaries.{PLOT_FORMAT}"))
 
         print("  [6/10] Iteration Performance...")
+
         fig6 = plot_iteration_performance(
             mpc_results,
             title_suffix=title_suffix,
@@ -648,78 +827,266 @@ for i, scenario_dir in enumerate(scenarios_to_analyze, 1):
         if SAVE_PLOTS:
             fig6.write_html(str(plots_dir / f"mpc_iteration_performance.{PLOT_FORMAT}"))
 
-        print("  [7/10] State Continuity...")
-        fig7 = plot_state_continuity(
-            mpc_results,
-            title_suffix=title_suffix,
-            tolerance_pct=0.1
-        )
-        if SAVE_PLOTS:
-            fig7.write_html(str(plots_dir / f"mpc_state_continuity.{PLOT_FORMAT}"))
+        # print("  [7/10] State Continuity...")
+        # fig7 = plot_state_continuity(
+        #     mpc_results,
+        #     title_suffix=title_suffix,
+        #     tolerance_pct=0.1
+        # )
+        # if SAVE_PLOTS:
+        #     fig7.write_html(str(plots_dir / f"mpc_state_continuity.{PLOT_FORMAT}"))
 
         # Custom analysis plots (3)
-        print("  [8/10] Financial Breakdown (Revenue)...")
-        fig8 = go.Figure(data=[go.Pie(
-            labels=['Day-Ahead', 'aFRR Energy', 'AS Capacity'],
-            values=[
-                perf.get('revenue_da_eur', 0),
-                perf.get('revenue_afrr_energy_eur', 0),
-                perf.get('revenue_as_capacity_eur', 0)
-            ],
-            marker=dict(colors=['#1F3A93', '#00B4A0', '#005EB8']),
-            textinfo='label+value+percent',
-            texttemplate='%{label}<br>>>%{value:,.0f}<br>(%{percent})'
-        )])
-        fig8.update_layout(
-            title=f"Revenue Breakdown - {title_suffix}",
-            font=dict(family='Arial', size=12),
-            height=500
+        print("  [8/10] Financial Breakdown (Revenue & Cost)...")
+
+        # Import waterfall colors for consistency
+        from py_script.visualization.config import WATERFALL_COLORS, MCKINSEY_COLORS
+        from plotly.subplots import make_subplots
+
+        # Calculate detailed revenue breakdown from iteration data
+        # This matches the waterfall chart breakdown
+        da_discharge_revenue = iter_df['da_discharge_revenue'].sum() if 'da_discharge_revenue' in iter_df.columns else 0
+        fcr_revenue = iter_df['fcr_revenue'].sum() if 'fcr_revenue' in iter_df.columns else 0
+        afrr_pos_cap_revenue = iter_df['afrr_pos_cap_revenue'].sum() if 'afrr_pos_cap_revenue' in iter_df.columns else 0
+        afrr_neg_cap_revenue = iter_df['afrr_neg_cap_revenue'].sum() if 'afrr_neg_cap_revenue' in iter_df.columns else 0
+
+        # Split aFRR energy revenue into positive and negative components
+        # Extract from solution timeseries for accurate breakdown
+        if 'afrr_pos_e_revenue' in iter_df.columns and 'afrr_neg_e_revenue' in iter_df.columns:
+            # Use separated columns from detailed breakdown
+            afrr_pos_energy_revenue = iter_df['afrr_pos_e_revenue'].sum()
+            afrr_neg_energy_revenue = iter_df['afrr_neg_e_revenue'].sum()
+        elif 'afrr_e_revenue' in iter_df.columns:
+            # Fallback: use total (unable to split)
+            afrr_energy_revenue = iter_df['afrr_e_revenue'].sum()
+            afrr_pos_energy_revenue = afrr_energy_revenue
+            afrr_neg_energy_revenue = 0
+        else:
+            # Last resort: use performance summary
+            afrr_energy_revenue = perf.get('revenue_afrr_energy_eur', 0)
+            afrr_pos_energy_revenue = afrr_energy_revenue
+            afrr_neg_energy_revenue = 0
+
+        # Calculate cost breakdown
+        da_charge_cost = iter_df['da_charge_cost'].sum() if 'da_charge_cost' in iter_df.columns else 0
+        cyclic_cost = iter_df['cyclic_cost'].sum() if 'cyclic_cost' in iter_df.columns else perf.get('degradation_cyclic_eur', 0)
+        calendar_cost = iter_df['calendar_cost'].sum() if 'calendar_cost' in iter_df.columns else perf.get('degradation_calendar_eur', 0)
+
+        # Build revenue pie chart data
+        revenue_pie_data = []
+        if da_discharge_revenue > 0:
+            revenue_pie_data.append(('DA Discharge', da_discharge_revenue, WATERFALL_COLORS['revenue_primary']))
+        if fcr_revenue > 0:
+            revenue_pie_data.append(('FCR Capacity', fcr_revenue, WATERFALL_COLORS['revenue_secondary']))
+        if afrr_pos_cap_revenue > 0:
+            revenue_pie_data.append(('aFRR+ Capacity', afrr_pos_cap_revenue, WATERFALL_COLORS['revenue_secondary']))
+        if afrr_neg_cap_revenue > 0:
+            revenue_pie_data.append(('aFRR- Capacity', afrr_neg_cap_revenue, 'rgba(34, 81, 255, 0.85)'))
+        if afrr_pos_energy_revenue > 0:
+            revenue_pie_data.append(('aFRR+ Energy', afrr_pos_energy_revenue, WATERFALL_COLORS['revenue_tertiary']))
+        if afrr_neg_energy_revenue > 0:
+            revenue_pie_data.append(('aFRR- Energy', afrr_neg_energy_revenue, 'rgba(0, 169, 244, 0.85)'))
+
+        # Build cost pie chart data
+        cost_pie_data = []
+        if da_charge_cost > 0:
+            cost_pie_data.append(('DA Charge Cost', da_charge_cost, WATERFALL_COLORS['cost_primary']))
+        if cyclic_cost > 0:
+            cost_pie_data.append(('Cyclic Aging', cyclic_cost, WATERFALL_COLORS['cost_secondary']))
+        if calendar_cost > 0:
+            cost_pie_data.append(('Calendar Aging', calendar_cost, WATERFALL_COLORS['cost_tertiary']))
+
+        # Create side-by-side pie charts with minimal spacing
+        fig8 = make_subplots(
+            rows=1, cols=2,
+            specs=[[{'type':'domain'}, {'type':'domain'}]],
+            subplot_titles=('Revenue Sources', 'Cost Sources'),
+            horizontal_spacing=0.02  # Minimal spacing between pies
         )
+
+        # Add revenue pie chart (left)
+        if revenue_pie_data:
+            rev_labels = [item[0] for item in revenue_pie_data]
+            rev_values = [item[1] for item in revenue_pie_data]
+            rev_colors = [item[2] for item in revenue_pie_data]
+
+            # Calculate percentages for smart positioning
+            total_rev = sum(rev_values)
+            rev_pcts = [v / total_rev * 100 for v in rev_values]
+
+            # Use 'inside' for large segments (>15%), 'outside' for small ones
+            # This prevents label cramping when one segment dominates
+            text_positions = ['inside' if pct > 15 else 'outside' for pct in rev_pcts]
+
+            fig8.add_trace(go.Pie(
+                labels=rev_labels,
+                values=rev_values,
+                marker=dict(colors=rev_colors),
+                textinfo='label+percent',
+                texttemplate='%{label}<br>%{percent}',  # Simplified for large segments
+                textposition=text_positions,
+                insidetextorientation='radial',  # Better readability for inside labels
+                name='Revenue',
+                domain={'x': [0, 0.48], 'y': [0, 1]},  # Larger pie (48% width)
+                hovertemplate='%{label}<br>€%{value:,.0f}<br>%{percent}<extra></extra>'  # Full info on hover
+            ), row=1, col=1)
+        else:
+            # Empty pie with message
+            fig8.add_trace(go.Pie(
+                labels=['No Revenue'],
+                values=[1],
+                marker=dict(colors=['#f0f0f0']),
+                textinfo='label',
+                name='Revenue',
+                domain={'x': [0, 0.48], 'y': [0, 1]}
+            ), row=1, col=1)
+
+        # Add cost pie chart (right)
+        if cost_pie_data:
+            cost_labels = [item[0] for item in cost_pie_data]
+            cost_values = [item[1] for item in cost_pie_data]
+            cost_colors = [item[2] for item in cost_pie_data]
+
+            # Calculate percentages for smart positioning
+            total_cost = sum(cost_values)
+            cost_pcts = [v / total_cost * 100 for v in cost_values]
+
+            # Use 'inside' for large segments (>15%), 'outside' for small ones
+            text_positions_cost = ['inside' if pct > 15 else 'outside' for pct in cost_pcts]
+
+            fig8.add_trace(go.Pie(
+                labels=cost_labels,
+                values=cost_values,
+                marker=dict(colors=cost_colors),
+                textinfo='label+percent',
+                texttemplate='%{label}<br>%{percent}',  # Simplified for large segments
+                textposition=text_positions_cost,
+                insidetextorientation='radial',  # Better readability for inside labels
+                name='Costs',
+                domain={'x': [0.52, 1], 'y': [0, 1]},  # Larger pie (48% width)
+                hovertemplate='%{label}<br>€%{value:,.0f}<br>%{percent}<extra></extra>'  # Full info on hover
+            ), row=1, col=2)
+        else:
+            # Empty pie with message
+            fig8.add_trace(go.Pie(
+                labels=['No Costs'],
+                values=[1],
+                marker=dict(colors=['#f0f0f0']),
+                textinfo='label',
+                name='Costs'
+            ), row=1, col=2)
+
+        # Update layout
+        total_revenue = sum([item[1] for item in revenue_pie_data]) if revenue_pie_data else 0
+        total_cost = sum([item[1] for item in cost_pie_data]) if cost_pie_data else 0
+
+        fig8.update_layout(
+            title=f"Financial Breakdown - {title_suffix}<br><sub>Total Revenue: €{total_revenue:,.0f} | Total Cost: €{total_cost:,.0f} | Net Profit: €{total_revenue - total_cost:,.0f}</sub>",
+            font=dict(family='Arial', size=11),  # Slightly smaller base font
+            height=550,  # 10% larger height
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.02,
+                font=dict(size=10)
+            )
+        )
+
+        # Update pie chart text font size
+        fig8.update_traces(
+            textfont_size=10,  # Smaller text to reduce crowding
+            pull=[0.05 if pct < 5 else 0 for pct in (rev_pcts if revenue_pie_data else [])],  # Pull out very small slices
+            selector=dict(type='pie', name='Revenue')
+        )
+
+        if cost_pie_data:
+            fig8.update_traces(
+                textfont_size=10,
+                pull=[0.05 if pct < 5 else 0 for pct in cost_pcts],
+                selector=dict(type='pie', name='Costs')
+            )
+
         if SAVE_PLOTS:
             fig8.write_html(str(plots_dir / f"financial_revenue_breakdown.{PLOT_FORMAT}"))
 
-        print("  [9/10] Degradation Breakdown...")
-        fig9 = go.Figure(data=[go.Pie(
-            labels=['Cyclic Aging', 'Calendar Aging'],
-            values=[
-                perf.get('degradation_cyclic_eur', 0),
-                perf.get('degradation_calendar_eur', 0)
-            ],
-            marker=dict(colors=['#E81E1E', '#FF6B6B']),
-            textinfo='label+value+percent',
-            texttemplate='%{label}<br>>>%{value:,.0f}<br>(%{percent})'
-        )])
-        fig9.update_layout(
-            title=f"Degradation Breakdown - {title_suffix}",
-            font=dict(family='Arial', size=12),
-            height=500
-        )
-        if SAVE_PLOTS:
-            fig9.write_html(str(plots_dir / f"degradation_breakdown.{PLOT_FORMAT}"))
-
+   
         print("  [10/10] Daily Profit Distribution...")
+
+        # Calculate statistics
+        mean_profit = iter_df['profit'].mean()
+        median_profit = iter_df['profit'].median()
+        std_profit = iter_df['profit'].std()
+
         fig10 = go.Figure()
+
+        # Histogram with McKinsey color
         fig10.add_trace(go.Histogram(
             x=iter_df['profit'],
             nbinsx=30,
-            marker_color='#00B4A0',
-            name='Daily Profit'
+            marker_color=WATERFALL_COLORS['revenue_secondary'],  # McKinsey blue
+            marker_line_color=MCKINSEY_COLORS['navy'],
+            marker_line_width=0.5,
+            name='Daily Profit',
+            opacity=0.85
         ))
+
+        # Mean line with McKinsey dark blue
         fig10.add_vline(
-            x=iter_df['profit'].mean(),
+            x=mean_profit,
             line_dash="dash",
-            line_color="#1F3A93",
-            annotation_text=f"Mean: >>{iter_df['profit'].mean():,.0f}",
-            annotation_position="top right"
+            line_color=MCKINSEY_COLORS['navy'],
+            line_width=2,
+            annotation_text=f"Mean: €{mean_profit:,.0f}",
+            annotation_position="top right",
+            annotation=dict(
+                font=dict(size=11, color=MCKINSEY_COLORS['navy']),
+                bgcolor='rgba(255, 255, 255, 0.8)',
+                bordercolor=MCKINSEY_COLORS['gray_light'],
+                borderwidth=1
+            )
         )
+
+        # Apply McKinsey template and styling
         fig10.update_layout(
-            title=f"Daily Profit Distribution - {title_suffix}",
+            template='mckinsey',
+            title=dict(
+                text=f"Daily Profit Distribution - {title_suffix}<br><sub>Mean: €{mean_profit:,.0f} | Median: €{median_profit:,.0f} | Std Dev: €{std_profit:,.0f}</sub>",
+                font=dict(size=16, color=MCKINSEY_COLORS['navy'])
+            ),
             xaxis_title="Daily Profit (EUR)",
             yaxis_title="Frequency (Days)",
-            font=dict(family='Arial', size=12),
+            font=dict(family='Arial, Helvetica, sans-serif', size=12),
             height=500,
-            showlegend=False
+            showlegend=False,
+            plot_bgcolor=MCKINSEY_COLORS['bg_light_gray'],
+            paper_bgcolor=MCKINSEY_COLORS['bg_white']
         )
+
+        # Update axis styling
+        fig10.update_xaxes(
+            showgrid=True,
+            gridcolor=MCKINSEY_COLORS['gray_light'],
+            gridwidth=0.5,
+            showline=True,
+            linewidth=1,
+            linecolor=MCKINSEY_COLORS['gray_dark'],
+            tickformat=',',
+            zeroline=False
+        )
+
+        fig10.update_yaxes(
+            showgrid=True,
+            gridcolor=MCKINSEY_COLORS['gray_light'],
+            gridwidth=0.5,
+            showline=True,
+            linewidth=1,
+            linecolor=MCKINSEY_COLORS['gray_dark'],
+            zeroline=False
+        )
+
         if SAVE_PLOTS:
             fig10.write_html(str(plots_dir / f"daily_profit_distribution.{PLOT_FORMAT}"))
 

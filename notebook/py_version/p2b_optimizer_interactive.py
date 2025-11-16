@@ -134,8 +134,8 @@ CONFIGURATION NOTES:
 TEST_COUNTRY = "AT"                 # Options: DE_LU, AT, CH, HU, CZ
 TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
-TEST_TIME_HORIZON_HOURS = 24        # Time horizon in hours (24h feasible with 6-segment config)
-TEST_START_STEP = int(96*0)         # Starting time step (96 = 1 day in 15-min intervals)
+TEST_TIME_HORIZON_HOURS = 36        # Time horizon in hours (24h feasible with 6-segment config)
+TEST_START_STEP = int(96*1)         # Starting time step (96 = 1 day in 15-min intervals)
 TEST_MODEL = "III"                  # Options: "I", "II", "III"
 USE_EV_WEIGHTING = True            # Enable aFRR EV weighting
 MAX_AS_RATIO = 0.8                  # Max ancillary service ratio (80%)
