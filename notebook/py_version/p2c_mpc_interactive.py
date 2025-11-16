@@ -176,9 +176,9 @@ ENABLE_CROSS_MARKET_EXCLUSIVITY = True  # Set to False to disable Cst-8 (reduces
 MAX_AS_RATIO = 0.8                      # Max ancillary service ratio (80%)
 
 # SOC operating limits (fraction of battery capacity)
-SOC_MIN = 0.0  # Minimum SOC (0% - 100% allowed per challenge rules)
-SOC_MAX = 1.0  # Maximum SOC (100%)
-REQUIRE_SEQUENTIAL = False          # Enforce sequential activation for charging the BESS
+SOC_MIN = 0.1  # Minimum SOC (0% - 100% allowed per challenge rules)
+SOC_MAX = 0.9  # Maximum SOC (100%)
+REQUIRE_SEQUENTIAL = True          # Enforce sequential activation for charging the BESS
 LIFO_EPSILON_KWH = 0            # Tolerance for LIFO segment fullness (kWh)
 
 
