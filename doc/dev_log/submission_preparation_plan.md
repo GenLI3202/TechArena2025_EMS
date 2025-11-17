@@ -30,14 +30,15 @@ git checkout -b p2_submission_ver
 ```
 TechArena2025_EMS/
 ├── main.py                          # NEW - Main entry point for examiners
-├── requirements.txt                 # MODIFY - Remove commercial solvers
-├── README.md                        # MODIFY - Add submission instructions
-├── input/                           # NEW - Input data directory
+├── requirements.txt                ✅ # MODIFY - Remove commercial solvers
+├── README.md                       ✅ # MODIFY - Add submission instructions
+├── input/                          ✅ # NEW - Input data directory
 │   └── TechArena2025_Phase2_data.xlsx
-├── output/                          # NEW - Generated output directory (empty initially)
-├── data/                            # KEEP - Configuration files
-│   └── p2_config/                   # KEEP - All JSON configs
-├── py_script/                       # KEEP - Core implementation
+├── output/                         ✅ # NEW - Output results directory    
+│   └── demo_results/               ✅ # NEW - save the converted `submission_results` of "20251116_222054_cz_crate0.5" as a demo
+├── data/                           ✅ # KEEP - Configuration files
+│   └── p2_config/                  ✅  # KEEP - All JSON configs
+├── py_script/                      ✅  # KEEP - Core implementation
 │   ├── core/
 │   ├── data/
 │   ├── mpc/
@@ -46,7 +47,7 @@ TechArena2025_EMS/
 │       ├── __init__.py
 │       ├── convert_results.py       # Converts submission_results to Excel
 │       └── format_outputs.py        # Formats optimizer results to submission format
-└── doc/                             # KEEP - Documentation
+└── doc/                            ✅ # KEEP - Documentation
 ```
 
 ---

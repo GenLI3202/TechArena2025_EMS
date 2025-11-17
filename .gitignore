@@ -17,7 +17,7 @@ doc/*.out
 doc/*.fls
 doc/*.fdb_latexmk
 doc/*.synctex.gz
-input/
+
 # Ignore Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
@@ -30,12 +30,12 @@ validation_results/**/*.html
 submission_results/
 
 # Large JSONL data files (200K+ lines)
-**/input/TechArena2025_data_tidy.jsonl
+
 **/TechArena2025_data_tidy.jsonl
 
 # Large notebook files with embedded outputs
 # notebook/final_validation.ipynb
-doc/Literature
+**/doc/Literature
 
 # ZIP archives
 *.zip
