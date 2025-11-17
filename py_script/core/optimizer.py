@@ -937,11 +937,9 @@ class BESSOptimizerModelI:
         """
         # Priority order: Try commercial first, fallback to open-source HiGHS
         solver_priority = [
+            ('gurobi', 'Gurobi (commercial)'),            
             ('cplex', 'CPLEX (commercial)'),
-            ('gurobi', 'Gurobi (commercial)'),
-            ('highs', 'HiGHS (open-source, competition approved)'),
-            ('cbc', 'CBC (open-source)'),
-            ('glpk', 'GLPK (open-source)')
+            ('highs', 'HiGHS (open-source, competition approved)')
         ]
         
         logger.info("🔍 Detecting available optimization solver...")
@@ -1408,7 +1406,7 @@ class BESSOptimizerModelI:
                         try:
                             # Build and solve model
                             model = self.build_optimization_model(country_data, c_rate, daily_cycle_limit)
-                            solved_model, solver_results = self.solve_model(model, 'cplex')
+                            solved_model, solver_results = self.solve_model(model, 'gurobi')
                             solution = self.extract_solution(solved_model, solver_results)
 
                             if solution['status'] in ['optimal', 'feasible']:

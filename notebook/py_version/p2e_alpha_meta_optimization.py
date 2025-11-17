@@ -70,18 +70,16 @@ from py_script.data.load_process_market_data import load_preprocessed_country_da
 
 # Visualization
 from py_script.visualization.config import WATERFALL_COLORS, MCKINSEY_COLORS, apply_mckinsey_style
-from py_script.visualization.optimization_analysis import (
-    plot_da_market_price_bid,
-    plot_afrr_energy_market_price_bid,
-    plot_capacity_markets_price_bid,
-    plot_soc_and_power_bids
-)
 
 # Results export
 from py_script.validation.results_exporter import save_optimization_results
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
+
+# Suppress Gurobi logging errors in threading mode (harmless)
+import logging
+logging.getLogger('gurobipy').setLevel(logging.CRITICAL)
 
 print("=" * 80)
 print("ALPHA META-OPTIMIZATION SCRIPT")
@@ -107,7 +105,7 @@ print("=" * 80)
 TEST_MODE = True  # Set to False for full 365-day run
 
 if TEST_MODE:
-    TEST_DAYS = 14  # Quick test: 14 days
+    TEST_DAYS = 5  # Quick test: 5 days
     SIMULATION_DESCRIPTION = f"{TEST_DAYS}-day test"
 else:
     TEST_DAYS = 365  # Full year
@@ -153,7 +151,7 @@ print(f"  - Total simulations: {len(alpha_values)}")
 # Parallel Execution Configuration
 # ============================================================================
 
-N_JOBS = 4  # Number of parallel workers (adjust based on your CPU cores)
+N_JOBS = 8  # Number of parallel workers (adjust based on your CPU cores)
 
 print(f"\n[CONFIG] Parallel Execution:")
 print(f"  - Workers: {N_JOBS}")
@@ -232,6 +230,9 @@ def run_single_alpha_simulation(alpha, config):
     dict
         Results dictionary with performance metrics and paths
     """
+    # Write progress to file instead of console (to avoid blocking in multiprocessing)
+    # Console logging in multiprocessing creates too much overhead
+
     try:
         # Extract configuration
         country = config['country']
@@ -247,37 +248,54 @@ def run_single_alpha_simulation(alpha, config):
         alpha_dir.mkdir(parents=True, exist_ok=True)
 
         # Load market data (preprocessed for speed)
-        market_data = load_preprocessed_country_data(country)
+        # Use project_root from config to ensure correct path
+        project_root = Path(config.get('project_root', Path.cwd()))
+        preprocessed_data_dir = project_root / "data" / "parquet" / "preprocessed"
+        market_data = load_preprocessed_country_data(country, data_dir=preprocessed_data_dir)
 
         # Limit data to test period
         start_date = market_data['timestamp'].min()
         end_date = start_date + pd.Timedelta(days=test_days)
         market_data = market_data[market_data['timestamp'] < end_date].copy()
 
-        # Create optimizer instance
-        optimizer = BESSOptimizerModelIII()
-        optimizer.set_parameters(
-            c_rate=c_rate,
-            country=country,
-            alpha=alpha
-        )
+        # Create optimizer instance with alpha parameter
+        optimizer = BESSOptimizerModelIII(alpha=alpha)
 
         # Update LIFO settings
         optimizer.REQUIRE_SEQUENTIAL_FILL = require_sequential
         optimizer.EPSILON = epsilon
 
-        # Create MPC simulator with custom config
-        mpc_config = base_mpc_config.copy()
-        mpc_config['alpha'] = alpha
-        mpc_config['checkpoint']['enabled'] = True
-        mpc_config['checkpoint']['interval_minutes'] = 120  # Save every 2 hours
+        # Extract MPC parameters
+        mpc_params = base_mpc_config.get('mpc_parameters', {})
+        horizon_hours = mpc_params.get('horizon_hours', 36)
+        execution_hours = mpc_params.get('execution_hours', 24)
 
-        simulator = MPCSimulator(optimizer, mpc_config)
+        # Create MPC simulator
+        simulator = MPCSimulator(
+            optimizer_model=optimizer,
+            full_data=market_data,
+            horizon_hours=horizon_hours,
+            execution_hours=execution_hours,
+            c_rate=c_rate,
+            validate_constraints=False  # Disable for speed
+        )
 
         # Run simulation
         start_time = time.time()
-        mpc_results = simulator.run_full_simulation(market_data)
+        mpc_results = simulator.run_full_simulation()
         runtime = time.time() - start_time
+
+        # Check if simulation succeeded
+        if mpc_results is None:
+            raise ValueError("MPC simulation returned None - simulation failed")
+
+        # Debug: Check what type mpc_results is
+        if not isinstance(mpc_results, dict):
+            raise TypeError(f"MPC results is {type(mpc_results)}, expected dict. Value: {str(mpc_results)[:200]}")
+
+        # MPC simulator returns data at top level, not in 'performance' dict
+        if 'total_revenue' not in mpc_results:
+            raise ValueError(f"MPC simulation completed but no financial data returned. Keys: {list(mpc_results.keys())}")
 
         # Save results
         results_summary = {
@@ -286,65 +304,129 @@ def run_single_alpha_simulation(alpha, config):
             'c_rate': c_rate,
             'test_days': test_days,
             'runtime_seconds': runtime,
-            'output_dir': str(alpha_dir)
+            'output_dir': str(alpha_dir),
+            'status': 'success'  # Mark as successful
         }
 
-        # Extract performance metrics
-        if mpc_results is not None and 'performance' in mpc_results:
-            perf = mpc_results['performance']
+        # Extract performance metrics from MPC results (top-level keys)
+        total_revenue = mpc_results.get('total_revenue', 0)
+        total_degradation_cost = mpc_results.get('total_degradation_cost', 0)
+        net_profit = mpc_results.get('net_profit', 0)
+
+        results_summary.update({
+            'total_profit_eur': net_profit,
+            'total_revenue_eur': total_revenue,
+            'total_cost_eur': total_degradation_cost,
+            'revenue_da_eur': mpc_results.get('da_revenue', 0),
+            'revenue_fcr_eur': 0,  # FCR is part of as_revenue
+            'revenue_afrr_capacity_eur': 0,  # aFRR capacity is part of as_revenue
+            'revenue_afrr_energy_eur': mpc_results.get('afrr_e_revenue', 0),
+            'revenue_as_eur': mpc_results.get('as_revenue', 0),  # Combined AS revenue
+            'degradation_cyclic_eur': mpc_results.get('cyclic_cost', 0),
+            'degradation_calendar_eur': mpc_results.get('calendar_cost', 0),
+            'total_aging_cost_eur': total_degradation_cost,
+            'num_iterations': mpc_results.get('summary', {}).get('iterations', 0),
+            'solver_status': 'optimal'  # MPC only returns if successful
+        })
+
+        # Calculate SOC statistics from 15-min SOC array
+        if 'soc_15min' in mpc_results and mpc_results['soc_15min']:
+            soc_values = mpc_results['soc_15min']
+            # Convert to numpy array if it's a list
+            if isinstance(soc_values, list):
+                soc_values = np.array(soc_values)
             results_summary.update({
-                'total_profit_eur': perf.get('total_profit_eur', 0),
-                'total_revenue_eur': perf.get('total_revenue_eur', 0),
-                'total_cost_eur': perf.get('total_cost_eur', 0),
-                'revenue_da_eur': perf.get('revenue_da_eur', 0),
-                'revenue_fcr_eur': perf.get('revenue_fcr_eur', 0),
-                'revenue_afrr_capacity_eur': perf.get('revenue_afrr_capacity_eur', 0),
-                'revenue_afrr_energy_eur': perf.get('revenue_afrr_energy_eur', 0),
-                'degradation_cyclic_eur': perf.get('degradation_cyclic_eur', 0),
-                'degradation_calendar_eur': perf.get('degradation_calendar_eur', 0),
-                'total_aging_cost_eur': perf.get('degradation_cyclic_eur', 0) + perf.get('degradation_calendar_eur', 0),
-                'num_iterations': perf.get('num_iterations', 0),
-                'solver_status': perf.get('solver_status', 'unknown')
+                'soc_avg_kwh': float(np.mean(soc_values)),
+                'soc_min_kwh': float(np.min(soc_values)),
+                'soc_max_kwh': float(np.max(soc_values)),
+                'soc_std_kwh': float(np.std(soc_values))
             })
 
-            # Calculate SOC statistics from timeseries
-            if 'timeseries' in mpc_results and 'e_soc' in mpc_results['timeseries']:
-                soc_values = mpc_results['timeseries']['e_soc']
-                results_summary.update({
-                    'soc_avg_kwh': np.mean(soc_values),
-                    'soc_min_kwh': np.min(soc_values),
-                    'soc_max_kwh': np.max(soc_values),
-                    'soc_std_kwh': np.std(soc_values)
-                })
-
         # Save detailed results
-        save_optimization_results(
-            optimizer_instance=optimizer,
-            solution=mpc_results.get('timeseries', {}),
-            performance_summary=mpc_results.get('performance', {}),
-            output_dir=alpha_dir,
-            run_name=f"alpha_{alpha:.1f}",
-            save_plots=False  # Don't generate plots yet
-        )
+        # Removed print statement - causes Unicode encoding issues on Windows console
+
+        # Save MPC-specific results
+        # Convert MPC results to format expected by save_optimization_results
+        performance_summary = {
+            'total_profit_eur': net_profit,
+            'total_revenue_eur': total_revenue,
+            'total_cost_eur': total_degradation_cost,
+            'revenue_da_eur': mpc_results.get('da_revenue', 0),
+            'revenue_afrr_energy_eur': mpc_results.get('afrr_e_revenue', 0),
+            'revenue_as_eur': mpc_results.get('as_revenue', 0),
+            'degradation_cyclic_eur': mpc_results.get('cyclic_cost', 0),
+            'degradation_calendar_eur': mpc_results.get('calendar_cost', 0),
+            'num_iterations': mpc_results.get('summary', {}).get('iterations', 0),
+            'alpha': alpha,
+            'c_rate': c_rate
+        }
+
+        # Save total_bids_df (annual bids DataFrame)
+        if 'total_bids_df' in mpc_results:
+            bids_csv_path = alpha_dir / "solution_timeseries.csv"
+            mpc_results['total_bids_df'].to_csv(bids_csv_path, index=False)
+            # Removed print statement - causes Unicode encoding issues on Windows console
+
+        # Save performance summary as JSON (ensure UTF-8 encoding for Unicode chars)
+        perf_json_path = alpha_dir / "performance_summary.json"
+        with open(perf_json_path, 'w', encoding='utf-8') as f:
+            json.dump(performance_summary, f, indent=2, ensure_ascii=False)
 
         # Save iteration summary if available
         if 'iteration_results' in mpc_results:
-            iter_df = extract_iteration_summary(mpc_results['iteration_results'])
-            iter_csv_path = alpha_dir / "iteration_summary.csv"
-            iter_df.to_csv(iter_csv_path, index=False)
+            try:
+                iter_df = extract_iteration_summary(mpc_results['iteration_results'])
+                iter_csv_path = alpha_dir / "iteration_summary.csv"
+                iter_df.to_csv(iter_csv_path, index=False)
+                # Removed print statement - causes Unicode encoding issues on Windows console
+            except Exception as iter_err:
+                # Don't fail entire simulation if iteration summary fails
+                print(f"Warning: Could not save iteration summary for alpha {alpha}: {iter_err}")
+
+        # Print success message (removed Unicode chars for Windows console compatibility)
+        profit = results_summary.get('total_profit_eur', 0)
+        aging_cost = results_summary.get('total_aging_cost_eur', 0)
+        # Removed print statements - causes Unicode encoding issues on Windows console
 
         return results_summary
 
     except Exception as e:
-        # Return error information
+        # Print detailed error for debugging
+        import traceback
+        print(f"\n[ERROR] Alpha {alpha:.1f} failed:")
+        print(f"  Error: {str(e)}")
+        print(f"  Traceback:")
+        traceback.print_exc()
+
+        # Return error information with all required fields
         return {
             'alpha': alpha,
             'status': 'error',
             'error': str(e),
             'runtime_seconds': 0,
-            'total_profit_eur': np.nan
+            'total_profit_eur': np.nan,
+            'total_revenue_eur': np.nan,
+            'total_cost_eur': np.nan,
+            'revenue_da_eur': np.nan,
+            'revenue_fcr_eur': np.nan,
+            'revenue_afrr_capacity_eur': np.nan,
+            'revenue_afrr_energy_eur': np.nan,
+            'degradation_cyclic_eur': np.nan,
+            'degradation_calendar_eur': np.nan,
+            'total_aging_cost_eur': np.nan,
+            'num_iterations': 0,
+            'solver_status': 'error',
+            'soc_avg_kwh': np.nan,
+            'soc_min_kwh': np.nan,
+            'soc_max_kwh': np.nan,
+            'soc_std_kwh': np.nan,
+            'country': config.get('country', 'unknown'),
+            'c_rate': config.get('c_rate', 0),
+            'test_days': config.get('test_days', 0),
+            'output_dir': str(Path(config.get('output_base_dir', '')) / f"alpha_{alpha:.1f}")
         }
 
+# %%
 # ============================================================================
 # Execute Parallel Alpha Sweep
 # ============================================================================
@@ -357,13 +439,14 @@ sweep_config = {
     'output_base_dir': str(output_base_dir),
     'base_mpc_config': base_mpc_config,
     'require_sequential': REQUIRE_SEQUENTIAL,
-    'epsilon': EPSILON
+    'epsilon': EPSILON,
+    'project_root': str(project_root)  # Pass project root for data loading
 }
 
 # Save sweep configuration
 output_base_dir.mkdir(parents=True, exist_ok=True)
-config_snapshot_path = output_base_dir / "sweep_config.json"
-with open(config_snapshot_path, 'w') as f:
+config_snapshot_path = output_base_dir / f"{TEST_DAYS}d_sweep_config.json"
+with open(config_snapshot_path, 'w', encoding='utf-8') as f:
     json.dump({
         'alpha_values': list(alpha_values),
         'test_mode': TEST_MODE,
@@ -376,23 +459,34 @@ with open(config_snapshot_path, 'w') as f:
         'execution_horizon_hours': execution_horizon_hours,
         'n_jobs': N_JOBS,
         'timestamp': timestamp
-    }, f, indent=2)
+    }, f, indent=2, ensure_ascii=False)
 
 print(f"\n[OK] Configuration saved to: {config_snapshot_path}")
 
 # Execute parallel sweep
 print(f"\n[START] Running alpha sweep with {N_JOBS} parallel workers...")
-print(f"Progress:")
+print(f"Total alphas to test: {len(alpha_values)}")
+# print(f"Expected total runtime: ~{len(alpha_values) * 45 / N_JOBS / 60:.1f} minutes")
+print(f"\n{'='*80}")
+print("DETAILED PROGRESS (each worker will report its status)")
+print(f"{'='*80}\n")
 
 sweep_start_time = time.time()
 
-# Run simulations in parallel with progress bar
-results_list = Parallel(n_jobs=N_JOBS, verbose=10)(
+##################################################
+# Run simulations in parallel with multiprocessing (faster, less logging noise)
+# verbose=10 shows detailed progress with timestamps
+print("\n[TIP] Simulations running in background. Watch for completion messages...")
+# print("      Each alpha should complete in 5-15 seconds for 2-day test.\n")
+
+results_list = Parallel(n_jobs=N_JOBS, verbose=10, backend='loky')(
     delayed(run_single_alpha_simulation)(alpha, sweep_config)
-    for alpha in tqdm(alpha_values, desc="Alpha sweep")
+    for alpha in alpha_values
 )
 
 sweep_runtime = time.time() - sweep_start_time
+###################################################
+
 
 print(f"\n[COMPLETE] Alpha sweep finished!")
 print(f"  - Total runtime: {sweep_runtime/60:.1f} minutes")
@@ -416,6 +510,20 @@ print("\n[START] Aggregating results...")
 
 # Convert results to DataFrame
 results_df = pd.DataFrame(results_list)
+
+# Debug: Check what columns we got
+print(f"\n[DEBUG] Results columns: {list(results_df.columns)}")
+print(f"[DEBUG] Number of rows: {len(results_df)}")
+
+# Check for errors
+if 'status' in results_df.columns:
+    n_errors = (results_df['status'] == 'error').sum()
+    if n_errors > 0:
+        print(f"\n[WARNING] {n_errors}/{len(results_df)} simulations failed!")
+        print("\nFailed alphas:")
+        error_rows = results_df[results_df['status'] == 'error']
+        for _, row in error_rows.iterrows():
+            print(f"  Alpha {row['alpha']:.1f}: {row.get('error', 'Unknown error')}")
 
 # Sort by alpha
 results_df = results_df.sort_values('alpha').reset_index(drop=True)
@@ -486,25 +594,36 @@ print()
 # Identify Optimal Alpha Values
 # ============================================================================
 
-# Find best alpha by different metrics
-best_profit_idx = results_df['net_profit_eur'].idxmax()
-best_npv_idx = results_df['npv_eur'].idxmax()
-best_roi_idx = results_df['roi_proxy'].idxmax()
+# Check if we have any successful results
+successful_results = results_df[results_df['status'] == 'success']
 
-print("=" * 80)
-print("OPTIMAL ALPHA CANDIDATES")
-print("=" * 80)
-print(f"\nBest by Net Profit: α = {results_df.loc[best_profit_idx, 'alpha']:.1f}")
-print(f"  - Profit: €{results_df.loc[best_profit_idx, 'net_profit_eur']:,.0f}")
-print(f"  - Aging Cost: €{results_df.loc[best_profit_idx, 'total_aging_cost_eur']:,.0f}")
+if len(successful_results) > 0:
+    # Find best alpha by different metrics (only among successful runs)
+    best_profit_idx = successful_results['net_profit_eur'].idxmax()
+    best_npv_idx = successful_results['npv_eur'].idxmax()
+    best_roi_idx = successful_results['roi_proxy'].idxmax()
 
-print(f"\nBest by NPV: α = {results_df.loc[best_npv_idx, 'alpha']:.1f}")
-print(f"  - NPV: €{results_df.loc[best_npv_idx, 'npv_eur']:,.0f}")
-print(f"  - Annual Profit Est.: €{results_df.loc[best_npv_idx, 'annual_profit_estimate']:,.0f}")
+    print("=" * 80)
+    print("OPTIMAL ALPHA CANDIDATES")
+    print("=" * 80)
+    print(f"\nBest by Net Profit: alpha = {results_df.loc[best_profit_idx, 'alpha']:.1f}")
+    print(f"  - Profit: €{results_df.loc[best_profit_idx, 'net_profit_eur']:,.0f}")
+    print(f"  - Aging Cost: €{results_df.loc[best_profit_idx, 'total_aging_cost_eur']:,.0f}")
 
-print(f"\nBest by ROI Proxy: α = {results_df.loc[best_roi_idx, 'alpha']:.1f}")
-print(f"  - ROI Proxy: {results_df.loc[best_roi_idx, 'roi_proxy']:.2f}")
-print()
+    print(f"\nBest by NPV: alpha = {results_df.loc[best_npv_idx, 'alpha']:.1f}")
+    print(f"  - NPV: €{results_df.loc[best_npv_idx, 'npv_eur']:,.0f}")
+    print(f"  - Annual Profit Est.: €{results_df.loc[best_npv_idx, 'annual_profit_estimate']:,.0f}")
+
+    print(f"\nBest by ROI Proxy: alpha = {results_df.loc[best_roi_idx, 'alpha']:.1f}")
+    print(f"  - ROI Proxy: {results_df.loc[best_roi_idx, 'roi_proxy']:.2f}")
+    print()
+else:
+    print("=" * 80)
+    print("OPTIMAL ALPHA CANDIDATES")
+    print("=" * 80)
+    print("\n[ERROR] No successful simulations! Cannot identify optimal alpha.")
+    print("Please fix the errors above and re-run.")
+    print()
 
 # %%
 # ================================================================================
@@ -776,7 +895,7 @@ def plot_revenue_breakdown_for_alpha(alpha, output_dir=None):
     go.Figure
         Plotly figure object
     """
-    print(f"\n[PLOTTING] Generating Revenue Breakdown for α={alpha:.1f}...")
+    print(f"\n[PLOTTING] Generating Revenue Breakdown for alpha={alpha:.1f}...")
 
     if output_dir is None:
         output_dir = output_base_dir
@@ -1051,9 +1170,9 @@ def interactive_control():
                 f.write(f"  - Total simulations: {len(alpha_values)}\n\n")
 
                 f.write(f"Optimal Alpha Values:\n")
-                f.write(f"  - Best Net Profit: α = {results_df.loc[results_df['net_profit_eur'].idxmax(), 'alpha']:.1f}\n")
-                f.write(f"  - Best NPV: α = {results_df.loc[results_df['npv_eur'].idxmax(), 'alpha']:.1f}\n")
-                f.write(f"  - Best ROI: α = {results_df.loc[results_df['roi_proxy'].idxmax(), 'alpha']:.1f}\n\n")
+                f.write(f"  - Best Net Profit: alpha = {results_df.loc[results_df['net_profit_eur'].idxmax(), 'alpha']:.1f}\n")
+                f.write(f"  - Best NPV: alpha = {results_df.loc[results_df['npv_eur'].idxmax(), 'alpha']:.1f}\n")
+                f.write(f"  - Best ROI: alpha = {results_df.loc[results_df['roi_proxy'].idxmax(), 'alpha']:.1f}\n\n")
 
                 f.write("Full Results Table:\n")
                 f.write(display_df.to_string(index=False))

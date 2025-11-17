@@ -5,7 +5,7 @@
   "mpc_parameters": {
     "horizon_hours": 36,
     "execution_hours": 24,
-    "duration_days": 14,
+    "duration_days": 365,
     "initial_soc_fraction": 0.5,
     "validate_constraints": false,
     "description": "MPC rolling horizon settings. horizon_hours: optimization lookahead window. execution_hours: committed/executed window (receding horizon step). initial_soc_fraction: starting battery SOC (0.0-1.0). validate_constraints: post-solve validation (disabled for speed)"
