@@ -59,13 +59,13 @@ mdc: true
 
 ## Business Impact
 - Investment Strategy
-- ROI Projections
+- ROI Projections (?)
 - Market Insights
 
 ## Implementation Quality
 - Code Architecture
-- Validation Framework
-- Production System
+- Validation Framework (Which ?)
+- Production System (which ?)
 
 </div>
 
@@ -125,9 +125,8 @@ layout: two-cols
 <div>
 
 ## Model I: Base + aFRR Energy
-```math
-\max Z = P_{DA} + P_{ANCI} + P_{aFRR_E}
-```
+$$\max Z = P_{DA} + P_{ANCI} + P_{aFRR_E}$$
+
 
 - Four-market co-optimization
 - 15-min DA + aFRR energy
@@ -242,69 +241,56 @@ layout: center
 
 ```mermaid
 graph TB
-    subgraph "Meta-Optimizer Layer"
+    subgraph "**Meta-Optimizer Layer**"
         MO[Meta-Optimizer<br/>Find optimal α]
     end
 
-    subgraph "MPC Controller Layer"
-        MPC[MPC Simulator<br/>30h horizon / 24h execution]
+    subgraph "**MPC Controller Layer**"
+        MPC[MPC Simulator<br/>36h horizon - 
+        24h execution]
     end
 
-    subgraph "MILP Solver Layer"
+    subgraph "**MILP Solver Layer**"
         MILP[Model III Optimizer<br/>4-market + degradation]
     end
 
-    MO -->|α parameter| MPC
-    MPC -->|Rolling horizon| MILP
-    MILP -->|Solution| MPC
+    MO --> | α parameter| MPC
+    MPC --> | Rolling horizon| MILP
+    MILP --> | Solution| MPC
     MPC -->|10-year NPV| MO
 
-    style MO fill:#e1f5fe
-    style MPC fill:#fff3e0
-    style MILP fill:#f3e5f5
+    style MO fill:#e8e8e8
+    style MPC fill:#00abf4bd
+    style MILP fill:#2256ff96
 ```
+<!-- WATERFALL_COLORS = {
+    # Positive Revenue Components (stacked above zero) - Blue gradient @ 85% opacity
+    'revenue_primary': 'rgba(32, 233, 217, 0.85)',    # #20e9d9 Teal - DA Discharge, primary revenue
+    'revenue_secondary': 'rgba(5, 121, 194, 0.85)',  # #0579c2 Blue - FCR Capacity
+    'revenue_tertiary': 'rgba(34, 81, 255, 0.85)',  # #2251ff Bright Blue - aFRR Energy, accent #2256ff96
+
+    # Negative Cost Components (stacked below zero) - Dark blues & grays @ 100% opacity
+    'cost_primary': 'rgba(6, 31, 121, 1.0)',         # #061f79 Dark Blue - DA Charge Cost
+    'cost_secondary': 'rgba(232, 232, 232, 1.0)',        # #e8e8e8 Light Gray - Cyclic Aging
+    'cost_tertiary': 'rgba(5, 28, 44, 1.0)',     # #051c2c Very Dark Blue - Calendar Aging
+
+    # Cumulative Metrics
+    'cumulative_line': '#061f79',                    # #061f79 Dark Blue - Cumulative Profit line
+    'cumulative_marker': '#061f79',                  # #061f79 Dark Blue - Profit markers (5.6px, 70% standard)
+
+    # Fallback colors (for aggregated view)
+    'total_revenue': 'rgba(0, 169, 244, 0.85)',      # #00a9f4 Cyan Blue
+    'total_cost': 'rgba(5, 28, 44, 1.0)',            # #051c2c Very Dark Blue
+} -->
 
 ### Key Parameters
-- **Horizon:** 30 hours lookahead
+- **Horizon:** 36 hours lookahead
 - **Execution:** 24 hours implemented
 - **Iterations:** 365 per year
 - **State continuity:** Final SOC(n) → Initial SOC(n+1)
 
 ---
-
-# Innovation 3: Production MPC System
-
-## Checkpoint-Based Batch Execution
-
-```python
-class MPCBatchRunner:
-    def run_with_checkpoints(self):
-        """Production-grade execution with recovery"""
-        checkpoint_interval = 120  # Save every 2 minutes
-
-        for scenario in priority_ordered_scenarios:
-            try:
-                # Load checkpoint if exists
-                if checkpoint_exists(scenario):
-                    state = load_checkpoint(scenario)
-                else:
-                    state = initialize_scenario(scenario)
-
-                # Run MPC iterations with periodic saves
-                for day in range(state.current_day, 365):
-                    solution = run_mpc_iteration(day, state)
-                    state.update(solution)
-
-                    if time_elapsed() > checkpoint_interval:
-                        save_checkpoint(state, scenario)
-
-            except Exception as e:
-                log_error(f"Scenario {scenario}: {e}")
-                save_partial_results(state)
-```
-
-**Features:** Priority ordering • Automatic recovery • Comprehensive logging • 100% completion rate
-
+layout: center
 ---
 
 # Results: Country Performance Rankings
@@ -415,32 +401,6 @@ Higher power capacity enables capturing high-value market opportunities that far
 
 ---
 
-# Critical Bug Fix: Timestamp Precision
-
-## The Problem
-Capacity prices became constant after January 18, 2024
-
-## Root Cause Analysis
-
-```python
-# Data contained mixed timestamp precision:
-"2024-02-06 03:45:00.999"  # Milliseconds
-"2024-02-06 04:00:01"      # Exact seconds
-
-# Initial fix attempt (FAILED):
-df['timestamp'] = df['timestamp'].dt.round('s')
-# Result: 04:00:01 → 04:00:01 (no change)
-
-# Final solution (SUCCESS):
-df['timestamp'] = df['timestamp'].dt.floor('min')
-# Result: Both become 04:00:00 → correct alignment
-```
-
-## Impact
-- **Before fix:** Corrupted capacity prices, underestimated revenue
-- **After fix:** All 15 scenarios re-run successfully
-- **File sizes:** Increased as expected (more unique price data)
-- **Validation:** 100% constraint satisfaction
 
 ---
 
@@ -671,7 +631,6 @@ layout: center
 ## Innovation Highlights 🚀
 - ✅ Four-market co-optimization
 - ✅ Aging-aware operation
-- ✅ Critical bug detection & fix
 - ✅ 10-100x faster data pipeline
 - ✅ Comprehensive validation framework
 

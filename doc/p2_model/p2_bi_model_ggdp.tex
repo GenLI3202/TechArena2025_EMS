@@ -6,11 +6,8 @@
 
 % Font and Language Setup
 \usepackage{fontspec}
-% Main language is english, secondary is chinese (for annotations)
-\usepackage[english, bidi=basic, provide=*]{babel}
-
-% Provide the languages
-\babelprovide[import, onchar=ids fonts]{english}
+% Main language is english
+\usepackage[english]{babel}
 
 % Set default/Latin font to Sans Serif (as per instructions)
 % Noto Sans is a clean, modern font suitable for reports.
@@ -90,17 +87,17 @@ $P_{DA}(t)$ & Day-ahead electricity price & EUR/MWh \\
 $P_{FCR}(b)$ & FCR capacity price & EUR/MW/h \\
 $P^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity price & EUR/MW/h \\
 $P^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity price & EUR/MW/h \\
-$P^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} Positive aFRR energy price & EUR/MWh \\
-$P^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} Negative aFRR energy price & EUR/MWh \\
+$P^{\mathrm{pos}}_{aFRR,E}(t)$ &  Positive aFRR energy price & EUR/MWh \\
+$P^{\mathrm{neg}}_{aFRR,E}(t)$ &  Negative aFRR energy price & EUR/MWh \\
 $E_{\mathrm{nom}}$ & Nominal energy capacity & kWh \\
 $P^{\mathrm{config}}_{\max}$ & Max charge/discharge power & kW \\
 $\eta_{\mathrm{ch}}, \eta_{\mathrm{dis}}$ & Charging/discharging efficiencies & - \\
 $SOC_{\min}, SOC_{\max}$ & Min/max SOC limits (fraction) & - \\
-$E^{\mathrm{seg}}_{j}$ & \textbf{(New)} Max energy capacity of segment $j$ & kWh \\
-$c^{\mathrm{cost}}_{j}$ & \textbf{(New)} Marginal cyclic degradation cost for segment $j$ & EUR/kWh \\
-$SOC^{\mathrm{point}}_i$ & \textbf{(New)} SOC breakpoint $i$ for calendar cost & kWh \\
-$Cost^{\mathrm{point}}_i$ & \textbf{(New)} Calendar degradation cost at breakpoint $i$ & EUR/hr \\
-$\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
+$E^{\mathrm{seg}}_{j}$ &  Max energy capacity of segment $j$ & kWh \\
+$c^{\mathrm{cost}}_{j}$ &  Marginal cyclic degradation cost for segment $j$ & EUR/kWh \\
+$SOC^{\mathrm{point}}_i$ &  SOC breakpoint $i$ for calendar cost & kWh \\
+$Cost^{\mathrm{point}}_i$ &  Calendar degradation cost at breakpoint $i$ & EUR/hr \\
+$\alpha$ &  Degradation price (meta-parameter) & - \\
 \bottomrule
 \end{tabular}
 
@@ -110,22 +107,22 @@ $\alpha$ & \textbf{(New)} Degradation price (meta-parameter) & - \\
 Symbol & Description & Type \\
 \midrule
 $p_{\mathrm{ch}}(t), p_{\mathrm{dis}}(t)$ & DA charge/discharge power & Cont. $\ge 0$ \\
-$p^{\mathrm{pos}}_{aFRR,E}(t)$ & \textbf{(New)} aFRR-E positive (discharge) power & Cont. $\ge 0$ \\
-$p^{\mathrm{neg}}_{aFRR,E}(t)$ & \textbf{(New)} aFRR-E negative (charge) power & Cont. $\ge 0$ \\
+$p^{\mathrm{pos}}_{aFRR,E}(t)$ &  aFRR-E positive (discharge) power & Cont. $\ge 0$ \\
+$p^{\mathrm{neg}}_{aFRR,E}(t)$ &  aFRR-E negative (charge) power & Cont. $\ge 0$ \\
 $c_{fcr}(b)$ & FCR capacity bid & Cont. $\ge 0$ \\
 $c^{\mathrm{pos}}_{aFRR}(b)$ & Positive aFRR capacity bid & Cont. $\ge 0$ \\
 $c^{\mathrm{neg}}_{aFRR}(b)$ & Negative aFRR capacity bid & Cont. $\ge 0$ \\
-$p^{\mathrm{total}}_{\mathrm{ch}}(t), p^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total charge/discharge power & Cont. $\ge 0$ \\
-$p^{\mathrm{ch}}_{j}(t), p^{\mathrm{dis}}_{j}(t)$ & \textbf{(New)} Charge/discharge power for segment $j$ & Cont. $\ge 0$ \\
-$e_{\mathrm{soc},j}(t)$ & \textbf{(New)} Energy stored in segment $j$ & Cont. $\ge 0$ \\
-$e_{\mathrm{soc}}(t)$ & \textbf{(New)} Total energy stored in BESS & Cont. $\ge 0$ \\
-$c^{\mathrm{cal}}_{\mathrm{cost}}(t)$ & \textbf{(New)} Calendar cost at time $t$ & Cont. $\ge 0$ \\
-$\lambda_{t,i}$ & \textbf{(New)} SOS2 variable for calendar cost & Cont. $\ge 0$ \\
+$p^{\mathrm{total}}_{\mathrm{ch}}(t), p^{\mathrm{total}}_{\mathrm{dis}}(t)$ &  Total charge/discharge power & Cont. $\ge 0$ \\
+$p^{\mathrm{ch}}_{j}(t), p^{\mathrm{dis}}_{j}(t)$ &  Charge/discharge power for segment $j$ & Cont. $\ge 0$ \\
+$e_{\mathrm{soc},j}(t)$ &  Energy stored in segment $j$ & Cont. $\ge 0$ \\
+$e_{\mathrm{soc}}(t)$ &  Total energy stored in BESS & Cont. $\ge 0$ \\
+$c^{\mathrm{cal}}_{\mathrm{cost}}(t)$ &  Calendar cost at time $t$ & Cont. $\ge 0$ \\
+$\lambda_{t,i}$ &  SOS2 variable for calendar cost & Cont. $\ge 0$ \\
 $y_{\mathrm{ch}}(t), y_{\mathrm{dis}}(t)$ & DA bid binaries & Binary \\
 $y_{fcr}(b), y^{\mathrm{pos}}_{aFRR}(b), ...$ & Ancillary service bid binaries & Binary \\
-$y^{\mathrm{pos}}_{aFRR,E}(t), ...$ & \textbf{(New)} aFRR-E bid binaries & Binary \\
-$y^{\mathrm{total}}_{\mathrm{ch}}(t), y^{\mathrm{total}}_{\mathrm{dis}}(t)$ & \textbf{(New)} Total operation binaries & Binary \\
-$z^{\text{active}}_{j}(t)$ & \textbf{(New)} Segment activation binary (1 if segment $j$ has energy) & Binary \\
+$y^{\mathrm{pos}}_{aFRR,E}(t), ...$ &  aFRR-E bid binaries & Binary \\
+$y^{\mathrm{total}}_{\mathrm{ch}}(t), y^{\mathrm{total}}_{\mathrm{dis}}(t)$ &  Total operation binaries & Binary \\
+$z^{\text{active}}_{j}(t)$ &  Segment activation binary (1 if segment $j$ has energy) & Binary \\
 \bottomrule
 \end{tabular}
 
@@ -158,9 +155,9 @@ Where:
     \item $\Delta t$ is the time step duration (hours).
   \end{itemize}
   \item The second term $\mathbb{P}^{ANCI}$ is ancillary service capacity profit.
-  \begin{itemize}
+  % \begin{itemize}
     % \item Bids $c(b)$ are in MW and prices $P(b)$ are in EUR/MW/h (hourly rates). Multiplying by $\Delta b = 4$ hours yields EUR per block.
-  \end{itemize}
+  % \end{itemize}
 \end{itemize}
 
 \subsection*{Constraints}
@@ -350,7 +347,7 @@ This effectively creates the cascading behavior where segment $j$ begins to fill
 
 \subsubsection{Calculation of the the Marginal Cost for Each SOC Segment $c^{\mathrm{cost}}_{j}$}
 The marginal cost for discharging from each SOC segment is derived from the BESS's total investment cost and its expected lifetime. To ensure the model is physically-grounded and traceable, the parameters have been re-evaluated based on LFP-specific data and the competition's economic specifications. The cost is distributed non-linearly based on a standard power-law model for LFP battery degradation.
-(Details refer to `doc\p2_model\aging_cost\cyclic_aging.tex`)
+(Details refer to \texttt{doc/p2\_model/aging\_cost/cyclic\_aging.tex})
 
 \paragraph{Step 1: Re-evaluating the Cycle Life Parameter ($a$)}
 The relationship between cycle life and Depth of Discharge (DoD) is described by the power-law model $\text{CycleLife}(D) = a \cdot D^{-b}$, where $b=2$ is a behaviorally superior choice for an EMS as it strongly penalizes deep discharges. The parameter $a$ (cycle life at 100\% DoD) is derived from the LFP-specific commercial claim of 6,000 cycles at 80\% DoD:
@@ -635,13 +632,13 @@ $z^{\text{active}}_{j}(t)$ & 1 if segment $j$ is active (can hold energy) at tim
 
 \subsubsection{Core LIFO Constraints}
 
-\paragraph{1. Segment Activation and SOC (Always Enforced)}
+\paragraph{1. Segment Activation and SOC}
 This constraint links the binary variable to the segment's state of charge. If a segment $j$ has any energy, its corresponding binary $z^{\text{active}}_{j}(t)$ must be 1.
-\begin{equation}
-    e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \label{eq:seg_activation_impl}
+\begin{equation}\label{eq:seg_activation_impl}
+    e_{\mathrm{soc},j}(t) \le E^{\mathrm{seg}}_{j} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j 
 \end{equation}
 
-\paragraph{2. LIFO Fullness Prerequisite (Always Enforced)}
+\paragraph{2. LIFO Fullness Prerequisite}
 The core of the LIFO logic. It enforces that a segment $j$ can only hold energy if the segment above it, $j-1$, is completely full.
 \begin{equation}
     e_{\mathrm{soc},j-1}(t) \ge E^{\mathrm{seg}}_{j-1} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \in \{2, ..., J\} \label{eq:lifo_fullness_impl}
@@ -650,7 +647,7 @@ This constraint links the activation of segment $j$ to the fullness of segment $
 
 \subsubsection{Optional Power Flow Constraints (Performance Tuning)}
 
-The following constraints can be optionally enabled via the \texttt{enforce\_segment\_binary} parameter. They provide stricter enforcement but add $2 \times T \times J$ constraints, which can slow solve time by 5-10x. In practice, Equations \eqref{eq:seg_activation_impl} and \eqref{eq:lifo_fullness_impl} are sufficient to enforce LIFO behavior.
+The following constraints can be optionally enabled via the \texttt{require\_sequential\_segment\_activation} parameter in \texttt{aging\_config.json}. They provide stricter enforcement but add $2 \times T \times J$ constraints, which can slow solve time by 5-10x. In practice, Equations \eqref{eq:seg_activation_impl} and \eqref{eq:lifo_fullness_impl} are sufficient to enforce LIFO behavior.
 
 \paragraph{3. Segment Charge/Discharge Activation (Optional)}
 These constraints ensure that power can only flow into or out of a segment if it is active:
@@ -659,7 +656,7 @@ These constraints ensure that power can only flow into or out of a segment if it
     p^{\mathrm{dis}}_{j}(t) &\le P^{\mathrm{config}}_{\max} \cdot z^{\text{active}}_{j}(t) \qquad \forall t, \forall j \label{eq:seg_dis_act}
 \end{align}
 
-\textbf{Implementation Note:} Set \texttt{enforce\_segment\_binary = False} (default) to disable Equations \eqref{eq:seg_ch_act} and \eqref{eq:seg_dis_act} for faster solve times. The LIFO behavior is maintained through Equations \eqref{eq:seg_activation_impl} and \eqref{eq:lifo_fullness_impl}.
+\textbf{Implementation Note:} Set \texttt{require\_sequential\_segment\_activation = False} in \texttt{aging\_config.json} (default: True) to disable Equations \eqref{eq:seg_ch_act} and \eqref{eq:seg_dis_act} for faster solve times. When disabled, LIFO behavior is maintained solely through Equations \eqref{eq:seg_activation_impl} and \eqref{eq:lifo_fullness_impl}, which is sufficient in practice.
 
 
 

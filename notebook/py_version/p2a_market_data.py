@@ -170,8 +170,10 @@ fig.show()
 # %%
 # NEW: Multi-Market Distribution Comparison (2x2 Grid)
 # Shows all 4 markets: Day-Ahead, FCR, aFRR Capacity, aFRR Energy
+
 fig1 = plot_all_markets_distribution(tables, countries=['DE', 'AT', 'CH', 'HU', 'CZ'])
 fig1.show()
+fig1.write_html('multi_market_distribution_comparison.html')
 
 # TODO: aFRR-C and aFRR-E should have both directions.
 
@@ -180,7 +182,8 @@ fig2 = plot_country_market_comparison(tables, country='DE')
 fig2.show()
 
 # %%
-fig3 = plot_price_time_series_mckinsey(tables, country='CH', time_range='Q2')
+fig3 = plot_price_time_series_mckinsey(tables, country='CZ', time_range='full',)
+fig3.update_layout(height=600, width=1200)
 fig3.show()
 
 # %%

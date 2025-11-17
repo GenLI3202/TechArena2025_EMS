@@ -384,22 +384,22 @@ class BESSOptimizerModelI:
 
         return combined_df
     
-    def build_optimization_model(self, country_data: pd.DataFrame, 
-                               c_rate: float, daily_cycle_limit: float) -> pyo.ConcreteModel:
+    def build_optimization_model(self, country_data: pd.DataFrame,
+                               c_rate: float, daily_cycle_limit: float = 2.0) -> pyo.ConcreteModel:
         """
         Build the improved optimization model addressing all critical issues.
-        
+
         Key improvements:
         1. Pre-computed block mappings for O(1) lookup
         2. AS prices indexed by block instead of time
         3. Constraint functions use model parameters only
         4. Comprehensive validation
-        
+
         Args:
             country_data: Market data for specific country
             c_rate: C-rate configuration (power to energy ratio)
-            daily_cycle_limit: Daily cycle limit
-            
+            daily_cycle_limit: Daily cycle limit (default: 2.0)
+
         Returns:
             pyo.ConcreteModel: Improved optimization model
         """

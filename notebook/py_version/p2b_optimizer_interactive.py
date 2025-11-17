@@ -131,12 +131,12 @@ CONFIGURATION NOTES:
 """
 
 # Test scenario configuration
-TEST_COUNTRY = "AT"                 # Options: DE_LU, AT, CH, HU, CZ
+TEST_COUNTRY = "CZ"                 # Options: DE_LU, AT, CH, HU, CZ
 TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
 TEST_TIME_HORIZON_HOURS = 36        # Time horizon in hours (24h feasible with 6-segment config)
-TEST_START_STEP = int(96*1)         # Starting time step (96 = 1 day in 15-min intervals)
-TEST_MODEL = "III"                  # Options: "I", "II", "III"
+TEST_START_STEP = int(96*132)         # Starting time step (96 = 1 day in 15-min intervals) (May 12th of CZ has interesting negative da prices)
+TEST_MODEL = "II"                  # Options: "I", "II", "III"
 USE_EV_WEIGHTING = True            # Enable aFRR EV weighting
 MAX_AS_RATIO = 0.8                  # Max ancillary service ratio (80%)
 ENABLE_CROSS_MARKET_EXCLUSIVITY = True # Disable to reduce complexity (Cst-8)
@@ -147,14 +147,14 @@ ENABLE_CROSS_MARKET_EXCLUSIVITY = True # Disable to reduce complexity (Cst-8)
 
 # To override config defaults, uncomment and modify:
 LIFO_EPSILON_KWH = 0              # Override: more relaxed LIFO (faster solve)
-REQUIRE_SEQUENTIAL = False          # Override: disable sequential activation (much faster, but less accurate)
+REQUIRE_SEQUENTIAL = True          # Override: disable sequential activation (much faster, but less accurate)
 
 # Battery SOC limits
 MAX_SOC = 1.0                       # Max state of charge
 MIN_SOC = 0.0                       # Min state of charge
 
 # Output options
-SAVE_RESULTS = False                # Save results to disk
+SAVE_RESULTS = True                # Save results to disk
 GENERATE_PLOTS = True               # Generate validation plots
 
 print("=" * 80)
@@ -264,9 +264,11 @@ print(f"Battery Capacity: {optimizer.battery_params['capacity_kwh']} kWh")
 print(f"Max AS Ratio: {MAX_AS_RATIO * 100:.0f}%")
 print(f"Cross-Market Exclusivity (Cst-8): {ENABLE_CROSS_MARKET_EXCLUSIVITY}")
 print(f"\n[DEGRADATION] Model Configuration:")
-print(f"  Segments: {len(optimizer.degradation_params.get('marginal_costs', []))}")
-print(f"  LIFO Epsilon: {optimizer.degradation_params.get('lifo_epsilon_kwh', 'N/A')} kWh")
-print(f"  Sequential Activation: {optimizer.degradation_params.get('require_sequential_segment_activation', 'N/A')}")
+
+if TEST_MODEL in ['II', 'III']:
+    print(f"  Segments: {len(optimizer.degradation_params.get('marginal_costs', []))}")
+    print(f"  LIFO Epsilon: {optimizer.degradation_params.get('lifo_epsilon_kwh', 'N/A')} kWh")
+    print(f"  Sequential Activation: {optimizer.degradation_params.get('require_sequential_segment_activation', 'N/A')}")
 
 # %%
 # ============================================================================
@@ -458,6 +460,8 @@ if TEST_MODEL in ['II', 'III']:
                 # save_path=str(plots_dir / "cyclic_soc_stacked.html")
             )
             fig_cyclic.show()
+            if SAVE_RESULTS:
+                fig_cyclic.write_html(str(plots_dir / "cyclic_soc_stacked.html"))
             print("   ✅ Saved: cyclic_soc_stacked.html")
         except Exception as e:
             print(f"   ❌ Error: {e}")
@@ -475,6 +479,8 @@ if TEST_MODEL in ['II', 'III']:
                 # save_path=str(plots_dir / "calendar_aging_curve.html")
             )
             fig_calendar.show()
+            if SAVE_RESULTS:
+                fig_calendar.write_html(str(plots_dir / "calendar_aging_curve.html"))
             print("   ✅ Saved: calendar_aging_curve.html")
         except Exception as e:
             print(f"   ❌ Error: {e}")
