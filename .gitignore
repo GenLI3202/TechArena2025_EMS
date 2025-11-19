@@ -30,8 +30,8 @@ validation_results/**/*.html
 submission_results/
 
 
-# Large JSONL data files (200K+ lines)
-
+# Large JSONL data files (200K+ line
+**/input
 **/TechArena2025_data_tidy.jsonl
 
 # Large notebook files with embedded outputs
