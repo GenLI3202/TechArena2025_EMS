@@ -121,11 +121,11 @@ class BESSOptimizerModelI:
         try:
             with open(solver_config_path, 'r') as f:
                 solver_config = json.load(f)
-            solver_time_limit = solver_config.get('solver_time_limit_sec', 600)
+            solver_time_limit = solver_config.get('solver_time_limit_sec', 1200)
             self.solver_config = solver_config
         except Exception as e:
-            logger.warning(f"Failed to load solver config: {e}. Using default timeout 600s")
-            solver_time_limit = 600
+            logger.warning(f"Failed to load solver config: {e}. Using default timeout 1200s")
+            solver_time_limit = 1200
             self.solver_config = {}
 
         # Market parameters

@@ -87,7 +87,7 @@ DEFAULT_SOLVER_TIME_LIMIT = solver_config.get('solver_time_limit_sec', 900)
 
 # Checkpointing
 ENABLE_CHECKPOINTING = True
-CHECKPOINT_INTERVAL_MINUTES = 2
+CHECKPOINT_INTERVAL_MINUTES = 3
 
 # Output settings
 SAVE_RESULTS = True
