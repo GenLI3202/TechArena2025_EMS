@@ -1,15 +1,51 @@
 # -*- coding: utf-8 -*-
 """
-Batch Execution Script for Final Submission Results
+Batch Execution Script for Competition Submission
 
-Generates 15 annual MPC results for all country-crate combinations:
+Generates MPC optimization results for all country-C-rate combinations:
 - 5 countries: DE_LU, AT, CH, HU, CZ
 - 3 C-rates: 0.25, 0.33, 0.5
 
-Execution order (priority-based):
-1. All countries at C-rate=0.25
-2. All countries at C-rate=0.33
-3. All countries at C-rate=0.50
+Features:
+- Flexible data loading: Excel (competition mode) or Parquet (development mode)
+- Checkpointing: Auto-saves progress every 3 minutes (recoverable)
+- Dual output:
+  1. Detailed results in submission_results/ (for p2d_results_ana.py)
+  2. Competition CSV files in output/ (for submission)
+
+Data Loading Modes:
+  PREPROCESSED_DATA_READY = False (default):
+    → Loads from Input/TechArena2025_Phase2_data.xlsx (competition mode)
+    → Suitable for final submission and evaluation
+
+  PREPROCESSED_DATA_READY = True:
+    → Loads from preprocessed parquet files (10-100x faster)
+    → Suitable for development and testing
+
+Output Files:
+  submission_results/TIMESTAMP_country_crateX.X/
+    - performance_summary.json (financial metrics)
+    - solution_timeseries.csv (15-min decision variables)
+    - iteration_summary.csv (daily MPC iteration stats)
+
+  output/
+    - TechArena_Phase2_Operation.csv (combined bidding schedule)
+    - TechArena_Phase2_Configuration.csv (per-country C-rate comparison)
+    - TechArena_Phase2_Investment.csv (per-country ROI analysis)
+
+Usage:
+  # Competition mode (load from Excel, generate all outputs)
+  python run_submission_batch.py
+
+  # Development mode (fast parquet loading)
+  Set PREPROCESSED_DATA_READY = True, then:
+  python run_submission_batch.py
+
+  # Analyze & plot results (run after batch completes)
+  python notebook/py_version/p2d_results_ana.py
+
+Author: SoloGen Team
+Date: November 2025
 """
 # %%
 import sys
@@ -52,10 +88,19 @@ logging.getLogger('py_script.mpc.mpc_simulator').setLevel(logging.WARNING)
 # CONFIGURATION
 # ================================================================================
 
+# *** DATA LOADING MODE ***
+# Set to False for competition submission (load from Excel)
+# Set to True for development (use preprocessed parquet - 10-100x faster)
+PREPROCESSED_DATA_READY = False
+
+# Input data path (used only if PREPROCESSED_DATA_READY = False)
+INPUT_EXCEL_PATH = "Input/TechArena2025_Phase2_data.xlsx"
+
 # Test parameters
 TEST_DURATION_DAYS = 365  # Full year for final submission
 ALPHA = 1.0  # Full degradation cost
 INITIAL_SOC_FRACTION = 0.5  # 50% initial SOC
+USE_AFRR_EV_WEIGHTING = False  # aFRR energy activation probability weighting
 
 # SOC limits (0-100% to avoid constraint bug)
 SOC_MIN = 0.0
@@ -68,6 +113,10 @@ LIFO_EPSILON_KWH = 0
 # Optimizer settings
 MAX_AS_RATIO = 0.9 # If set to 0.8, when C-rate = 0.25, max AS capacity = 4472 * 0.25 * 0.8 = 894.4 kW < 1MW miniumm bid requirement
 ENABLE_CROSS_MARKET_EXCLUSIVITY = True
+
+# Output settings
+GENERATE_COMPETITION_CSV = True  # Generate 3 CSV files for competition submission
+SKIP_CSV_EXPORT = False  # Set to True to skip CSV generation (faster testing)
 
 # MPC settings (load from config)
 config_dir = project_root / "data" / "p2_config"
@@ -166,7 +215,7 @@ def setup_logging():
 # MAIN EXECUTION FUNCTION
 # ================================================================================
 
-def run_scenario(country, c_rate, logger):
+def run_scenario(country, c_rate, logger, full_market_data=None):
     """
     Run MPC simulation for a single scenario.
 
@@ -178,6 +227,8 @@ def run_scenario(country, c_rate, logger):
         C-rate (0.25, 0.33, or 0.5)
     logger : logging.Logger
         Logger instance
+    full_market_data : pd.DataFrame, optional
+        Pre-loaded full market data (MultiIndex DataFrame) or None
 
     Returns
     -------
@@ -193,8 +244,21 @@ def run_scenario(country, c_rate, logger):
 
         # 1. Load market data
         logger.info(f"[1/5] Loading market data for {country}...")
-        preprocessed_dir = project_root / "data" / "parquet" / "preprocessed"
-        country_data = load_preprocessed_country_data(country, data_dir=preprocessed_dir)
+
+        if full_market_data is not None:
+            # Use pre-loaded full market data (Excel mode - efficient)
+            logger.info("  → Extracting from pre-loaded market data...")
+            temp_optimizer = BESSOptimizerModelIII(alpha=ALPHA, use_afrr_ev_weighting=USE_AFRR_EV_WEIGHTING)
+            country_data = temp_optimizer.extract_country_data(full_market_data, country)
+            logger.info(f"  → Extracted {country} data with {len(country_data.columns)} price columns")
+        elif PREPROCESSED_DATA_READY:
+            # Load from preprocessed parquet (development fast path)
+            logger.info("  → Loading from preprocessed parquet (fast path)...")
+            preprocessed_dir = project_root / "data" / "parquet" / "preprocessed"
+            country_data = load_preprocessed_country_data(country, data_dir=preprocessed_dir)
+            logger.info(f"  → Loaded preprocessed data")
+        else:
+            raise ValueError("No market data available. full_market_data must be provided when PREPROCESSED_DATA_READY=False")
 
         # Slice to test duration
         duration_timesteps = TEST_DURATION_DAYS * 96
@@ -204,11 +268,11 @@ def run_scenario(country, c_rate, logger):
         else:
             country_data_slice = country_data.iloc[:duration_timesteps].copy()
 
-        logger.info(f"  Loaded {len(country_data_slice)} timesteps ({TEST_DURATION_DAYS} days)")
+        logger.info(f"  → Using {len(country_data_slice)} timesteps ({TEST_DURATION_DAYS} days)")
 
         # 2. Initialize optimizer
         logger.info(f"[2/5] Initializing optimizer (Alpha={ALPHA})...")
-        optimizer = BESSOptimizerModelIII(alpha=ALPHA)
+        optimizer = BESSOptimizerModelIII(alpha=ALPHA, use_afrr_ev_weighting=USE_AFRR_EV_WEIGHTING)
 
         # Configure optimizer
         optimizer.max_as_ratio = MAX_AS_RATIO
@@ -397,12 +461,14 @@ def main():
     logger.info("=" * 80)
     logger.info("BATCH EXECUTION: FINAL SUBMISSION RESULTS")
     logger.info("=" * 80)
+    logger.info(f"Data mode: {'Preprocessed parquet' if PREPROCESSED_DATA_READY else 'Excel (TechArena2025_Phase2_data.xlsx)'}")
     logger.info(f"Total scenarios: {len(SCENARIOS)}")
     logger.info(f"Test duration: {TEST_DURATION_DAYS} days")
     logger.info(f"Alpha: {ALPHA}")
     logger.info(f"MPC Settings: {HORIZON_HOURS}h horizon / {EXECUTION_HOURS}h execution")
     logger.info(f"Solver: {DEFAULT_SOLVER}")
     logger.info(f"Output directory: {BASE_OUTPUT_DIR}")
+    logger.info(f"Generate CSV: {GENERATE_COMPETITION_CSV and not SKIP_CSV_EXPORT}")
     logger.info("=" * 80)
     logger.info("")
 
@@ -410,10 +476,32 @@ def main():
     print("=" * 60)
     print("BATCH EXECUTION: FINAL SUBMISSION")
     print("=" * 60)
+    print(f"Data: {'Parquet (fast)' if PREPROCESSED_DATA_READY else 'Excel (competition)'}")
     print(f"Scenarios: {len(SCENARIOS)} ({TEST_DURATION_DAYS} days each)")
     print(f"Solver: {DEFAULT_SOLVER} | Horizon: {HORIZON_HOURS}h / Exec: {EXECUTION_HOURS}h")
     print(f"Output: {BASE_OUTPUT_DIR}/")
     print("=" * 60)
+
+    # Load full market data once if using Excel mode
+    full_market_data = None
+    if not PREPROCESSED_DATA_READY:
+        logger.info("\n" + "=" * 80)
+        logger.info("LOADING MARKET DATA FROM EXCEL")
+        logger.info("=" * 80)
+        excel_path = project_root / INPUT_EXCEL_PATH
+        logger.info(f"Loading from: {excel_path}")
+
+        if not excel_path.exists():
+            logger.error(f"Excel file not found: {excel_path}")
+            raise FileNotFoundError(f"Excel file not found: {excel_path}")
+
+        # Use optimizer's data loading method
+        temp_optimizer = BESSOptimizerModelIII(alpha=ALPHA, use_afrr_ev_weighting=USE_AFRR_EV_WEIGHTING)
+        full_market_data = temp_optimizer.load_and_preprocess_data(str(excel_path))
+        logger.info(f"[OK] Loaded {len(full_market_data)} timesteps for all countries")
+        logger.info(f"[OK] Countries available: {list(set([col[0] for col in full_market_data.columns]))}")
+        logger.info(f"[OK] aFRR EV weighting: {USE_AFRR_EV_WEIGHTING}")
+        logger.info("=" * 80)
 
     # Execute all scenarios
     batch_start = time.time()
@@ -427,7 +515,7 @@ def main():
         # Console progress
         print(f"\n[{i}/{len(SCENARIOS)}] {country} @ C-rate {c_rate}...", flush=True)
 
-        result = run_scenario(country, c_rate, logger)
+        result = run_scenario(country, c_rate, logger, full_market_data)
         results_list.append(result)
 
         # Brief summary
@@ -472,7 +560,133 @@ def main():
             logger.info(f"  - {row['country']} @ C-rate {row['c_rate']}: {row['error']}")
 
     logger.info(f"\nBatch summary saved to: {summary_csv_path}")
-    logger.info("=" * 80)
+
+    # Generate competition CSV files
+    if GENERATE_COMPETITION_CSV and not SKIP_CSV_EXPORT and n_success > 0:
+        logger.info("\n" + "=" * 80)
+        logger.info("GENERATING COMPETITION CSV FILES")
+        logger.info("=" * 80)
+
+        try:
+            # Import conversion functions
+            from py_script.submission.convert_results import (
+                load_result_from_directory,
+                convert_operation_file,
+                calculate_10year_roi,
+                WACC, INFLATION, BATTERY_CAPACITY_KWH
+            )
+            from py_script.mpc.transform_mpc_results import transform_mpc_results_for_viz
+
+            # Create output directory
+            output_dir = project_root / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Load results from submission_results directories
+            logger.info("[1/3] Loading results from scenario directories...")
+            loaded_results = []
+            for _, row in successful_results.iterrows():
+                # Find scenario directory
+                scenario_pattern = f"*{row['country'].lower()}*crate{row['c_rate']}*"
+                matches = list((project_root / BASE_OUTPUT_DIR).glob(scenario_pattern))
+                if matches:
+                    scenario_dir = matches[0]
+                    try:
+                        result_data = load_result_from_directory(scenario_dir)
+                        loaded_results.append(result_data)
+                        logger.info(f"  [OK] Loaded: {result_data['country']} @ C-rate {result_data['c_rate']}")
+                    except Exception as e:
+                        logger.warning(f"  [SKIP] {scenario_dir.name}: {e}")
+
+            if not loaded_results:
+                logger.error("No results could be loaded for CSV generation!")
+            else:
+                logger.info(f"[OK] Loaded {len(loaded_results)} scenario results")
+
+                # Generate Operation CSV (combined file)
+                logger.info("\n[2/3] Generating Operation CSV...")
+                operation_rows = []
+                for result in loaded_results:
+                    operation_df = convert_operation_file(result['solution_df'])
+                    operation_df['Country'] = result['country']
+                    operation_df['C-rate'] = result['c_rate']
+                    operation_rows.append(operation_df)
+
+                combined_operation_df = pd.concat(operation_rows, ignore_index=True)
+                operation_csv_path = output_dir / "TechArena_Phase2_Operation.csv"
+                combined_operation_df.to_csv(operation_csv_path, index=False)
+                logger.info(f"  [SAVED] {operation_csv_path} ({len(combined_operation_df)} rows)")
+
+                # Generate Configuration CSV
+                logger.info("\n[3/3] Generating Configuration & Investment CSVs...")
+                config_rows = []
+                investment_rows = []
+
+                # Group by country
+                country_results = {}
+                for result in loaded_results:
+                    country = result['country']
+                    if country not in country_results:
+                        country_results[country] = []
+                    country_results[country].append(result)
+
+                for country, country_res in sorted(country_results.items()):
+                    # Configuration data
+                    for result in sorted(country_res, key=lambda x: x['c_rate']):
+                        c_rate = result['c_rate']
+                        perf = result['performance']
+
+                        battery_power_mw = BATTERY_CAPACITY_KWH * c_rate / 1000
+                        annual_profit = perf['total_profit_eur']
+                        yearly_profit_per_mw = (annual_profit / battery_power_mw) / 1000
+
+                        roi_percent, _ = calculate_10year_roi(annual_profit, country)
+
+                        cyclic_cost = perf.get('degradation_cyclic_eur', 0)
+                        num_cycles = cyclic_cost / 100 if cyclic_cost > 0 else 0
+
+                        config_rows.append({
+                            'Country': country,
+                            'C-rate': c_rate,
+                            'number of cycles': round(num_cycles, 2),
+                            'yearly profits [kEUR/MW]': round(yearly_profit_per_mw, 2),
+                            'levelized ROI [%]': round(roi_percent, 2)
+                        })
+
+                    # Investment data (best C-rate per country)
+                    best_result = max(country_res, key=lambda x: x['performance']['total_profit_eur'])
+                    annual_profit = best_result['performance']['total_profit_eur']
+                    c_rate = best_result['c_rate']
+                    roi_percent, years_df = calculate_10year_roi(annual_profit, country)
+
+                    investment_rows.append({
+                        'Country': country,
+                        'WACC': WACC[country],
+                        'Inflation Rate': INFLATION[country],
+                        'Discount Rate': WACC[country],
+                        'Yearly Profits (2024) [kEUR]': annual_profit / 1000,
+                        'Best C-rate': c_rate,
+                        'Levelized ROI [%]': round(roi_percent, 2),
+                        'Total Investment [kEUR]': BATTERY_CAPACITY_KWH * 200 / 1000
+                    })
+
+                config_df = pd.DataFrame(config_rows)
+                config_csv_path = output_dir / "TechArena_Phase2_Configuration.csv"
+                config_df.to_csv(config_csv_path, index=False)
+                logger.info(f"  [SAVED] {config_csv_path} ({len(config_df)} rows)")
+
+                investment_df = pd.DataFrame(investment_rows)
+                investment_csv_path = output_dir / "TechArena_Phase2_Investment.csv"
+                investment_df.to_csv(investment_csv_path, index=False)
+                logger.info(f"  [SAVED] {investment_csv_path} ({len(investment_df)} rows)")
+
+                logger.info("\n[OK] All competition CSV files generated successfully!")
+
+        except Exception as e:
+            logger.error(f"[ERROR] CSV generation failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    logger.info("\n" + "=" * 80)
     logger.info("BATCH EXECUTION COMPLETE")
     logger.info("=" * 80)
 
@@ -487,6 +701,13 @@ def main():
         print(f"Total Profit: €{successful_results['profit'].sum():,.0f}")
         print(f"Avg Profit: €{successful_results['profit'].mean():,.0f}")
     print(f"Results: {summary_csv_path}")
+    if GENERATE_COMPETITION_CSV and not SKIP_CSV_EXPORT and n_success > 0:
+        print(f"\nCompetition CSV files saved to: output/")
+        print("  - TechArena_Phase2_Operation.csv")
+        print("  - TechArena_Phase2_Configuration.csv")
+        print("  - TechArena_Phase2_Investment.csv")
+    print("\nTo analyze and plot results, run:")
+    print("  python notebook/py_version/p2d_results_ana.py")
     print("=" * 60)
 
     return summary_df
