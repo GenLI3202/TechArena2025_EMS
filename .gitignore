@@ -29,6 +29,7 @@ doc/*.synctex.gz
 validation_results/**/*.html
 submission_results/
 
+
 # Large JSONL data files (200K+ lines)
 
 **/TechArena2025_data_tidy.jsonl
@@ -44,6 +45,8 @@ submission_results/
 # Large Excel files from validation tests
 ValidationTest_*/TechArena_Phase1_Operation.xlsx
 **/vali_TechArena_Phase1_*.xlsx
+SoloGen_Phase2_Submission/output
+
 
 # Temporary and backup files
 *_backup.md
