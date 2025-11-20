@@ -121,11 +121,11 @@ class BESSOptimizerModelI:
         try:
             with open(solver_config_path, 'r') as f:
                 solver_config = json.load(f)
-            solver_time_limit = solver_config.get('solver_time_limit_sec', 600)
+            solver_time_limit = solver_config.get('solver_time_limit_sec', 1200)
             self.solver_config = solver_config
         except Exception as e:
-            logger.warning(f"Failed to load solver config: {e}. Using default timeout 600s")
-            solver_time_limit = 600
+            logger.warning(f"Failed to load solver config: {e}. Using default timeout 1200s")
+            solver_time_limit = 1200
             self.solver_config = {}
 
         # Market parameters
@@ -301,6 +301,12 @@ class BESSOptimizerModelI:
 
         processed_dfs = []
 
+        # CRITICAL: Normalize all timestamps to minute precision to handle Excel microsecond drift
+        # Excel has inconsistent seconds/microseconds (00:00:00.5, 00:00:01, 00:15:00.005, etc.)
+        # This causes reindex mismatches between 15-min and 4-hour block timestamps
+        for market_key in market_tables:
+            market_tables[market_key]['timestamp'] = pd.to_datetime(market_tables[market_key]['timestamp']).dt.floor('min')
+
         # Process day-ahead data (15-min intervals)
         if 'day_ahead' in market_tables:
             da_df = market_tables['day_ahead'].set_index('timestamp')
@@ -315,7 +321,7 @@ class BESSOptimizerModelI:
         # Process FCR data (4-hour blocks -> need to expand to 15-min)
         if 'fcr' in market_tables:
             fcr_df = market_tables['fcr'].set_index('timestamp')
-            # Reindex to 15-min and forward fill
+            # Reindex to 15-min and forward fill (timestamps now aligned to minute precision)
             full_index = market_tables['day_ahead'].set_index('timestamp').index
             fcr_expanded = fcr_df.reindex(full_index).ffill()
             # Create MultiIndex: (country, 'fcr', '')
@@ -384,22 +390,22 @@ class BESSOptimizerModelI:
 
         return combined_df
     
-    def build_optimization_model(self, country_data: pd.DataFrame,
-                               c_rate: float, daily_cycle_limit: float = 2.0) -> pyo.ConcreteModel:
+    def build_optimization_model(self, country_data: pd.DataFrame, 
+                               c_rate: float, daily_cycle_limit: float) -> pyo.ConcreteModel:
         """
         Build the improved optimization model addressing all critical issues.
-
+        
         Key improvements:
         1. Pre-computed block mappings for O(1) lookup
         2. AS prices indexed by block instead of time
         3. Constraint functions use model parameters only
         4. Comprehensive validation
-
+        
         Args:
             country_data: Market data for specific country
             c_rate: C-rate configuration (power to energy ratio)
-            daily_cycle_limit: Daily cycle limit (default: 2.0)
-
+            daily_cycle_limit: Daily cycle limit
+            
         Returns:
             pyo.ConcreteModel: Improved optimization model
         """

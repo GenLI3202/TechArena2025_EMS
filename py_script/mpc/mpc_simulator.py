@@ -37,6 +37,7 @@ import pandas as pd
 import numpy as np
 import pyomo.environ as pyo
 import logging
+import time
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -369,12 +370,14 @@ class MPCSimulator:
 
             # Log progress
             progress_pct = 100 * t_start / self.total_steps
+            total_iterations = (self.total_steps - 1) // self.execution_steps + 1
+            iteration_start_time = time.time()
+
             logger.info("")
-            logger.info("─" * 80)
-            logger.info("MPC Iteration %d | Progress: %.1f%% | Time step: %d / %d",
-                       iteration, progress_pct, t_start, self.total_steps)
-            logger.info("  Horizon: [%d, %d) | Execution: [%d, %d)",
-                       t_start, t_end_horizon, t_start, t_end_execution)
+            logger.info("=" * 80)
+            logger.info(">>> MPC Iteration %d/%d | Progress: %.1f%% | Time step: %d-%d <<<",
+                       iteration, total_iterations, progress_pct, t_start, t_end_execution)
+            logger.info("=" * 80)
 
             # 1. Slice data for this window
             data_window = self.full_data.iloc[t_start:t_end_horizon].copy()
@@ -382,7 +385,7 @@ class MPCSimulator:
 
             # 2. Get initial segment SOC from current total SOC
             initial_segment_soc = self._get_initial_segment_soc(current_total_soc)
-            logger.info("  Initial SOC: %.2f kWh (%.1f%%)",
+            logger.debug("  Initial SOC: %.2f kWh (%.1f%%)",
                        current_total_soc,
                        100 * current_total_soc / self.battery_params['capacity_kwh'])
 
@@ -393,7 +396,7 @@ class MPCSimulator:
                 # NOTE: optimizer expects FRACTION (0-1), not absolute kWh!
                 initial_soc_fraction = current_total_soc / self.battery_params['capacity_kwh']
                 self.optimizer.battery_params['initial_soc'] = initial_soc_fraction
-                logger.info("  Set battery_params['initial_soc'] = %.4f (%.2f kWh) for this iteration",
+                logger.debug("  Set battery_params['initial_soc'] = %.4f (%.2f kWh) for this iteration",
                            initial_soc_fraction, current_total_soc)
 
                 # Build model
@@ -423,17 +426,21 @@ class MPCSimulator:
                                 logger.debug("    Fixed z_segment_active[0,%d] = 0 (empty)", j)
 
                 # Solve
+                logger.info("  Solving iteration %d/%d...", iteration, total_iterations)
                 solved_model, solver_results = self.optimizer.solve_model(model, solver_name=self.solver_name)
                 solution = self.optimizer.extract_solution(solved_model, solver_results)
 
+                iteration_solve_time = time.time() - iteration_start_time
+
                 if solution['status'] not in ['optimal', 'feasible']:
-                    logger.error("Solver failed at iteration %d: %s",
-                               iteration, solution.get('termination_condition'))
+                    logger.error("  ✗ Iteration %d/%d FAILED: %s (%.1fs)",
+                               iteration, total_iterations,
+                               solution.get('termination_condition'), iteration_solve_time)
                     logger.error("Stopping simulation.")
                     break
 
-                logger.info("  Solve status: %s (%.2f seconds)",
-                           solution['status'], solution['solve_time'])
+                logger.info("  ✓ Iteration %d/%d SUCCESS: %s (%.1fs)",
+                           iteration, total_iterations, solution['status'], iteration_solve_time)
 
                 # Validate constraints (if enabled)
                 validation_report = None

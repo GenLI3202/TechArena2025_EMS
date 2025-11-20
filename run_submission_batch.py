@@ -80,9 +80,14 @@ from py_script.data.load_process_market_data import load_preprocessed_country_da
 # Results export
 from py_script.validation.results_exporter import save_optimization_results
 
-# Suppress verbose logging from optimizer and MPC modules (keep warnings/errors)
-logging.getLogger('py_script.core.optimizer').setLevel(logging.WARNING)
-logging.getLogger('py_script.mpc.mpc_simulator').setLevel(logging.WARNING)
+# Configure module logging levels
+logging.getLogger('py_script.core.optimizer').setLevel(logging.WARNING)  # Suppress optimizer verbose output
+logging.getLogger('py_script.mpc.mpc_simulator').setLevel(logging.INFO)  # Show MPC iteration progress
+
+# CRITICAL: Suppress Pyomo's verbose DEBUG output
+logging.getLogger('pyomo').setLevel(logging.ERROR)  # Only show Pyomo errors
+logging.getLogger('pyomo.core').setLevel(logging.ERROR)
+logging.getLogger('pyomo.opt').setLevel(logging.ERROR)
 
 # ================================================================================
 # CONFIGURATION
@@ -97,14 +102,14 @@ PREPROCESSED_DATA_READY = False
 INPUT_EXCEL_PATH = "Input/TechArena2025_Phase2_data.xlsx"
 
 # Test parameters
-TEST_DURATION_DAYS = 365  # Full year for final submission
+TEST_DURATION_DAYS = 3  # Full year for final submission
 ALPHA = 1.0  # Full degradation cost
 INITIAL_SOC_FRACTION = 0.5  # 50% initial SOC
 USE_AFRR_EV_WEIGHTING = False  # aFRR energy activation probability weighting
 
 # SOC limits (0-100% to avoid constraint bug)
-SOC_MIN = 0.0
-SOC_MAX = 1.0
+SOC_MIN = 0.1
+SOC_MAX = 0.9
 
 # Degradation settings
 REQUIRE_SEQUENTIAL = False  # Faster solving
@@ -158,7 +163,7 @@ BASE_OUTPUT_DIR = "submission_results"
 
 SCENARIOS = [
     # Round 1: C-rate 0.25
-    # # ('CH', 0.25), # DONE
+    # ('CH', 0.25), # DONE
     # ('DE_LU', 0.25), #DONE
     # ('AT', 0.25), #DONE
     # ('HU', 0.25),  #DONE
@@ -169,16 +174,15 @@ SCENARIOS = [
     # # ('CH', 0.33), #DONE
     # ('DE_LU', 0.33),  #DONE
     # ('AT', 0.33), #DONE
-    # ('HU', 0.33),  #DONE
+    ('HU', 0.33),  #DONE
     # ('CZ', 0.33), #DONE
 
     # Round 3: C-rate 0.5 (highest priority)
     # ('CH', 0.5), # DONE
-    ('DE_LU', 0.5),
-    ('AT', 0.5),
-    ('HU', 0.5),
-    ('CZ', 0.5),
-
+    # ('DE_LU', 0.5),
+    # ('AT', 0.5),
+    # ('HU', 0.5),
+    # ('CZ', 0.5),
 
 ]
 
@@ -188,26 +192,56 @@ SCENARIOS = [
 TIMENOW_STR = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 def setup_logging():
-    """Setup logging: detailed file logs, errors-only to console"""
+    """Setup logging: detailed file logs + MPC progress to console"""
     log_file = project_root / BASE_OUTPUT_DIR / f"batch_execution_{TIMENOW_STR}.log"
-    # Create logger
-    logger = logging.getLogger('batch_executor')
-    logger.setLevel(logging.INFO)
 
-    # File handler - detailed logs
+    # Configure root logger to capture all module logs
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)  # Changed from DEBUG to INFO to reduce console noise
+
+    # File handler - detailed logs (INFO and above - no DEBUG spam)
     fh = logging.FileHandler(log_file, mode='w')
-    fh.setLevel(logging.INFO)
+    fh.setLevel(logging.INFO)  # Changed from DEBUG - we don't need Pyomo's DEBUG spam
     file_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
+        '%(asctime)s - %(levelname)s - %(name)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     fh.setFormatter(file_formatter)
-    logger.addHandler(fh)
+    root_logger.addHandler(fh)
 
-    # Console handler - errors only (no duplicate INFO messages)
+    # Console handler - show MPC iteration progress (INFO) + errors
     ch = logging.StreamHandler()
-    ch.setLevel(logging.ERROR)
-    logger.addHandler(ch)
+    ch.setLevel(logging.INFO)
+    console_formatter = logging.Formatter('%(message)s')  # Clean format for console
+    ch.setFormatter(console_formatter)
+
+    # Create filter to only show MPC iteration messages on console
+    class MPCProgressFilter(logging.Filter):
+        def filter(self, record):
+            # Show messages from MPC simulator
+            if record.name == 'py_script.mpc.mpc_simulator':
+                # Show iteration headers, solving messages, and success/failure
+                return any(keyword in record.getMessage() for keyword in [
+                    '>>> MPC Iteration',
+                    'Solving iteration',
+                    '✓ Iteration',
+                    '✗ Iteration',
+                    '=======',
+                    'MPC SIMULATOR INITIALIZED',
+                    'STARTING FULL-YEAR MPC'
+                ])
+            # Show batch executor INFO messages
+            if record.name == 'batch_executor':
+                return record.levelno >= logging.INFO
+            # Show all ERROR/CRITICAL from any module
+            return record.levelno >= logging.ERROR
+
+    ch.addFilter(MPCProgressFilter())
+    root_logger.addHandler(ch)
+
+    # Create batch executor logger
+    logger = logging.getLogger('batch_executor')
+    logger.setLevel(logging.INFO)
 
     return logger
 # %%

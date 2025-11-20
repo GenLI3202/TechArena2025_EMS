@@ -94,16 +94,21 @@ def transform_mpc_results_for_viz(
             f"{len(country_data)} rows. Cannot align data."
         )
 
-    # Add timestamp column from country_data
-    viz_df['timestamp'] = country_data['timestamp'].iloc[:len(viz_df)].values
+    # CRITICAL FIX: Align prices by timestep index, not sequential order
+    # MPC total_bids_df uses 'timestep' column that corresponds to country_data row indices
+    # We must use timestep values to correctly index into country_data
+    timesteps = viz_df['timestep'].values
 
-    # Add market prices for visualization (align by length)
-    viz_df['price_day_ahead'] = country_data['price_day_ahead'].iloc[:len(viz_df)].values
-    viz_df['price_fcr'] = country_data['price_fcr'].iloc[:len(viz_df)].values
-    viz_df['price_afrr_pos'] = country_data['price_afrr_pos'].iloc[:len(viz_df)].values
-    viz_df['price_afrr_neg'] = country_data['price_afrr_neg'].iloc[:len(viz_df)].values
-    viz_df['price_afrr_energy_pos'] = country_data['price_afrr_energy_pos'].iloc[:len(viz_df)].values
-    viz_df['price_afrr_energy_neg'] = country_data['price_afrr_energy_neg'].iloc[:len(viz_df)].values
+    # Add timestamp column from country_data (aligned by timestep index)
+    viz_df['timestamp'] = country_data['timestamp'].iloc[timesteps].values
+
+    # Add market prices for visualization (aligned by timestep index)
+    viz_df['price_day_ahead'] = country_data['price_day_ahead'].iloc[timesteps].values
+    viz_df['price_fcr'] = country_data['price_fcr'].iloc[timesteps].values
+    viz_df['price_afrr_pos'] = country_data['price_afrr_pos'].iloc[timesteps].values
+    viz_df['price_afrr_neg'] = country_data['price_afrr_neg'].iloc[timesteps].values
+    viz_df['price_afrr_energy_pos'] = country_data['price_afrr_energy_pos'].iloc[timesteps].values
+    viz_df['price_afrr_energy_neg'] = country_data['price_afrr_energy_neg'].iloc[timesteps].values
 
     # NOTE: Capacity bids (c_fcr, c_afrr_pos, c_afrr_neg) are already in total_bids_df from MPC
     # DO NOT overwrite them here!
