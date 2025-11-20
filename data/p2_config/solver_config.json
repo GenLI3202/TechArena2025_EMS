@@ -1,5 +1,5 @@
 {
-  "default_solver": "highs",
+  "default_solver": "gurobi",
   "solver_time_limit_sec": 1200,
   "solver_options": {
     "gurobi": {

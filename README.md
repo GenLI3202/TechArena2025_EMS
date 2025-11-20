@@ -505,3 +505,30 @@ See `LICENSE` file for details.
 - **Huawei Technologies** - Competition organization and technical specifications
 - **Pyomo Development Team** - Optimization modeling framework
 - **COIN-OR CBC** - Open-source MILP solver
+
+
+
+
+```
+TechArena2025_EMS/
+├── data/                         # market data and Configuration files for battery aging models
+├── doc/                          # Project documentation, mathematical formulations, literature
+├── notebook/                     # Jupyter notebooks for data exploration, analysis, and prototyping
+notebooks for various analyses
+├── py_script/                    # Main Python package for the BESS optimizer
+│   ├── core/                     # Core optimization logic (REFACTORED)
+│   │   ├── __init__.py
+│   │   ├── optimizer.py          # Main optimization models with clean solve/extract separation
+│   │   └── investment/           # Investment analysis and DCF calculations
+│   ├── data/                     # Data loading and processing
+│   ├── mpc/                      # Model Predictive Control (MPC) implementation
+│   ├── test/                     # Unit and integration tests
+│   ├── validation/               # General-purpose validation utilities (NEW)
+│   └── visualization/            # Plotting and visualization tools
+├── validation_results/           # Outputs from validation runs
+├── .gitignore
+├── CLAUDE.md
+├── LICENSE
+├── README.md                     # Project overview (this file)
+├── requirements.txt              # Project-level Python dependencies
+```

@@ -177,19 +177,45 @@ TechArena2025_EMS/
 ├── .vscode/                      # VSCode settings
 ├── data/                         # Raw and processed market data
 │   ├── metadata.json
-│   ├── TechArena2025_Phase2_data.xlsx
-│   ├── aging_config/             # Configuration files for battery aging models
+│   ├── TechArena2025_Phase2_data.xlsx  # Official Phase 2 market data (Excel)
+│   ├── p2_config/                # Configuration files for Phase 2 models
+│   │   ├── aging_config.json     # Cyclic & calendar aging parameters
+│   │   ├── solver_config.json    # Solver settings (HiGHS, Gurobi, CPLEX, CBC, GLPK)
+│   │   ├── afrr_ev_weights_config.json  # aFRR activation probabilities
+│   │   ├── mpc_config.json       # MPC horizon/execution settings
+│   │   ├── mpc_test_config.json  # MPC testing configurations
+│   │   └── investment.json       # Investment analysis parameters
 │   ├── archive_p1_3markets/      # Archived Phase 1 data
-│   ├── json/                     # Processed market data in JSON format
+│   ├── json/                     # Processed market data in JSON format (legacy)
 │   └── parquet/                  # Processed market data in Parquet format
+│       ├── day_ahead.parquet     # DA prices (all countries, 15-min intervals)
+│       ├── fcr.parquet           # FCR capacity prices (4-hour blocks)
+│       ├── afrr_capacity.parquet # aFRR capacity prices (4-hour blocks)
+│       ├── afrr_energy.parquet   # aFRR energy prices (15-min intervals)
+│       └── preprocessed/         # Country-specific combined data (validation fast path)
+│           ├── de_lu.parquet     # Germany/Luxembourg (all 4 markets combined)
+│           ├── at.parquet        # Austria
+│           ├── ch.parquet        # Switzerland
+│           ├── hu.parquet        # Hungary
+│           └── cz.parquet        # Czech Republic
 ├── doc/                          # Project documentation, mathematical formulations, literature
 │   ├── Pyomo_OptModelingInPython_3rdVersion.pdf
 │   ├── whole_project_description.md
 │   ├── dev_log/                  # Development logs and plans
 │   ├── Literature/               # Relevant research papers
 │   ├── official_instruction_docs/# Official competition documents
-│   └── p2_model/                 # Phase 2 model formulations (LaTeX, PDF)
+│   ├── p2_model/                 # Phase 2 model formulations (LaTeX, PDF)
+│   │   └── p2_bi_model_ggdp.pdf  # Model III full mathematical formulation
+│   └── pre_slides/               # Presentation materials
 ├── notebook/                     # Jupyter notebooks for data exploration, analysis, and prototyping
+│   ├── py_version/               # Python script versions of notebooks (production-ready)
+│   │   ├── p2a_market_data.py           # Data loading & preprocessing demos
+│   │   ├── p2b_optimizer_interactive.py # Single optimization with plots & reload feature
+│   │   ├── p2c_model_comparison.py      # Compare Model I/II/III performance
+│   │   ├── p2c_mpc_interactive.py       # MPC simulation with visualization
+│   │   ├── p2d_results_ana.py           # Batch results analysis & comparison
+│   │   ├── p2e_alpha_meta_optimization.py # Alpha parameter tuning
+│   │   └── mpc_results_interactive.py   # MPC results deep-dive analysis
 │   ├── p1_final_validation.ipynb
 │   ├── p2a_market_data.ipynb
 │   ├── p2b_optimizer.ipynb
@@ -199,26 +225,29 @@ TechArena2025_EMS/
 ├── py_script/                    # Main Python package for the BESS optimizer
 │   ├── README.md                 # Detailed README for the Python package
 │   ├── requirements.txt          # Python package dependencies
-│   ├── core/                     # Core optimization logic (REFACTORED)
+│   ├── core/                     # Core optimization logic
 │   │   ├── __init__.py
 │   │   ├── optimizer.py          # Main optimization models with clean solve/extract separation
 │   │   │                         # - BESSOptimizerModelI: Base 4-market optimization
 │   │   │                         # - BESSOptimizerModelII: + Cyclic aging cost
-│   │   │                         # - BESSOptimizerModelIII: + Calendar aging cost
+│   │   │                         # - BESSOptimizerModelIII: + Calendar aging (Phase 2 final)
 │   │   └── investment/           # Investment analysis and DCF calculations
 │   ├── data/                     # Data loading and processing
 │   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── load_process_market_data.py
+│   │   ├── config.py             # Data loading configuration
+│   │   ├── load_process_market_data.py         # Dual-path loading (Excel/parquet)
+│   │   ├── generate_preprocessed_country_data.py  # Preprocessing pipeline
 │   │   └── visualize_market_data.py
 │   ├── mpc/                      # Model Predictive Control (MPC) implementation
-│   │   ├── meta_optimizer.py
-│   │   └── mpc_simulator.py
+│   │   ├── __init__.py
+│   │   ├── mpc_simulator.py      # Rolling horizon MPC controller
+│   │   ├── meta_optimizer.py     # Alpha parameter meta-optimization
+│   │   └── transform_mpc_results.py  # MPC results transformation for visualization
 │   ├── test/                     # Unit and integration tests
 │   │   ├── __init__.py
 │   │   ├── test_optimizer_core.py    # Formal pytest unit tests
 │   │   ├── run_36h_hu_winter.py      # Example validation script (legacy)
-│   │   └── test_single_32h_vs_mpc.py # Example comparison script 
+│   │   ├── test_single_32h_vs_mpc.py # Example comparison script
 │   │   ├── README.md             # Comprehensive validation utilities guide
 │   │   ├── run_optimization.py   # General CLI runner (replaces hardcoded scripts)
 │   │   ├── compare_optimizations.py  # General comparison framework
@@ -226,18 +255,34 @@ TechArena2025_EMS/
 │   │   └── constraint_validator.py   # Constraint verification utilities
 │   └── visualization/            # Plotting and visualization tools
 │       ├── __init__.py
-│       ├── config.py
-│       ├── optimization_analysis.py  # Standard 4-plot suite
-│       └── aging_analysis.py         # Degradation-specific visualizations
+│       ├── config.py             # McKinsey color palette & styling constants
+│       ├── optimization_analysis.py  # Standard 4-plot suite for single runs
+│       └── aging_analysis.py         # Degradation visualizations (cyclic, calendar)
 ├── validation_results/           # Outputs from validation runs
-│   ├── market_data_analysis/
-│   ├── optimizer_validation/
-│   └── mpc_validation/
+│   ├── market_data_analysis/     # Market data exploration plots
+│   ├── optimizer_validation/     # Single optimization results
+│   │   └── YYYYMMDD_HHMMSS_*/    # Timestamped run directories
+│   │       ├── solution_timeseries.csv       # Full decision variable timeseries
+│   │       ├── performance_summary.json      # Profit, revenue, costs, solver status
+│   │       ├── iteration_summary.csv         # MPC iteration metrics (if MPC run)
+│   │       └── plots/                        # HTML/PNG visualizations
+│   │           ├── soc_and_power_bids.html
+│   │           ├── calendar_aging_curve.html
+│   │           ├── da_market_price_bid.html
+│   │           └── ...
+│   └── mpc_validation/           # MPC simulation results
+├── submission_results/           # Final batch execution results for submission
+│   └── YYYYMMDD_HHMMSS_*/        # Batch run directories (15 scenarios)
+│       ├── batch_summary.csv     # All scenarios comparison
+│       ├── COUNTRY_crateX.X/     # Individual scenario results
+│       └── analysis_report.md    # Summary and insights
+├── SoloGen_Phase2_Submission/    # Clean submission package (git submodule)
 ├── .gitignore
-├── CLAUDE.md
+├── CLAUDE.md                     # Instructions for Claude Code assistant
 ├── LICENSE
 ├── README.md                     # Project overview (this file)
 ├── requirements.txt              # Project-level Python dependencies
+└── run_submission_batch.py       # Batch execution script for all 15 scenarios
 ```
 
 - **Implementation Details:** See `py_script/README.md`
@@ -550,3 +595,4 @@ See `LICENSE` file for details.
 - **Huawei Technologies** - Competition organization and technical specifications
 - **Pyomo Development Team** - Optimization modeling framework
 - **COIN-OR CBC** - Open-source MILP solver
+- **HiGHS Development Team** - Open-source high-performance LP/MILP solver

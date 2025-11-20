@@ -359,10 +359,10 @@ def plot_calendar_aging_curve(
             mode='markers',
             name='Optimization Results',
             marker=dict(
-                size=6,
-                color=MCKINSEY_COLORS['navy'],
-                opacity=0.6,
-                line=dict(width=0.5, color='white')
+                size=10,  # Increased from 6 to 10 for better visibility
+                color=MCKINSEY_COLORS['dark_blue'],  # McKinsey dark blue (#2f4b7c)
+                opacity=0.7,  # Slightly increased opacity
+                line=dict(width=1, color='white')  # Slightly thicker border
             ),
             hovertemplate='SOC: %{x:.2f} kWh<br>Cost: %{y:.4f} EUR/hr<extra></extra>'
         )
@@ -384,7 +384,7 @@ def plot_calendar_aging_curve(
                     mode='markers+lines',
                     name='Theoretical Breakpoints',
                     marker=dict(
-                        size=10,
+                        size=14,  # Increased from 10 to 14 for better visibility
                         color=MCKINSEY_COLORS['teal'],
                         symbol='diamond',
                         line=dict(width=2, color='white')
@@ -420,9 +420,9 @@ def plot_calendar_aging_curve(
     fig.add_annotation(
         text="Expected: Convex piecewise-linear curve with higher cost at higher SOC",
         xref="paper", yref="paper",
-        x=0.5, y=-0.12,
+        x=0.5, y=-0.18,  # Moved lower from -0.12 to -0.18 to avoid overlap with x-axis label
         showarrow=False,
-        font=dict(size=10, color=MCKINSEY_COLORS['gray_dark']),
+        font=dict(size=11, color=MCKINSEY_COLORS['gray_dark']),  # Slightly larger font
         xanchor='center'
     )
 

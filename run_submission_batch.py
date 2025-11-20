@@ -99,7 +99,7 @@ logging.getLogger('pyomo.opt').setLevel(logging.ERROR)
 PREPROCESSED_DATA_READY = False
 
 # Input data path (used only if PREPROCESSED_DATA_READY = False)
-INPUT_EXCEL_PATH = "Input/TechArena2025_Phase2_data.xlsx"
+INPUT_EXCEL_PATH = "Input/TechArena2025-Phase2_onsite-challenge2025.xlsx"
 
 # Test parameters
 TEST_DURATION_DAYS = 3  # Full year for final submission

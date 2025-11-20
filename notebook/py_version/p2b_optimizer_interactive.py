@@ -136,7 +136,7 @@ TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
 TEST_TIME_HORIZON_HOURS = 36        # Time horizon in hours (24h feasible with 6-segment config)
 TEST_START_STEP = int(96*132)         # Starting time step (96 = 1 day in 15-min intervals) (May 12th of CZ has interesting negative da prices)
-TEST_MODEL = "II"                  # Options: "I", "II", "III"
+TEST_MODEL = "III"                  # Options: "I", "II", "III"
 USE_EV_WEIGHTING = True            # Enable aFRR EV weighting
 MAX_AS_RATIO = 0.8                  # Max ancillary service ratio (80%)
 ENABLE_CROSS_MARKET_EXCLUSIVITY = True # Disable to reduce complexity (Cst-8)
@@ -503,6 +503,127 @@ print("=" * 80)
 print(f"Total Profit: {solution_dict['objective_value']:.2f} EUR")
 print(f"Total Time:   {build_time + solve_time:.2f}s")
 print("=" * 80)
+
+# %%
+# ============================================================================
+# RELOAD AND REPLOT FROM SAVED RESULTS
+# ============================================================================
+# Use this section to regenerate plots from previously saved results
+# without re-running the optimization.
+#
+# Instructions:
+# 1. Set RELOAD_MODE = True
+# 2. Set SAVED_RESULTS_DIR to the path of your saved results
+# 3. Run this cell to regenerate all plots from saved CSV
+
+RELOAD_MODE = True  # Set to True to enable reload mode
+SAVED_RESULTS_DIR = project_root / "validation_results" / "optimizer_validation" / "20251120_071539_interactive_modeliii_cz_36h_eps0"
+
+
+if RELOAD_MODE:
+    import json
+
+    print("\n" + "=" * 80)
+    print("[RELOAD MODE] Loading saved results...")
+    print("=" * 80)
+
+    # Resolve path relative to project root
+    if not Path(SAVED_RESULTS_DIR).is_absolute():
+        saved_dir = Path.cwd() / SAVED_RESULTS_DIR
+    else:
+        saved_dir = Path(SAVED_RESULTS_DIR)
+    if not saved_dir.exists():
+        print(f"❌ Error: Directory not found: {saved_dir}")
+    else:
+        # Load solution timeseries
+        timeseries_path = saved_dir / "solution_timeseries.csv"
+        performance_path = saved_dir / "performance_summary.json"
+
+        if not timeseries_path.exists():
+            print(f"❌ Error: File not found: {timeseries_path}")
+        elif not performance_path.exists():
+            print(f"❌ Error: File not found: {performance_path}")
+        else:
+            # Load the CSV
+            print(f"Loading: {timeseries_path}")
+            reload_df = pd.read_csv(timeseries_path)
+
+            # Load performance summary to get config info
+            print(f"Loading: {performance_path}")
+            with open(performance_path, 'r') as f:
+                perf_summary = json.load(f)
+
+            # Reconstruct solution_dict format needed by plot functions
+            # Extract calendar aging data if available
+            reload_solution_dict = {
+                'objective_value': perf_summary.get('total_profit', 0.0),
+                'status': perf_summary.get('solver_status', 'Unknown'),
+            }
+
+            # Check if calendar aging columns exist (Model III only)
+            cal_cost_cols = [col for col in reload_df.columns if col.startswith('c_cal_cost_')]
+            if cal_cost_cols:
+                # Extract calendar costs from the CSV
+                # Column format: c_cal_cost_0, c_cal_cost_1, ..., c_cal_cost_4
+                reload_solution_dict['c_cal_cost'] = {}
+                for col in cal_cost_cols:
+                    timestep_idx = int(col.split('_')[-1])
+                    reload_solution_dict['c_cal_cost'][timestep_idx] = reload_df[col].tolist()
+
+                # Extract SOC values
+                if 'e_soc' in reload_df.columns:
+                    reload_solution_dict['e_soc'] = reload_df['e_soc'].tolist()
+
+                print(f"✅ Loaded {len(reload_df)} timesteps from saved results")
+                print(f"   Total Profit: {reload_solution_dict['objective_value']:.2f} EUR")
+                print(f"   Solver Status: {reload_solution_dict['status']}")
+
+                # Create plots directory for reloaded results
+                reload_plots_dir = saved_dir / "plots_reloaded"
+                reload_plots_dir.mkdir(exist_ok=True)
+
+                # Generate calendar aging plot
+                print("\n" + "=" * 80)
+                print("[REPLOT] Generating plots from saved data...")
+                print("=" * 80)
+
+                if reload_solution_dict['c_cal_cost']:
+                    print("\n[1/1] Calendar Aging Cost Curve...")
+                    try:
+                        # Load aging config
+                        aging_config_path = Path(r"data/p2_config/aging_config.json")
+                        with open(aging_config_path, 'r') as f:
+                            reload_aging_config = json.load(f)
+
+                        # Extract metadata for title
+                        country = perf_summary.get('country', 'Unknown')
+                        c_rate = perf_summary.get('c_rate', 'Unknown')
+                        model_name = perf_summary.get('model_type', 'Model III')
+
+                        reload_title_suffix = f"{country.upper()} | C-rate {c_rate} | {model_name}"
+
+                        fig_calendar = plot_calendar_aging_curve(
+                            reload_solution_dict,
+                            aging_config=reload_aging_config,
+                            title_suffix=reload_title_suffix,
+                        )
+                        fig_calendar.show()
+                        fig_calendar.write_html(str(reload_plots_dir / "calendar_aging_curve_reloaded.html"))
+                        print(f"   ✅ Saved: {reload_plots_dir / 'calendar_aging_curve_reloaded.html'}")
+                    except Exception as e:
+                        print(f"   ❌ Error: {e}")
+                        import traceback
+                        traceback.print_exc()
+
+                # Could add more plots here if needed (SOC, power bids, etc.)
+                # For now, focusing on calendar aging as requested
+
+                print("\n" + "=" * 80)
+                print("✅ Replot from saved results complete!")
+                print("=" * 80)
+            else:
+                print("⚠️  No calendar aging data found in saved results")
+                print("   (This is expected for Model I/II)")
 
 # %%
 # Optional: Quick parameter sweep

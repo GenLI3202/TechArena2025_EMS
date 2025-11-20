@@ -107,7 +107,7 @@ class BESSOptimizerModelI:
         """
         # Battery specifications
         self.battery_params = {
-            'capacity_kwh': 4472,
+            'capacity_kwh': 4500,
             'efficiency': 0.95,
             'soc_min': 0, # the offical QnA says in this challenge free to use from 0-100%
             'soc_max': 1,
