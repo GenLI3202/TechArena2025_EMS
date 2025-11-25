@@ -2,7 +2,7 @@
 
 > **Project Status:** Phase II Development (Round 2)
 > **Phase I Archive:** See branch `r1-static-battery` for Phase I submission
-> **Active Branch:** `p2-full-model-3-clean`
+> **Active Branch:** `p2_submission_ver`
 
 An advanced Energy Management System (EMS) that optimizes battery storage operations across multiple European electricity markets to maximize profitability while meeting operational constraints. And 
 
