@@ -724,6 +724,12 @@ print("✓ Exported: de_all_markets_q1.html")
 
 print(f"\n📁 All exports saved to: {output_dir.absolute()}")
 
+# %%
+# Develop a new feature here, add ML model to predict activation rate
+
+import numpy as np
+
+
 # %% [markdown]
 # ---
 # 
