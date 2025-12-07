@@ -134,8 +134,8 @@ CONFIGURATION NOTES:
 TEST_COUNTRY = "CZ"                 # Options: DE_LU, AT, CH, HU, CZ
 TEST_C_RATE = 0.5                   # Options: 0.25, 0.33, 0.5
 TEST_ALPHA = 1.0                    # Degradation weight
-TEST_TIME_HORIZON_HOURS = 36        # Time horizon in hours (24h feasible with 6-segment config)
-TEST_START_STEP = int(96*132)         # Starting time step (96 = 1 day in 15-min intervals) (May 12th of CZ has interesting negative da prices)
+TEST_TIME_HORIZON_HOURS = 12        # Time horizon in hours (24h feasible with 6-segment config)
+TEST_START_STEP = int(96*70)         # Starting time step (96 = 1 day in 15-min intervals) (May 12th of CZ has interesting negative da prices)
 TEST_MODEL = "III"                  # Options: "I", "II", "III"
 USE_EV_WEIGHTING = True            # Enable aFRR EV weighting
 MAX_AS_RATIO = 0.8                  # Max ancillary service ratio (80%)
@@ -285,6 +285,7 @@ print(f"[OK] Model built in {build_time:.2f} seconds")
 print(f"Variables:   {model.nvariables()}")
 print(f"Constraints: {model.nconstraints()}")
 
+
 # %%
 # ============================================================================
 # SOLVE OPTIMIZATION MODEL
@@ -341,7 +342,8 @@ print(f"\n[INFO] Solution DataFrame: {solution_df.shape}")
 # INSPECT SOLUTION (INTERACTIVE)
 # ============================================================================
 
-solution_df
+# solution_df
+# solution_df.columns
 
 # %%
 # ============================================================================
